@@ -1,0 +1,55 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  desktop:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.25.x"
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libc6-dev libgl1-mesa-dev libxcursor-dev libxi-dev \
+            libxinerama-dev libxrandr-dev libxxf86vm-dev \
+            libasound2-dev pkg-config xvfb
+      - name: Test
+        if: runner.os != 'Linux'
+        run: go test ./...
+      - name: Test under Xvfb
+        if: runner.os == 'Linux'
+        run: xvfb-run -a go test ./...
+      - run: go vet ./...
+
+  android-binding:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.25.x"
+      - name: Install Ebitengine mobile binder
+        run: go install github.com/hajimehoshi/ebiten/v2/cmd/ebitenmobile@v2.9.9
+      - name: Build Android AAR
+        run: |
+          mkdir -p build
+          ebitenmobile bind \
+            -target android \
+            -javapkg io.github.mirusu400.aram \
+            -o build/aram.aar \
+            ./mobile
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aram-frontend-android-aar
+          path: build/aram.aar
+          if-no-files-found: error

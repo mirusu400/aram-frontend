@@ -1,0 +1,15 @@
+/build/
+/dist/
+/android/.gradle/
+/android/local.properties
+/ios/DerivedData/
+*.aar
+*.xcframework
+*.apk
+*.aab
+*.test
+*.out
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
