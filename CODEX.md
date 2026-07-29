@@ -11,6 +11,8 @@ Sibling repositories:
 
 - `aram-core`: headless execution, loaders, profiles, state, debugger backend;
 - `aram-emu`: ecosystem roadmap, integration, packaging, release criteria;
+- `aram-test`: black-box corpus orchestration, compatibility deltas, and
+  failure triage;
 - `anycall_magichole`: reverse-engineering evidence and reference runtime.
 
 ## Platform split

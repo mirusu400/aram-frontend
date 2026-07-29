@@ -1,0 +1,67 @@
+package frontend
+
+import (
+	"context"
+	"testing"
+	"time"
+)
+
+type fixedPicker struct {
+	path string
+}
+
+func (picker fixedPicker) OpenFile() (string, error) {
+	return picker.path, nil
+}
+
+func (fixedPicker) OpenFirmwareDirectory(string) (string, error) {
+	return "", ErrPickerUnavailable
+}
+
+func (fixedPicker) ChooseRecent([]string) (string, error) {
+	return "", ErrPickerUnavailable
+}
+
+type openRecordingBackend struct {
+	requests chan OpenRequest
+}
+
+func (backend *openRecordingBackend) Open(
+	_ context.Context,
+	request OpenRequest,
+) (InputInfo, error) {
+	backend.requests <- request
+	return InputInfo{DisplayName: "synthetic.dat", Format: "eads"}, nil
+}
+
+func (*openRecordingBackend) State() BackendState          { return StateReady }
+func (*openRecordingBackend) Supports(BackendCommand) bool { return false }
+func (*openRecordingBackend) Execute(context.Context, BackendCommand) error {
+	return ErrBackendUnavailable
+}
+func (*openRecordingBackend) Close() error { return nil }
+
+func TestFileOpenConvergesOnBackendOpenRequest(t *testing.T) {
+	temporary := t.TempDir()
+	t.Setenv("APPDATA", temporary)
+	t.Setenv("XDG_CONFIG_HOME", temporary)
+	path := temporary + "/synthetic.dat"
+	backend := &openRecordingBackend{requests: make(chan OpenRequest, 1)}
+	shell := NewShell(backend, fixedPicker{path: path}, "")
+
+	shell.chooseFile()
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		shell.consumeResults()
+		select {
+		case request := <-backend.requests:
+			if request.Path != path || request.Firmware {
+				t.Fatalf("OpenRequest = %+v", request)
+			}
+			return
+		default:
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatal("File/Open did not reach Backend.Open")
+}

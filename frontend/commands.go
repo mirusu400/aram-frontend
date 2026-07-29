@@ -1,22 +1,48 @@
 package frontend
 
+import "fmt"
+
 type Command struct {
-	ID       string
-	Label    string
-	Shortcut string
-	Backend  BackendCommand
-	Enabled  func(*Shell) bool
-	Action   func(*Shell)
+	ID           string
+	Label        string
+	Shortcut     string
+	Backend      BackendCommand
+	Enabled      func(*Shell) bool
+	Action       func(*Shell)
+	DynamicLabel func(*Shell) string
+}
+
+func (c Command) DisplayLabel(shell *Shell) string {
+	if c.DynamicLabel != nil {
+		return c.DynamicLabel(shell)
+	}
+	return c.Label
+}
+
+func (c Command) Availability(shell *Shell) Capability {
+	if c.Enabled != nil && !c.Enabled(shell) {
+		return Capability{Reason: "This command is not available in the current frontend state"}
+	}
+	if c.Backend != "" {
+		if shell.input == nil {
+			return Capability{Reason: "Open a title or firmware input first"}
+		}
+		if capabilities, ok := shell.backend.(CapabilityBackend); ok {
+			return capabilities.Capability(c.Backend)
+		}
+		if !shell.backend.Supports(c.Backend) {
+			return Capability{Reason: "The selected backend does not support this command"}
+		}
+		return Capability{Supported: true}
+	}
+	if c.Action == nil {
+		return Capability{Reason: "This frontend command is not implemented"}
+	}
+	return Capability{Supported: true}
 }
 
 func (c Command) IsEnabled(shell *Shell) bool {
-	if c.Enabled != nil && !c.Enabled(shell) {
-		return false
-	}
-	if c.Backend != "" {
-		return shell.backend.Supports(c.Backend)
-	}
-	return c.Action != nil
+	return c.Availability(shell).Supported
 }
 
 type Menu struct {
@@ -27,6 +53,7 @@ type Menu struct {
 func defaultMenus() []Menu {
 	hasInput := func(shell *Shell) bool { return shell.input != nil }
 	hasRecent := func(shell *Shell) bool { return len(shell.settings.RecentFiles) > 0 }
+	hasFrame := func(shell *Shell) bool { return shell.currentFrame().Image != nil }
 	return []Menu{
 		{
 			Label: "File",
@@ -43,12 +70,26 @@ func defaultMenus() []Menu {
 			Commands: []Command{
 				{ID: "emu.start", Label: "Start", Shortcut: "F5", Backend: CommandStart},
 				{ID: "emu.pause", Label: "Pause / Resume", Shortcut: "F6", Backend: CommandPauseResume},
+				{ID: "emu.frame", Label: "Frame Advance", Shortcut: "F7", Backend: CommandFrame},
 				{ID: "emu.stop", Label: "Stop", Shortcut: "F8", Backend: CommandStop},
 				{ID: "emu.reset", Label: "Reset", Shortcut: "Ctrl+R", Backend: CommandReset},
-				{ID: "emu.frame", Label: "Frame Advance", Backend: CommandFrame},
 				{ID: "emu.fast_forward", Label: "Fast Forward", Backend: CommandFastForward},
-				{ID: "emu.load_state", Label: "Load State...", Shortcut: "F9", Backend: CommandLoadState},
-				{ID: "emu.save_state", Label: "Save State...", Shortcut: "F10", Backend: CommandSaveState},
+				{ID: "emu.load_state", Label: "Load State", Shortcut: "F9", Backend: CommandLoadState},
+				{ID: "emu.save_state", Label: "Save State", Shortcut: "F10", Backend: CommandSaveState},
+				{
+					ID:     "emu.state_slot",
+					Action: (*Shell).cycleStateSlot,
+					DynamicLabel: func(shell *Shell) string {
+						return fmt.Sprintf("State Slot: %d", shell.settings.StateSlot)
+					},
+				},
+				{
+					ID:     "emu.speed",
+					Action: (*Shell).cycleSpeed,
+					DynamicLabel: func(shell *Shell) string {
+						return fmt.Sprintf("Speed: %gx", shell.settings.Speed)
+					},
+				},
 				{ID: "emu.rewind", Label: "Rewind", Backend: CommandRewind},
 			},
 		},
@@ -58,32 +99,50 @@ func defaultMenus() []Menu {
 				{ID: "view.fullscreen", Label: "Toggle Fullscreen", Shortcut: "F11", Action: (*Shell).toggleFullscreen},
 				{ID: "view.integer", Label: "Integer Scaling", Action: (*Shell).toggleIntegerScaling},
 				{ID: "view.aspect", Label: "Preserve Aspect Ratio", Action: (*Shell).toggleAspectRatio},
-				{ID: "view.fit", Label: "Fit Window"},
-				{ID: "view.rotation", Label: "Rotation"},
-				{ID: "view.layout", Label: "Screen Layout"},
-				{ID: "view.filter", Label: "Filter"},
-				{ID: "view.screenshot", Label: "Screenshot"},
+				{ID: "view.fit", Label: "Fit Window", Shortcut: "Ctrl+0", Action: (*Shell).fitWindow},
+				{
+					ID:     "view.rotation",
+					Action: (*Shell).cycleRotation,
+					DynamicLabel: func(shell *Shell) string {
+						return fmt.Sprintf("Rotation: %d°", shell.settings.Rotation)
+					},
+				},
+				{
+					ID:     "view.layout",
+					Action: (*Shell).cycleScreenLayout,
+					DynamicLabel: func(shell *Shell) string {
+						return "Screen Layout: " + shell.settings.ScreenLayout
+					},
+				},
+				{
+					ID:     "view.filter",
+					Action: (*Shell).cycleFilter,
+					DynamicLabel: func(shell *Shell) string {
+						return "Filter: " + shell.settings.Filter
+					},
+				},
+				{ID: "view.screenshot", Label: "Screenshot", Shortcut: "Ctrl+Shift+S", Enabled: hasFrame, Action: (*Shell).saveScreenshot},
 			},
 		},
 		{
 			Label: "Tools",
 			Commands: []Command{
-				{ID: "tools.cheats", Label: "Cheat Manager"},
-				{ID: "tools.memory", Label: "Memory Search"},
-				{ID: "tools.patches", Label: "Patch Manager"},
-				{ID: "tools.debugger", Label: "Debugger"},
-				{ID: "tools.controller", Label: "Controller Settings"},
-				{ID: "tools.audio", Label: "Audio Settings"},
-				{ID: "tools.properties", Label: "Title Properties"},
-				{ID: "tools.compatibility", Label: "Compatibility Report"},
-				{ID: "tools.logs", Label: "Logs"},
+				{ID: "tools.cheats", Label: "Cheat Manager", Action: func(shell *Shell) { shell.openToolPanel(ToolCheats) }},
+				{ID: "tools.memory", Label: "Memory Search", Action: func(shell *Shell) { shell.openToolPanel(ToolMemory) }},
+				{ID: "tools.patches", Label: "Patch Manager", Action: func(shell *Shell) { shell.openToolPanel(ToolPatches) }},
+				{ID: "tools.debugger", Label: "Debugger", Action: func(shell *Shell) { shell.openToolPanel(ToolDebugger) }},
+				{ID: "tools.controller", Label: "Controller Settings", Action: (*Shell).openControllerPanel},
+				{ID: "tools.audio", Label: "Audio Settings", Action: (*Shell).openAudioPanel},
+				{ID: "tools.properties", Label: "Title Properties", Enabled: hasInput, Action: (*Shell).openPropertiesPanel},
+				{ID: "tools.compatibility", Label: "Compatibility Report", Enabled: hasInput, Action: (*Shell).openCompatibilityPanel},
+				{ID: "tools.logs", Label: "Logs", Action: func(shell *Shell) { shell.openToolPanel(ToolLogs) }},
 			},
 		},
 		{
 			Label: "Help",
 			Commands: []Command{
-				{ID: "help.documentation", Label: "Documentation"},
-				{ID: "help.issue", Label: "Report Issue"},
+				{ID: "help.documentation", Label: "Documentation", Action: (*Shell).openDocumentation},
+				{ID: "help.issue", Label: "Report Issue", Action: (*Shell).openIssueTracker},
 				{ID: "help.about", Label: "About ARAM", Action: (*Shell).showAbout},
 			},
 		},

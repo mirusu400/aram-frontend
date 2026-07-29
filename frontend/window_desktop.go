@@ -16,9 +16,17 @@ func togglePlatformFullscreen() string {
 	return "Fullscreen disabled"
 }
 
-func Run(backend Backend, initialPath string) error {
-	ebiten.SetWindowTitle("ARAM — Archived Runtime for ARM Mobiles")
+func fitPlatformWindow() string {
 	ebiten.SetWindowSize(logicalWidth, logicalHeight)
+	return "Window restored to 960x720"
+}
+
+func platformUsesTouchLayout() bool { return false }
+
+func Run(backend Backend, initialPath string) error {
+	ebiten.SetWindowTitle("ARAM - Archived Runtime for ARM Mobiles")
+	ebiten.SetWindowSize(logicalWidth, logicalHeight)
+	ebiten.SetWindowSizeLimits(720, 540, -1, -1)
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 	return ebiten.RunGame(NewShell(backend, NewPlatformPicker(), initialPath))
 }

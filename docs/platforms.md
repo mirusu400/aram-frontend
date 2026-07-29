@@ -30,6 +30,12 @@ Activity owns:
 The native layer passes a document handle or copied cache file to the shared
 frontend. Desktop Zenity code is excluded by build tags.
 
+The shared mobile layout provides large touch targets for persistent
+File/Emulation/View/Tools/Help navigation plus D-pad, OK, Back, Menu, and soft
+keys. Native hosts can dispatch the same stable command IDs and forward
+inactive/active lifecycle changes. The lifecycle bridge resumes only a machine
+that it automatically paused; it never overrides a manual user pause.
+
 CI binds `./mobile` into `build/aram.aar`; this prevents Android support from
 becoming an uncompiled roadmap claim.
 

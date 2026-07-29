@@ -26,6 +26,20 @@ go test ./...
 The standalone command uses a null backend, so menus and file selection work
 while execution reports that an integration backend is not attached.
 
+The runnable product command lives in the sibling `aram-emu` integration
+repository. It attaches the portable `aram-core` application machine:
+
+```powershell
+cd ..\aram-emu
+go run ./cmd/aram
+```
+
+On Windows the shared shell supports native file and firmware selection,
+command-line inputs, drag-and-drop, the full emulator command model, guest
+frame rendering, keyboard/gamepad input, native-resolution screenshots, and
+frontend tool panels. Backend-dependent operations stay visible and explain
+why they are unavailable.
+
 ## Mobile
 
 Ebitengine mobile applications are generated as native libraries:
