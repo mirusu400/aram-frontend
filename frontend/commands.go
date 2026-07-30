@@ -91,6 +91,7 @@ func defaultMenus() []Menu {
 					},
 				},
 				{ID: "emu.rewind", Label: "Rewind", Backend: CommandRewind},
+				{ID: "emu.configure", Label: "Configure...", Action: (*Shell).openSettingsPanel},
 			},
 		},
 		{

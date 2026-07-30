@@ -11,6 +11,12 @@ This repository owns:
 - generic emulator workflows such as open/recent, pause, state, rewind,
   controller configuration, cheats, debugger, and compatibility reporting.
 
+The presentation layer uses Ebitengine with EbitenUI and an ARAM-specific
+design system. Semantic palette, typography, spacing, radius, and component
+tokens live in `frontend/design_system.go`; shell composition lives in
+`frontend/shell_ui.go`. See [`docs/design-system.md`](docs/design-system.md)
+before adding or restyling UI.
+
 It does not parse WIPI containers or emulate ARM. An injected `Backend`
 implementation connects it to
 [`aram-core`](https://github.com/mirusu400/aram-core). The integration and
@@ -40,6 +46,12 @@ frame rendering, keyboard/gamepad input, native-resolution screenshots, and
 frontend tool panels. Backend-dependent operations stay visible and explain
 why they are unavailable.
 
+Desktop resizing uses the available window as the internal canvas: the guest
+viewport expands while menus, text, centered dialogs, and scrollable settings
+remain readable. Controller bindings use press-to-capture keyboard/gamepad
+remapping with global and per-title profiles. An optional responsive virtual
+phone keypad can be shown beside the guest display.
+
 ## Mobile
 
 Ebitengine mobile applications are generated as native libraries:
@@ -52,6 +64,10 @@ ebitenmobile bind -target android -javapkg io.github.mirusu400.aram \
 Android Studio supplies the Activity, Storage Access Framework document
 picker, lifecycle, and packaging. iOS uses the equivalent generated
 XCFramework and native document picker.
+
+The generated mobile API accepts a native `Host` callback for document-picker
+requests and exposes completion, cancellation, lifecycle, and audio-focus
+entry points.
 
 The CI workflow builds the Android AAR as a first-class portability check.
 The native Android host project and release signing remain integration

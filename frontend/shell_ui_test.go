@@ -1,0 +1,290 @@
+package frontend
+
+import (
+	"fmt"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/hajimehoshi/ebiten/v2"
+)
+
+func TestShellBuildsEbitenUIDesignSystem(t *testing.T) {
+	shell := NewShell(NullBackend{}, nil, "")
+	if shell.design == nil {
+		t.Fatal("ARAM design system was not initialized")
+	}
+	if shell.interfaceUI == nil || shell.interfaceUI.ui == nil {
+		t.Fatal("EbitenUI shell was not initialized")
+	}
+	if got, want := len(shell.interfaceUI.menuButtons), len(defaultMenus()); got != want {
+		t.Fatalf("menu button count = %d, want %d", got, want)
+	}
+	if shell.design.Type.Body == nil || shell.design.Type.Heading == nil {
+		t.Fatal("typography hierarchy is incomplete")
+	}
+	if shell.design.Components.Surface == nil || shell.design.Components.PrimaryButton.Image == nil {
+		t.Fatal("component styles are incomplete")
+	}
+}
+
+func TestEbitenUIDropdownPreservesStableCommandIDs(t *testing.T) {
+	shell := NewShell(NullBackend{}, nil, "")
+	view := shell.interfaceUI
+	view.openMenu(0)
+	t.Cleanup(view.closeMenu)
+
+	if shell.activeMenu != 0 || view.menuIndex != 0 {
+		t.Fatalf("active menu = shell:%d ui:%d, want 0", shell.activeMenu, view.menuIndex)
+	}
+	if view.menuWindow == nil || !view.menuWindow.Modal {
+		t.Fatal("dropdown does not block click-through into the guest surface")
+	}
+	for _, command := range shell.menus[0].Commands {
+		if view.commandButtons[command.ID] == nil {
+			t.Errorf("dropdown omitted stable command ID %q", command.ID)
+		}
+	}
+}
+
+func TestEbitenUIModalTracksPanelLifecycle(t *testing.T) {
+	shell := NewShell(NullBackend{}, nil, "")
+	shell.showAbout()
+	shell.interfaceUI.sync(shell)
+	if shell.interfaceUI.panelWindow == nil || !shell.interfaceUI.panelWindow.Modal {
+		t.Fatal("about panel did not open as an EbitenUI modal")
+	}
+
+	shell.panel = nil
+	shell.interfaceUI.sync(shell)
+	if shell.interfaceUI.panelWindow != nil {
+		t.Fatal("panel window remained open after the panel state was cleared")
+	}
+}
+
+func TestConfigureCommandOpensCategorySettingsWindow(t *testing.T) {
+	shell := NewShell(NullBackend{}, nil, "")
+	shell.dispatchCommand("emu.configure")
+	shell.interfaceUI.sync(shell)
+
+	if shell.panel == nil || shell.panel.Kind != "settings" {
+		t.Fatalf("configure panel = %#v", shell.panel)
+	}
+	if shell.interfaceUI.panelWindow == nil || !shell.interfaceUI.panelWindow.Modal {
+		t.Fatal("configure command did not open a modal settings window")
+	}
+	if shell.interfaceUI.settingsSection != "General" {
+		t.Fatalf("initial settings section = %q", shell.interfaceUI.settingsSection)
+	}
+	for _, id := range []string{"file.open", "emu.start", "emu.pause", "emu.stop", "emu.configure"} {
+		if shell.interfaceUI.toolbarButtons[id] == nil {
+			t.Errorf("application toolbar omitted %q", id)
+		}
+	}
+}
+
+func TestControllerCommandOpensControlsSettings(t *testing.T) {
+	shell := NewShell(NullBackend{}, nil, "")
+	shell.dispatchCommand("tools.controller")
+	shell.interfaceUI.sync(shell)
+
+	if shell.panel == nil || shell.panel.Kind != "settings" {
+		t.Fatalf("controller panel = %#v", shell.panel)
+	}
+	if shell.settingsSection != "Controls" || shell.interfaceUI.settingsSection != "Controls" {
+		t.Fatalf(
+			"controller settings section = shell:%q ui:%q",
+			shell.settingsSection,
+			shell.interfaceUI.settingsSection,
+		)
+	}
+	if shell.interfaceUI.panelWindow == nil || !shell.interfaceUI.panelWindow.Modal {
+		t.Fatal("controller command did not open the settings modal")
+	}
+}
+
+func TestAudioCommandOpensAudioSettings(t *testing.T) {
+	shell := NewShell(NullBackend{}, nil, "")
+	shell.dispatchCommand("tools.audio")
+	shell.interfaceUI.sync(shell)
+
+	if shell.panel == nil || shell.panel.Kind != "settings" {
+		t.Fatalf("audio panel = %#v", shell.panel)
+	}
+	if shell.settingsSection != "Audio" || shell.interfaceUI.settingsSection != "Audio" {
+		t.Fatalf(
+			"audio settings section = shell:%q ui:%q",
+			shell.settingsSection,
+			shell.interfaceUI.settingsSection,
+		)
+	}
+}
+
+func TestResponsiveModalStaysInsideViewport(t *testing.T) {
+	for _, size := range [][2]int{{390, 844}, {720, 540}, {960, 720}, {1600, 900}} {
+		width, height := size[0], size[1]
+		rect := centeredWindowRect(width, height, 740, 580)
+		if rect.Min.X < 0 || rect.Min.Y < 0 || rect.Max.X > width || rect.Max.Y > height {
+			t.Fatalf("modal %v outside %dx%d", rect, width, height)
+		}
+		if rect.Min.X != (width-rect.Dx())/2 || rect.Min.Y != (height-rect.Dy())/2 {
+			t.Fatalf("modal %v is not centered in %dx%d", rect, width, height)
+		}
+	}
+}
+
+func TestARAMRoundedRectHitModel(t *testing.T) {
+	if !insideRoundedRect(5, 5, 0, 0, 11, 11, 4) {
+		t.Fatal("rounded rectangle excludes its center")
+	}
+	if insideRoundedRect(0, 0, 0, 0, 11, 11, 4) {
+		t.Fatal("rounded rectangle includes a clipped corner")
+	}
+	if !insideRoundedRect(0, 0, 0, 0, 11, 11, 0) {
+		t.Fatal("square rectangle excludes its corner")
+	}
+}
+
+func TestAppearanceSwitchRebuildsNeutralSquareDesign(t *testing.T) {
+	shell := NewShell(NullBackend{}, nil, "")
+	shell.settings.ThemeMode = "light"
+	shell.syncDesignSystem()
+	lightUI := shell.interfaceUI
+	if shell.design.Mode != "light" {
+		t.Fatalf("initial design mode = %q", shell.design.Mode)
+	}
+	if shell.design.Radius.Small != 0 ||
+		shell.design.Radius.Medium != 0 ||
+		shell.design.Radius.Large != 0 ||
+		shell.design.Radius.Pill != 0 {
+		t.Fatalf("design still uses rounded corners: %#v", shell.design.Radius)
+	}
+
+	shell.settings.ThemeMode = "dark"
+	shell.syncDesignSystem()
+	if shell.design.Mode != "dark" {
+		t.Fatalf("switched design mode = %q", shell.design.Mode)
+	}
+	if shell.interfaceUI == lightUI {
+		t.Fatal("theme switch did not rebuild EbitenUI component styles")
+	}
+	canvas := shell.design.Palette.Canvas
+	if canvas.R != canvas.G || canvas.G != canvas.B {
+		t.Fatalf("dark canvas is not neutral: %#v", canvas)
+	}
+}
+
+func TestEbitenUIDrawsPersistentApplicationChrome(t *testing.T) {
+	shell := NewShell(NullBackend{}, nil, "")
+	if err := shell.Update(); err != nil {
+		t.Fatalf("Update returned %v", err)
+	}
+	screen := ebiten.NewImage(logicalWidth, logicalHeight)
+	shell.Draw(screen)
+}
+
+func TestResponsiveSettingsRenderAtCompactAndLargeSizes(t *testing.T) {
+	for _, size := range [][2]int{{390, 844}, {720, 540}, {1440, 900}} {
+		width, height := size[0], size[1]
+		t.Run(fmt.Sprintf("%dx%d", width, height), func(t *testing.T) {
+			shell := NewShell(NullBackend{}, nil, "")
+			shell.Layout(width, height)
+			shell.openSettingsSection("Bindings")
+			shell.interfaceUI.sync(shell)
+			shell.interfaceUI.ui.Update()
+
+			screen := ebiten.NewImage(width, height)
+			shell.Draw(screen)
+			if shell.interfaceUI.panelWindow == nil {
+				t.Fatal("responsive settings window was not created")
+			}
+			if shell.interfaceUI.compact != (width < 820 || height < 620) {
+				t.Fatalf("compact mode = %t", shell.interfaceUI.compact)
+			}
+		})
+	}
+}
+
+func TestOpenRecentUsesScrollableFilenameFirstList(t *testing.T) {
+	shell := NewShell(NullBackend{}, nil, "")
+	shell.settings.RecentFiles = make([]string, recentFileLimit)
+	for index := range shell.settings.RecentFiles {
+		shell.settings.RecentFiles[index] = filepath.Join(
+			`C:\very\long\archive\directory\with\identical\prefixes`,
+			fmt.Sprintf("distinct-game-%02d.dat", index),
+		)
+	}
+
+	shell.chooseRecent()
+	shell.interfaceUI.sync(shell)
+	shell.interfaceUI.ui.Update()
+
+	if shell.dialogOpen {
+		t.Fatal("Open Recent still opened a platform-owned dialog")
+	}
+	if shell.panel == nil || shell.panel.Kind != "recent" {
+		t.Fatalf("Open Recent panel = %#v", shell.panel)
+	}
+	if shell.interfaceUI.panelWindow == nil || shell.interfaceUI.recentList == nil {
+		t.Fatal("scrollable recent-input list was not created")
+	}
+	if got := len(shell.interfaceUI.recentList.Entries()); got != recentFileLimit {
+		t.Fatalf("recent list entries = %d, want %d", got, recentFileLimit)
+	}
+	first := shell.settings.RecentFiles[0]
+	label := recentEntryLabel(first, 70)
+	if !strings.HasPrefix(label, "distinct-game-00.dat") {
+		t.Fatalf("recent entry does not lead with its filename: %q", label)
+	}
+	details := recentPathDetails(first, 26, 8)
+	if !strings.Contains(strings.ReplaceAll(details, "\n", ""), "distinct-game-00.dat") {
+		t.Fatalf("selected-path details omit the filename: %q", details)
+	}
+}
+
+func TestOpenRecentListRendersAtMinimumWindowSize(t *testing.T) {
+	shell := NewShell(NullBackend{}, nil, "")
+	shell.Layout(720, 540)
+	for index := 0; index < recentFileLimit; index++ {
+		shell.settings.RecentFiles = append(
+			shell.settings.RecentFiles,
+			filepath.Join("archive", fmt.Sprintf("game-%02d.dat", index)),
+		)
+	}
+	shell.chooseRecent()
+	shell.interfaceUI.sync(shell)
+	shell.interfaceUI.ui.Update()
+	shell.Draw(ebiten.NewImage(720, 540))
+
+	if shell.interfaceUI.panelWindow == nil || shell.interfaceUI.recentList == nil {
+		t.Fatal("compact Open Recent modal did not render its list")
+	}
+}
+
+func TestInteractiveToolFormRendersAtCompactSize(t *testing.T) {
+	shell := NewShell(NullBackend{}, nil, "")
+	shell.Layout(390, 844)
+	shell.panel = &Panel{
+		Kind:  "tool",
+		Tool:  ToolMemory,
+		Title: "Memory Search",
+		Lines: []string{"Checked searches execute behind the backend boundary."},
+		Fields: []ToolField{{
+			ID:          "value",
+			Label:       "Value",
+			Placeholder: "0x1234",
+		}},
+		FieldValues: map[string]string{"value": "42"},
+		Actions: []ToolAction{{
+			ID:      "search",
+			Label:   "Search",
+			Enabled: true,
+		}},
+	}
+	shell.interfaceUI.sync(shell)
+	shell.interfaceUI.ui.Update()
+	shell.Draw(ebiten.NewImage(390, 844))
+	if shell.interfaceUI.panelWindow == nil {
+		t.Fatal("interactive tool window was not created")
+	}
+}

@@ -1,115 +1,72 @@
 package frontend
 
 import (
-	"fmt"
 	"image"
+	"image/color"
 	"math"
 	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
-func (s *Shell) drawMenuBar(screen *ebiten.Image) {
-	ebitenutil.DrawRect(screen, 0, 0, logicalWidth, menuHeight, menuColor)
-	offset := 0
-	widths := menuWidths(s.menus)
-	for index, menu := range s.menus {
-		width := widths[index]
-		if s.activeMenu == index {
-			ebitenutil.DrawRect(screen, float64(offset), 0, float64(width), menuHeight, menuActiveColor)
-		}
-		ebitenutil.DebugPrintAt(screen, menu.Label, offset+12, 8)
-		offset += width
-	}
-	stateText := strings.ToUpper(string(s.state))
-	ebitenutil.DebugPrintAt(screen, stateText, logicalWidth-len(stateText)*8-14, 8)
-}
-
-func (s *Shell) drawDropdown(screen *ebiten.Image, menuIndex int) {
-	commands := s.menus[menuIndex].Commands
-	x := menuStartX(s.menus, menuIndex)
-	itemHeight := effectiveMenuItemHeight()
-	height := len(commands) * itemHeight
-	ebitenutil.DrawRect(screen, float64(x), menuHeight, dropdownWidth, float64(height), menuColor)
-	for index, command := range commands {
-		y := menuHeight + index*itemHeight
-		if !command.IsEnabled(s) {
-			ebitenutil.DrawRect(screen, float64(x), float64(y), dropdownWidth, float64(itemHeight), disabledColor)
-		}
-		textY := y + (itemHeight-10)/2
-		ebitenutil.DebugPrintAt(screen, shorten(command.DisplayLabel(s), 28), x+12, textY)
-		if command.Shortcut != "" {
-			ebitenutil.DebugPrintAt(screen, command.Shortcut, x+222, textY)
-		}
-	}
-	ebitenutil.DrawRect(screen, float64(x), float64(menuHeight+height-1), dropdownWidth, 1, borderColor)
-}
-
 func (s *Shell) drawWorkspace(screen *ebiten.Image) {
-	contentTop := menuHeight + 20
-	contentBottom := logicalHeight - statusHeight - 20
-	viewportPanel := image.Rect(20, contentTop, 670, contentBottom)
-	viewport := image.Rect(40, contentTop+20, 650, contentBottom-20)
+	palette := defaultARAMPalette()
+	if s.design != nil {
+		palette = s.design.Palette
+	}
+	bounds := screen.Bounds()
+	contentTop := bounds.Min.Y + menuHeight + applicationToolbarHeight + 12
+	contentBottom := bounds.Max.Y - statusHeight - 12
+	if platformUsesTouchLayout() {
+		contentBottom -= touchDeckHeight(bounds.Dx(), bounds.Dy())
+	}
+	contentRight := bounds.Max.X - 12
+	if s.virtualKeypadVisible() {
+		contentRight -= virtualKeypadReservedWidthFor(bounds.Dx())
+	}
+	viewportPanel := image.Rect(bounds.Min.X+12, contentTop, contentRight, contentBottom)
+	if viewportPanel.Dx() < 32 || viewportPanel.Dy() < 32 {
+		return
+	}
+	viewport := image.Rect(
+		viewportPanel.Min.X+6,
+		viewportPanel.Min.Y+6,
+		viewportPanel.Max.X-6,
+		viewportPanel.Max.Y-6,
+	)
 	ebitenutil.DrawRect(
 		screen,
 		float64(viewportPanel.Min.X),
 		float64(viewportPanel.Min.Y),
 		float64(viewportPanel.Dx()),
 		float64(viewportPanel.Dy()),
-		panelColor,
+		palette.Border,
+	)
+	ebitenutil.DrawRect(
+		screen,
+		float64(viewportPanel.Min.X+1),
+		float64(viewportPanel.Min.Y+1),
+		float64(viewportPanel.Dx()-2),
+		float64(viewportPanel.Dy()-2),
+		palette.Surface,
 	)
 	s.drawGuestViewport(screen, viewport)
-
-	panelX := 690
-	ebitenutil.DrawRect(screen, float64(panelX), float64(contentTop), 250, float64(contentBottom-contentTop), panelColor)
-	ebitenutil.DebugPrintAt(screen, "ARAM", panelX+16, contentTop+18)
-	lines := []string{
-		"Archived Runtime for ARM Mobiles",
-		"",
-		"Frontend: " + string(s.state),
-		"Backend: " + shorten(s.backendName(), 21),
-		"Core state: " + string(s.backend.State()),
-		fmt.Sprintf("Scale: integer=%t", s.settings.IntegerScaling),
-		fmt.Sprintf("Aspect: locked=%t", s.settings.PreserveAspect),
-		fmt.Sprintf("Rotation: %d degrees", s.settings.Rotation),
-		"Layout/filter: " + s.settings.ScreenLayout + "/" + s.settings.Filter,
-		fmt.Sprintf("State slot/speed: %d / %gx", s.settings.StateSlot, s.settings.Speed),
-	}
-	if s.input != nil {
-		lines = append(lines,
-			"",
-			"Selected input:",
-			shorten(s.input.DisplayName, 27),
-			"Format: "+emptyFallback(s.input.Format, "unknown"),
-			"Profile: "+emptyFallback(s.input.ProfileID, "unselected"),
-			fmt.Sprintf("Size: %d bytes", s.input.Size),
-			"SHA-256:",
-			shorten(s.input.SHA256, 27),
-			"Path:",
-			shorten(s.selectedPath, 27),
-		)
-	}
-	if s.problem != nil {
-		lines = append(lines,
-			"",
-			"Actionable error:",
-			"State: "+string(s.problem.State),
-			"Reason:",
-			shorten(s.problem.Reason, 27),
-		)
-	}
-	ebitenutil.DebugPrintAt(screen, strings.Join(lines, "\n"), panelX+16, contentTop+42)
 }
 
 func (s *Shell) drawGuestViewport(screen *ebiten.Image, viewport image.Rectangle) {
+	palette := defaultARAMPalette()
+	if s.design != nil {
+		palette = s.design.Palette
+	}
 	ebitenutil.DrawRect(
 		screen,
-		float64(viewport.Min.X-5),
-		float64(viewport.Min.Y-5),
-		float64(viewport.Dx()+10),
-		float64(viewport.Dy()+10),
-		borderColor,
+		float64(viewport.Min.X-2),
+		float64(viewport.Min.Y-2),
+		float64(viewport.Dx()+4),
+		float64(viewport.Dy()+4),
+		palette.BorderStrong,
 	)
 	ebitenutil.DrawRect(
 		screen,
@@ -117,7 +74,7 @@ func (s *Shell) drawGuestViewport(screen *ebiten.Image, viewport image.Rectangle
 		float64(viewport.Min.Y),
 		float64(viewport.Dx()),
 		float64(viewport.Dy()),
-		backgroundColor,
+		palette.Canvas,
 	)
 
 	if s.frameImage == nil || s.frame.Image == nil {
@@ -185,24 +142,23 @@ func (s *Shell) frameDestination(viewport image.Rectangle, width, height int) im
 }
 
 func (s *Shell) drawEmptyViewport(screen *ebiten.Image, viewport image.Rectangle) {
-	lines := []string{
-		"No guest frame",
-		"",
-		"File > Open File...",
-		"or drag a file here",
+	palette := defaultARAMPalette()
+	if s.design != nil {
+		palette = s.design.Palette
 	}
+	title := "No guest frame"
+	details := []string{"Open a title from File, or drag a file here."}
 	if s.loading {
-		lines = []string{"Preparing input...", "", strings.ToUpper(string(s.state))}
+		title = "Preparing input"
+		details = []string{strings.ToUpper(string(s.state))}
 	} else if s.problem != nil {
-		lines = []string{
-			"Unable to start this input",
-			"",
+		title = "Unable to start this input"
+		details = []string{
 			"State: " + string(s.problem.State),
 			"Input: " + shorten(s.problem.Input, 40),
 			"Format: " + emptyFallback(s.problem.Format, "unknown"),
 			"Profile: " + emptyFallback(s.problem.Profile, "unselected"),
 			"Backend: " + emptyFallback(s.problem.Backend, "unknown"),
-			"",
 			shorten(s.problem.Reason, 64),
 		}
 		ebitenutil.DrawRect(
@@ -211,16 +167,41 @@ func (s *Shell) drawEmptyViewport(screen *ebiten.Image, viewport image.Rectangle
 			float64(viewport.Min.Y),
 			float64(viewport.Dx()),
 			4,
-			faultColor,
+			palette.Fault,
 		)
 	}
-	x := viewport.Min.X + 28
-	y := viewport.Min.Y + viewport.Dy()/2 - len(lines)*8
-	ebitenutil.DebugPrintAt(screen, strings.Join(lines, "\n"), x, y)
+	if s.design == nil {
+		lines := append([]string{title, ""}, details...)
+		ebitenutil.DebugPrintAt(
+			screen,
+			strings.Join(lines, "\n"),
+			viewport.Min.X+28,
+			viewport.Min.Y+viewport.Dy()/2-len(lines)*8,
+		)
+		return
+	}
+
+	blockHeight := 28 + len(details)*20
+	y := viewport.Min.Y + (viewport.Dy()-blockHeight)/2
+	drawCenteredText(screen, title, s.design.Type.Display, palette.Text, viewport, y)
+	y += 36
+	for _, line := range details {
+		drawCenteredText(screen, line, s.design.Type.Body, palette.TextMuted, viewport, y)
+		y += 20
+	}
 }
 
-func (s *Shell) drawStatusBar(screen *ebiten.Image) {
-	y := logicalHeight - statusHeight
-	ebitenutil.DrawRect(screen, 0, float64(y), logicalWidth, statusHeight, menuColor)
-	ebitenutil.DebugPrintAt(screen, shorten(s.status, 116), 10, y+7)
+func drawCenteredText(
+	screen *ebiten.Image,
+	label string,
+	face *text.Face,
+	textColor color.Color,
+	bounds image.Rectangle,
+	y int,
+) {
+	width, _ := text.Measure(label, *face, 0)
+	options := &text.DrawOptions{}
+	options.GeoM.Translate(float64(bounds.Min.X)+(float64(bounds.Dx())-width)/2, float64(y))
+	options.ColorScale.ScaleWithColor(textColor)
+	text.Draw(screen, label, *face, options)
 }

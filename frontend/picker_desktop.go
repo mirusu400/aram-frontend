@@ -40,14 +40,26 @@ func (platformPicker) OpenFirmwareDirectory(previous string) (string, error) {
 }
 
 func (platformPicker) ChooseRecent(recent []string) (string, error) {
-	path, err := zenity.List(
+	labels := make([]string, len(recent))
+	for index, path := range recent {
+		labels[index] = recentEntryLabel(path, 110)
+	}
+	selected, err := zenity.List(
 		"Choose a recent input",
-		recent,
+		labels,
 		zenity.Title("ARAM recent files"),
 		zenity.Width(840),
 		zenity.Height(420),
 	)
-	return path, normalizePickerError(err)
+	if err != nil {
+		return "", normalizePickerError(err)
+	}
+	for index, label := range labels {
+		if label == selected {
+			return recent[index], nil
+		}
+	}
+	return "", ErrPickerCanceled
 }
 
 func normalizePickerError(err error) error {

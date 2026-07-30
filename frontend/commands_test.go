@@ -1,6 +1,10 @@
 package frontend
 
-import "testing"
+import (
+	"context"
+	"testing"
+	"time"
+)
 
 func TestGenericEmulatorCommandsRemainPresent(t *testing.T) {
 	menus := defaultMenus()
@@ -21,6 +25,7 @@ func TestGenericEmulatorCommandsRemainPresent(t *testing.T) {
 		"emu.state_slot":      false,
 		"emu.speed":           false,
 		"emu.rewind":          false,
+		"emu.configure":       false,
 		"tools.cheats":        false,
 		"tools.memory":        false,
 		"tools.patches":       false,
@@ -101,5 +106,75 @@ func TestToolCommandOpensCapabilityPanel(t *testing.T) {
 	}
 	if len(shell.panel.Lines) == 0 {
 		t.Fatal("debugger panel does not explain the unavailable backend capability")
+	}
+}
+
+type interactiveToolBackend struct {
+	NullBackend
+	requests chan ToolRequest
+}
+
+func (*interactiveToolBackend) ToolSnapshot(
+	context.Context,
+	ToolKind,
+) (ToolSnapshot, error) {
+	return ToolSnapshot{
+		Title:  "Memory Search",
+		Lines:  []string{"Enter a value to begin a checked backend search."},
+		Fields: []ToolField{{ID: "value", Label: "Value", Placeholder: "0x1234"}},
+		Actions: []ToolAction{{
+			ID:      "search",
+			Label:   "Search",
+			Enabled: true,
+		}},
+	}, nil
+}
+
+func (backend *interactiveToolBackend) ExecuteToolAction(
+	_ context.Context,
+	request ToolRequest,
+) (ToolSnapshot, error) {
+	backend.requests <- request
+	return ToolSnapshot{
+		Title: "Memory Search",
+		Lines: []string{"1 checked result"},
+		Actions: []ToolAction{{
+			ID:      "clear",
+			Label:   "Clear",
+			Enabled: true,
+		}},
+	}, nil
+}
+
+func TestInteractiveToolSendsFieldsThroughBackendBoundary(t *testing.T) {
+	backend := &interactiveToolBackend{requests: make(chan ToolRequest, 1)}
+	shell := NewShell(backend, nil, "")
+	shell.openToolPanel(ToolMemory)
+	shell.consumeToolResult(waitToolResult(t, shell.toolResults))
+
+	if len(shell.panel.Fields) != 1 || len(shell.panel.Actions) != 1 {
+		t.Fatalf("interactive tool panel = %#v", shell.panel)
+	}
+	shell.executeToolAction("search", map[string]string{"value": "0x1234"})
+	request := <-backend.requests
+	if request.Kind != ToolMemory ||
+		request.Action != "search" ||
+		request.Fields["value"] != "0x1234" {
+		t.Fatalf("tool request = %#v", request)
+	}
+	shell.consumeToolResult(waitToolResult(t, shell.toolResults))
+	if shell.panel.Busy || len(shell.panel.Lines) != 1 || shell.panel.Lines[0] != "1 checked result" {
+		t.Fatalf("completed tool panel = %#v", shell.panel)
+	}
+}
+
+func waitToolResult(t *testing.T, results <-chan toolResult) toolResult {
+	t.Helper()
+	select {
+	case result := <-results:
+		return result
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for tool result")
+		return toolResult{}
 	}
 }

@@ -28,5 +28,7 @@ func Run(backend Backend, initialPath string) error {
 	ebiten.SetWindowSize(logicalWidth, logicalHeight)
 	ebiten.SetWindowSizeLimits(720, 540, -1, -1)
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
-	return ebiten.RunGame(NewShell(backend, NewPlatformPicker(), initialPath))
+	shell := NewShell(backend, NewPlatformPicker(), initialPath)
+	defer shell.closeAudio()
+	return ebiten.RunGame(shell)
 }

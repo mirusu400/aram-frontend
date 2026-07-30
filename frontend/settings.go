@@ -9,33 +9,60 @@ import (
 
 const recentFileLimit = 10
 
+type ControllerProfile struct {
+	KeyboardProfile  string            `json:"keyboard_profile"`
+	KeyboardBindings map[string]string `json:"keyboard_bindings,omitempty"`
+	GamepadEnabled   bool              `json:"gamepad_enabled"`
+	GamepadLayout    string            `json:"gamepad_layout"`
+	GamepadAnalog    bool              `json:"gamepad_analog"`
+	GamepadDeadzone  int               `json:"gamepad_deadzone"`
+	GamepadBindings  map[string]string `json:"gamepad_bindings,omitempty"`
+}
+
 type Settings struct {
-	RecentFiles      []string `json:"recent_files"`
-	IntegerScaling   bool     `json:"integer_scaling"`
-	PreserveAspect   bool     `json:"preserve_aspect"`
-	LastFirmwarePath string   `json:"last_firmware_path,omitempty"`
-	Rotation         int      `json:"rotation"`
-	ScreenLayout     string   `json:"screen_layout"`
-	Filter           string   `json:"filter"`
-	StateSlot        int      `json:"state_slot"`
-	Speed            float64  `json:"speed"`
-	Muted            bool     `json:"muted"`
-	Volume           int      `json:"volume"`
-	AudioLatencyMS   int      `json:"audio_latency_ms"`
-	KeyboardProfile  string   `json:"keyboard_profile"`
+	RecentFiles       []string                     `json:"recent_files"`
+	ThemeMode         string                       `json:"theme_mode"`
+	IntegerScaling    bool                         `json:"integer_scaling"`
+	PreserveAspect    bool                         `json:"preserve_aspect"`
+	LastFirmwarePath  string                       `json:"last_firmware_path,omitempty"`
+	Rotation          int                          `json:"rotation"`
+	ScreenLayout      string                       `json:"screen_layout"`
+	Filter            string                       `json:"filter"`
+	StateSlot         int                          `json:"state_slot"`
+	Speed             float64                      `json:"speed"`
+	Muted             bool                         `json:"muted"`
+	Volume            int                          `json:"volume"`
+	AudioLatencyMS    int                          `json:"audio_latency_ms"`
+	AudioDeviceID     string                       `json:"audio_device_id,omitempty"`
+	KeyboardProfile   string                       `json:"keyboard_profile"`
+	KeyboardBindings  map[string]string            `json:"keyboard_bindings,omitempty"`
+	GamepadEnabled    bool                         `json:"gamepad_enabled"`
+	GamepadLayout     string                       `json:"gamepad_layout"`
+	GamepadAnalog     bool                         `json:"gamepad_analog"`
+	GamepadDeadzone   int                          `json:"gamepad_deadzone"`
+	GamepadBindings   map[string]string            `json:"gamepad_bindings,omitempty"`
+	PerTitleControls  bool                         `json:"per_title_controls"`
+	TitleControllers  map[string]ControllerProfile `json:"title_controller_profiles,omitempty"`
+	ShowVirtualKeypad bool                         `json:"show_virtual_keypad"`
 }
 
 func defaultSettings() Settings {
 	return Settings{
-		IntegerScaling:  true,
-		PreserveAspect:  true,
-		ScreenLayout:    "center",
-		Filter:          "nearest",
-		StateSlot:       0,
-		Speed:           1,
-		Volume:          100,
-		AudioLatencyMS:  60,
-		KeyboardProfile: "default",
+		ThemeMode:        "light",
+		IntegerScaling:   true,
+		PreserveAspect:   true,
+		ScreenLayout:     "center",
+		Filter:           "nearest",
+		StateSlot:        0,
+		Speed:            1,
+		Volume:           100,
+		AudioLatencyMS:   60,
+		KeyboardProfile:  "default",
+		GamepadEnabled:   true,
+		GamepadLayout:    "standard",
+		GamepadAnalog:    true,
+		GamepadDeadzone:  30,
+		TitleControllers: make(map[string]ControllerProfile),
 	}
 }
 
@@ -57,6 +84,9 @@ func loadSettings() Settings {
 }
 
 func (s *Settings) normalize() {
+	if s.ThemeMode != "light" && s.ThemeMode != "dark" {
+		s.ThemeMode = "light"
+	}
 	switch s.Rotation {
 	case 0, 90, 180, 270:
 	default:
@@ -80,9 +110,82 @@ func (s *Settings) normalize() {
 	if s.AudioLatencyMS < 20 || s.AudioLatencyMS > 250 {
 		s.AudioLatencyMS = 60
 	}
-	if s.KeyboardProfile == "" {
+	if s.KeyboardProfile != "default" &&
+		s.KeyboardProfile != "wasd" &&
+		s.KeyboardProfile != "custom" {
 		s.KeyboardProfile = "default"
 	}
+	if s.GamepadLayout != "standard" &&
+		s.GamepadLayout != "swapped" &&
+		s.GamepadLayout != "custom" {
+		s.GamepadLayout = "standard"
+	}
+	if s.GamepadDeadzone < 15 || s.GamepadDeadzone > 50 {
+		s.GamepadDeadzone = 30
+	}
+	s.KeyboardBindings = normalizeKeyboardBindingIDs(s.KeyboardBindings)
+	s.GamepadBindings = normalizeGamepadBindingIDs(s.GamepadBindings)
+	if s.TitleControllers == nil {
+		s.TitleControllers = make(map[string]ControllerProfile)
+	}
+	for key, profile := range s.TitleControllers {
+		profile.normalize()
+		s.TitleControllers[key] = profile
+	}
+}
+
+func (s Settings) globalControllerProfile() ControllerProfile {
+	profile := ControllerProfile{
+		KeyboardProfile:  s.KeyboardProfile,
+		KeyboardBindings: cloneStringMap(s.KeyboardBindings),
+		GamepadEnabled:   s.GamepadEnabled,
+		GamepadLayout:    s.GamepadLayout,
+		GamepadAnalog:    s.GamepadAnalog,
+		GamepadDeadzone:  s.GamepadDeadzone,
+		GamepadBindings:  cloneStringMap(s.GamepadBindings),
+	}
+	profile.normalize()
+	return profile
+}
+
+func (s *Settings) setGlobalControllerProfile(profile ControllerProfile) {
+	profile.normalize()
+	s.KeyboardProfile = profile.KeyboardProfile
+	s.KeyboardBindings = cloneStringMap(profile.KeyboardBindings)
+	s.GamepadEnabled = profile.GamepadEnabled
+	s.GamepadLayout = profile.GamepadLayout
+	s.GamepadAnalog = profile.GamepadAnalog
+	s.GamepadDeadzone = profile.GamepadDeadzone
+	s.GamepadBindings = cloneStringMap(profile.GamepadBindings)
+}
+
+func (profile *ControllerProfile) normalize() {
+	if profile.KeyboardProfile != "default" &&
+		profile.KeyboardProfile != "wasd" &&
+		profile.KeyboardProfile != "custom" {
+		profile.KeyboardProfile = "default"
+	}
+	switch profile.GamepadLayout {
+	case "standard", "swapped", "custom":
+	default:
+		profile.GamepadLayout = "standard"
+	}
+	if profile.GamepadDeadzone < 15 || profile.GamepadDeadzone > 50 {
+		profile.GamepadDeadzone = 30
+	}
+	profile.KeyboardBindings = normalizeKeyboardBindingIDs(profile.KeyboardBindings)
+	profile.GamepadBindings = normalizeGamepadBindingIDs(profile.GamepadBindings)
+}
+
+func cloneStringMap(source map[string]string) map[string]string {
+	if len(source) == 0 {
+		return nil
+	}
+	result := make(map[string]string, len(source))
+	for key, value := range source {
+		result[key] = value
+	}
+	return result
 }
 
 func (s *Settings) addRecent(path string) {

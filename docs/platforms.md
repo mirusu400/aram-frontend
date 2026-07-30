@@ -30,6 +30,11 @@ Activity owns:
 The native layer passes a document handle or copied cache file to the shared
 frontend. Desktop Zenity code is excluded by build tags.
 
+The generated binding exposes `mobile.SetHost`. The native Activity implements
+`RequestDocument`, then completes the asynchronous request with
+`OpenDocument`, `OpenFirmware`, or `DocumentSelectionCanceled`. `AudioFocus`
+and `Pause`/`Resume` feed the same automatic lifecycle-pause contract.
+
 The shared mobile layout provides large touch targets for persistent
 File/Emulation/View/Tools/Help navigation plus D-pad, OK, Back, Menu, and soft
 keys. Native hosts can dispatch the same stable command IDs and forward
@@ -44,6 +49,9 @@ becoming an uncompiled roadmap claim.
 The same shared game is bound into an XCFramework. UIKit owns the document
 picker, application lifecycle, security-scoped resources, signing, and store
 packaging.
+
+CI builds `build/ARAM.xcframework` on macOS so the exported host bridge is
+checked for both mobile platforms.
 
 ## Backend portability
 

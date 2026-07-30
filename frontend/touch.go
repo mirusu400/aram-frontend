@@ -2,7 +2,6 @@ package frontend
 
 import (
 	"image"
-	"image/color"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -15,34 +14,66 @@ type touchButton struct {
 	Bounds  image.Rectangle
 }
 
-var (
-	touchButtonColor = color.RGBA{R: 0x27, G: 0x2b, B: 0x33, A: 0xc8}
-	touchActiveColor = color.RGBA{R: 0x52, G: 0x86, B: 0xbd, A: 0xe8}
-)
-
 func touchControlButtons() []touchButton {
+	return touchControlButtonsFor(logicalWidth, logicalHeight)
+}
+
+func touchControlButtonsFor(width, height int) []touchButton {
+	deckHeight := touchDeckHeight(width, height)
+	deckTop := height - statusBarHeight - deckHeight
+	margin := max(12, min(28, width/32))
+	gap := max(6, min(12, width/96))
+	buttonSize := max(40, min(62, min(width/12, (deckHeight-64-gap*2)/3)))
+	dpadX := margin + buttonSize
+	dpadY := deckTop + 40 + buttonSize + gap
+	actionX := width - margin - buttonSize*3
+	actionY := dpadY
+
 	return []touchButton{
-		{Control: "up", Label: "UP", Bounds: image.Rect(100, 514, 162, 558)},
-		{Control: "left", Label: "LEFT", Bounds: image.Rect(38, 558, 100, 606)},
-		{Control: "ok", Label: "OK", Bounds: image.Rect(100, 558, 162, 606)},
-		{Control: "right", Label: "RIGHT", Bounds: image.Rect(162, 558, 224, 606)},
-		{Control: "down", Label: "DOWN", Bounds: image.Rect(100, 606, 162, 650)},
-		{Control: "soft-left", Label: "L", Bounds: image.Rect(432, 520, 492, 564)},
-		{Control: "soft-right", Label: "R", Bounds: image.Rect(570, 520, 630, 564)},
-		{Control: "back", Label: "BACK", Bounds: image.Rect(432, 576, 512, 626)},
-		{Control: "menu", Label: "MENU", Bounds: image.Rect(522, 576, 582, 626)},
-		{Control: "ok", Label: "OK", Bounds: image.Rect(592, 576, 652, 626)},
+		{Control: "up", Label: "UP", Bounds: rectAt(dpadX, dpadY-buttonSize-gap, buttonSize, buttonSize)},
+		{Control: "left", Label: "LEFT", Bounds: rectAt(dpadX-buttonSize-gap, dpadY, buttonSize, buttonSize)},
+		{Control: "ok", Label: "OK", Bounds: rectAt(dpadX, dpadY, buttonSize, buttonSize)},
+		{Control: "right", Label: "RIGHT", Bounds: rectAt(dpadX+buttonSize+gap, dpadY, buttonSize, buttonSize)},
+		{Control: "down", Label: "DOWN", Bounds: rectAt(dpadX, dpadY+buttonSize+gap, buttonSize, buttonSize)},
+		{Control: "soft-left", Label: "L", Bounds: rectAt(actionX, actionY-buttonSize-gap, buttonSize, buttonSize)},
+		{Control: "soft-right", Label: "R", Bounds: rectAt(actionX+buttonSize*2+gap*2, actionY-buttonSize-gap, buttonSize, buttonSize)},
+		{Control: "back", Label: "BACK", Bounds: rectAt(actionX, actionY, buttonSize, buttonSize)},
+		{Control: "menu", Label: "MENU", Bounds: rectAt(actionX+buttonSize+gap, actionY, buttonSize, buttonSize)},
+		{Control: "ok", Label: "OK", Bounds: rectAt(actionX+buttonSize*2+gap*2, actionY, buttonSize, buttonSize)},
 	}
 }
 
 func touchNavigationButtons() []touchButton {
-	return []touchButton{
-		{Label: "File", Bounds: image.Rect(700, 518, 810, 554)},
-		{Label: "Emulation", Bounds: image.Rect(820, 518, 930, 554)},
-		{Label: "View", Bounds: image.Rect(700, 564, 810, 600)},
-		{Label: "Tools", Bounds: image.Rect(820, 564, 930, 600)},
-		{Label: "Help", Bounds: image.Rect(700, 610, 810, 646)},
+	return touchNavigationButtonsFor(logicalWidth, logicalHeight)
+}
+
+func touchNavigationButtonsFor(width, height int) []touchButton {
+	labels := []string{"File", "Emulation", "View", "Tools", "Help"}
+	margin := max(12, min(28, width/32))
+	gap := max(4, min(10, width/120))
+	available := width - margin*2 - gap*(len(labels)-1)
+	buttonWidth := max(72, available/len(labels))
+	y := height - statusBarHeight - touchDeckHeight(width, height) + 8
+	buttons := make([]touchButton, 0, len(labels))
+	for index, label := range labels {
+		x := margin + index*(buttonWidth+gap)
+		buttons = append(buttons, touchButton{
+			Label:  label,
+			Bounds: rectAt(x, y, buttonWidth, 32),
+		})
 	}
+	return buttons
+}
+
+func touchDeckHeight(width, height int) int {
+	if width <= 0 || height <= 0 {
+		return 0
+	}
+	return min(230, max(174, height*3/10))
+}
+
+func rectAt(x, y, width, height int) image.Rectangle {
+	return image.Rect(x, y, x+width, y+height)
 }
 
 func (s *Shell) handleTouch() {
@@ -55,17 +86,56 @@ func (s *Shell) handleTouch() {
 	for _, id := range inpututil.AppendJustPressedTouchIDs(nil) {
 		x, y := ebiten.TouchPosition(id)
 		if s.panel == nil && s.activeMenu < 0 {
-			if control, ok := touchControlAt(x, y); ok {
+			if control, ok := s.touchControlAt(x, y); ok {
 				s.touchControls[id] = control
 				continue
 			}
 		}
-		s.handlePointerPress(x, y)
+		if s.panel == nil {
+			if index, ok := s.touchNavigationAt(x, y); ok {
+				if s.activeMenu == index {
+					s.activeMenu = -1
+				} else {
+					s.activeMenu = index
+				}
+				continue
+			}
+		}
+		if s.interfaceUI == nil {
+			s.handlePointerPress(x, y)
+		}
 	}
 }
 
+func touchNavigationAt(x, y int) (int, bool) {
+	return touchNavigationAtSize(x, y, logicalWidth, logicalHeight)
+}
+
+func (s *Shell) touchNavigationAt(x, y int) (int, bool) {
+	width, height := s.viewportSize()
+	return touchNavigationAtSize(x, y, width, height)
+}
+
+func touchNavigationAtSize(x, y, width, height int) (int, bool) {
+	for index, button := range touchNavigationButtonsFor(width, height) {
+		if pointInRect(x, y, button.Bounds) {
+			return index, true
+		}
+	}
+	return 0, false
+}
+
 func touchControlAt(x, y int) (string, bool) {
-	for _, button := range touchControlButtons() {
+	return touchControlAtSize(x, y, logicalWidth, logicalHeight)
+}
+
+func (s *Shell) touchControlAt(x, y int) (string, bool) {
+	width, height := s.viewportSize()
+	return touchControlAtSize(x, y, width, height)
+}
+
+func touchControlAtSize(x, y, width, height int) (string, bool) {
+	for _, button := range touchControlButtonsFor(width, height) {
 		if pointInRect(x, y, button.Bounds) {
 			return button.Control, true
 		}
@@ -85,31 +155,45 @@ func (s *Shell) drawTouchControls(screen *ebiten.Image) {
 	for _, control := range s.touchControls {
 		active[control] = true
 	}
-	for _, button := range touchControlButtons() {
-		buttonColor := touchButtonColor
-		if active[button.Control] {
-			buttonColor = touchActiveColor
-		}
-		drawTouchButton(screen, button, buttonColor)
+	width, height := screen.Bounds().Dx(), screen.Bounds().Dy()
+	for _, button := range touchControlButtonsFor(width, height) {
+		s.drawTouchButton(screen, button, active[button.Control])
 	}
-	for index, button := range touchNavigationButtons() {
-		buttonColor := touchButtonColor
-		if s.activeMenu == index {
-			buttonColor = touchActiveColor
-		}
-		drawTouchButton(screen, button, buttonColor)
+	for index, button := range touchNavigationButtonsFor(width, height) {
+		s.drawTouchButton(screen, button, s.activeMenu == index)
 	}
 }
 
-func drawTouchButton(screen *ebiten.Image, button touchButton, buttonColor color.Color) {
+func (s *Shell) drawTouchButton(screen *ebiten.Image, button touchButton, active bool) {
 	bounds := button.Bounds
+	if s.design != nil {
+		surface := s.design.Components.TouchButton.Image.Idle
+		textColor := s.design.Palette.TextMuted
+		if active {
+			surface = s.design.Components.TouchButton.Image.Pressed
+			textColor = s.design.Palette.Text
+		}
+		surface.Draw(screen, bounds.Dx(), bounds.Dy(), func(options *ebiten.DrawImageOptions) {
+			options.GeoM.Translate(float64(bounds.Min.X), float64(bounds.Min.Y))
+		})
+		drawCenteredText(
+			screen,
+			button.Label,
+			s.design.Type.Strong,
+			textColor,
+			bounds,
+			bounds.Min.Y+(bounds.Dy()-13)/2,
+		)
+		return
+	}
+	palette := defaultARAMPalette()
 	ebitenutil.DrawRect(
 		screen,
 		float64(bounds.Min.X),
 		float64(bounds.Min.Y),
 		float64(bounds.Dx()),
 		float64(bounds.Dy()),
-		buttonColor,
+		palette.SurfaceRaised,
 	)
 	textX := bounds.Min.X + (bounds.Dx()-len(button.Label)*6)/2
 	textY := bounds.Min.Y + (bounds.Dy()-8)/2

@@ -10,6 +10,20 @@ type fixedPicker struct {
 	path string
 }
 
+type deferredPicker struct{}
+
+func (deferredPicker) OpenFile() (string, error) {
+	return "", ErrPickerDeferred
+}
+
+func (deferredPicker) OpenFirmwareDirectory(string) (string, error) {
+	return "", ErrPickerDeferred
+}
+
+func (deferredPicker) ChooseRecent([]string) (string, error) {
+	return "", ErrPickerUnavailable
+}
+
 func (picker fixedPicker) OpenFile() (string, error) {
 	return picker.path, nil
 }
@@ -64,4 +78,23 @@ func TestFileOpenConvergesOnBackendOpenRequest(t *testing.T) {
 		time.Sleep(time.Millisecond)
 	}
 	t.Fatal("File/Open did not reach Backend.Open")
+}
+
+func TestDeferredNativePickerCanBeCanceled(t *testing.T) {
+	shell := NewShell(NullBackend{}, deferredPicker{}, "")
+	shell.chooseFile()
+	deadline := time.Now().Add(time.Second)
+	for shell.status != "Waiting for the native document picker..." && time.Now().Before(deadline) {
+		shell.consumeResults()
+		time.Sleep(time.Millisecond)
+	}
+	if shell.status != "Waiting for the native document picker..." {
+		t.Fatalf("deferred picker status = %q", shell.status)
+	}
+
+	shell.CancelExternalDocumentSelection()
+	shell.consumeResults()
+	if shell.status != "Selection canceled" || shell.dialogOpen {
+		t.Fatalf("canceled native picker: status=%q dialog=%t", shell.status, shell.dialogOpen)
+	}
 }

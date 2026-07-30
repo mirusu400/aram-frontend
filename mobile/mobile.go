@@ -14,8 +14,19 @@ var game = frontend.NewShell(
 	"",
 )
 
+// Host is implemented by the generated Android/iOS application layer. The
+// native host owns SAF/UIDocumentPicker presentation and later calls
+// OpenDocument, OpenFirmware, or DocumentSelectionCanceled.
+type Host interface {
+	RequestDocument(firmware bool)
+}
+
 func init() {
 	mobile.SetGame(game)
+}
+
+func SetHost(host Host) {
+	frontend.SetNativePickerHost(host)
 }
 
 // OpenDocument is called by the Android/iOS host after its native document
@@ -26,6 +37,10 @@ func OpenDocument(path, displayName string) {
 
 func OpenFirmware(path, displayName string) {
 	game.OpenExternalDocument(path, displayName, true)
+}
+
+func DocumentSelectionCanceled() {
+	game.CancelExternalDocumentSelection()
 }
 
 // Command invokes a stable frontend command ID from the native host.
@@ -41,6 +56,12 @@ func Pause() {
 
 func Resume() {
 	game.SetHostActive(true)
+}
+
+// AudioFocus mirrors native audio-focus/interruption callbacks. Losing focus
+// uses the same automatic pause contract as lifecycle deactivation.
+func AudioFocus(active bool) {
+	game.SetHostActive(active)
 }
 
 // Dummy forces gomobile/ebitenmobile to bind the package.

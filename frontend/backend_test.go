@@ -82,6 +82,92 @@ func TestParameterizedCommandCarriesSlotAndSpeed(t *testing.T) {
 	}
 }
 
+type autoStartBackend struct {
+	mu       sync.Mutex
+	state    BackendState
+	commands chan BackendCommand
+}
+
+func (backend *autoStartBackend) Open(
+	context.Context,
+	OpenRequest,
+) (InputInfo, error) {
+	return InputInfo{DisplayName: "synthetic.dat"}, nil
+}
+
+func (backend *autoStartBackend) State() BackendState {
+	backend.mu.Lock()
+	defer backend.mu.Unlock()
+	return backend.state
+}
+
+func (*autoStartBackend) Supports(command BackendCommand) bool {
+	return command == CommandStart
+}
+
+func (backend *autoStartBackend) Execute(
+	_ context.Context,
+	command BackendCommand,
+) error {
+	backend.mu.Lock()
+	if command == CommandStart {
+		backend.state = StateRunning
+	}
+	backend.mu.Unlock()
+	backend.commands <- command
+	return nil
+}
+
+func (*autoStartBackend) Close() error { return nil }
+
+func TestLoadedReadyOrPausedInputAutomaticallyStarts(t *testing.T) {
+	temporary := t.TempDir()
+	t.Setenv("APPDATA", temporary)
+	t.Setenv("XDG_CONFIG_HOME", temporary)
+
+	for _, initialState := range []BackendState{StateReady, StatePaused} {
+		t.Run(string(initialState), func(t *testing.T) {
+			backend := &autoStartBackend{
+				state:    initialState,
+				commands: make(chan BackendCommand, 1),
+			}
+			shell := NewShell(backend, nil, "")
+
+			shell.consumeBackendResult(backendResult{
+				request: OpenRequest{Path: "synthetic.dat"},
+				info: InputInfo{
+					DisplayName: "synthetic.dat",
+					Format:      "eads",
+				},
+			})
+
+			select {
+			case command := <-backend.commands:
+				if command != CommandStart {
+					t.Fatalf("automatic command = %q, want %q", command, CommandStart)
+				}
+			case <-time.After(time.Second):
+				t.Fatal("loaded input did not automatically start")
+			}
+
+			deadline := time.Now().Add(time.Second)
+			for shell.busyCommands[CommandStart] && time.Now().Before(deadline) {
+				shell.consumeResults()
+				time.Sleep(time.Millisecond)
+			}
+			if shell.busyCommands[CommandStart] {
+				t.Fatal("automatic start did not complete")
+			}
+			if state := backend.State(); state != StateRunning {
+				t.Fatalf("backend state = %q, want %q", state, StateRunning)
+			}
+			if shell.state != FrontendRunning {
+				t.Fatalf("frontend state = %q, want %q", shell.state, FrontendRunning)
+			}
+		})
+	}
+}
+
 func TestFrameDestinationPreservesAspectAndIntegerScale(t *testing.T) {
 	shell := &Shell{settings: defaultSettings()}
 	destination := shell.frameDestination(image.Rect(0, 0, 650, 650), 240, 320)
@@ -90,6 +176,45 @@ func TestFrameDestinationPreservesAspectAndIntegerScale(t *testing.T) {
 	}
 	if destination.Min.X != 85 || destination.Min.Y != 5 {
 		t.Fatalf("destination origin = %v", destination.Min)
+	}
+}
+
+type configurableAudioBackend struct {
+	NullBackend
+	settings AudioSettings
+}
+
+func (backend *configurableAudioBackend) ConfigureAudio(settings AudioSettings) error {
+	backend.settings = settings
+	return nil
+}
+
+func (*configurableAudioBackend) AudioDevices() []AudioDevice {
+	return []AudioDevice{
+		{ID: "speakers", Name: "Desk speakers"},
+		{ID: "headset", Name: "USB headset"},
+		{ID: "speakers", Name: "Duplicate"},
+	}
+}
+
+func TestAudioDeviceSelectionReachesBackend(t *testing.T) {
+	temporary := t.TempDir()
+	t.Setenv("APPDATA", temporary)
+	t.Setenv("XDG_CONFIG_HOME", temporary)
+	backend := &configurableAudioBackend{}
+	shell := NewShell(backend, nil, "")
+	shell.settings.AudioDeviceID = ""
+
+	shell.cycleAudioDevice()
+
+	if shell.settings.AudioDeviceID != "speakers" {
+		t.Fatalf("selected audio device = %q", shell.settings.AudioDeviceID)
+	}
+	if backend.settings.DeviceID != "speakers" {
+		t.Fatalf("backend audio settings = %#v", backend.settings)
+	}
+	if got := len(shell.audioDevices()); got != 3 {
+		t.Fatalf("deduplicated audio devices = %d", got)
 	}
 }
 
@@ -184,5 +309,109 @@ func waitCommandRequest(t *testing.T, requests <-chan CommandRequest) CommandReq
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for backend command")
 		return CommandRequest{}
+	}
+}
+
+type schedulingBackend struct {
+	mu      sync.Mutex
+	calls   int
+	started chan struct{}
+	release chan struct{}
+	state   BackendState
+}
+
+func (*schedulingBackend) Open(context.Context, OpenRequest) (InputInfo, error) {
+	return InputInfo{DisplayName: "synthetic.dat"}, nil
+}
+
+func (backend *schedulingBackend) State() BackendState {
+	backend.mu.Lock()
+	defer backend.mu.Unlock()
+	return backend.state
+}
+
+func (*schedulingBackend) Supports(BackendCommand) bool {
+	return true
+}
+
+func (*schedulingBackend) Execute(context.Context, BackendCommand) error {
+	return nil
+}
+
+func (*schedulingBackend) Close() error {
+	return nil
+}
+
+func (backend *schedulingBackend) RunFrame(context.Context) error {
+	backend.mu.Lock()
+	backend.calls++
+	backend.mu.Unlock()
+	backend.started <- struct{}{}
+	<-backend.release
+	return nil
+}
+
+func TestShellContinuouslySchedulesOneRunningFrameAtATime(t *testing.T) {
+	backend := &schedulingBackend{
+		started: make(chan struct{}, 2),
+		release: make(chan struct{}, 2),
+		state:   StateRunning,
+	}
+	shell := NewShell(backend, nil, "")
+	shell.input = &InputInfo{DisplayName: "synthetic.dat"}
+
+	shell.scheduleRunningFrame()
+	waitSignal(t, backend.started, "first frame")
+	shell.scheduleRunningFrame()
+	backend.mu.Lock()
+	calls := backend.calls
+	backend.mu.Unlock()
+	if calls != 1 {
+		t.Fatalf("concurrent frame calls = %d, want 1", calls)
+	}
+
+	backend.release <- struct{}{}
+	waitFrameCompletion(t, shell)
+	shell.scheduleRunningFrame()
+	waitSignal(t, backend.started, "second frame")
+	backend.mu.Lock()
+	calls = backend.calls
+	backend.mu.Unlock()
+	if calls != 2 {
+		t.Fatalf("sequential frame calls = %d, want 2", calls)
+	}
+	backend.release <- struct{}{}
+	waitFrameCompletion(t, shell)
+
+	backend.mu.Lock()
+	backend.state = StatePaused
+	backend.mu.Unlock()
+	shell.scheduleRunningFrame()
+	backend.mu.Lock()
+	calls = backend.calls
+	backend.mu.Unlock()
+	if calls != 2 {
+		t.Fatalf("paused backend was advanced; calls = %d", calls)
+	}
+}
+
+func waitSignal(t *testing.T, signal <-chan struct{}, label string) {
+	t.Helper()
+	select {
+	case <-signal:
+	case <-time.After(time.Second):
+		t.Fatalf("timed out waiting for %s", label)
+	}
+}
+
+func waitFrameCompletion(t *testing.T, shell *Shell) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for shell.frameRunPending && time.Now().Before(deadline) {
+		shell.consumeResults()
+		time.Sleep(time.Millisecond)
+	}
+	if shell.frameRunPending {
+		t.Fatal("timed out waiting for scheduled frame completion")
 	}
 }

@@ -7,15 +7,18 @@ import (
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
 type Panel struct {
-	Kind  string
-	Tool  ToolKind
-	Title string
-	Lines []string
+	Kind        string
+	Tool        ToolKind
+	Title       string
+	Lines       []string
+	Fields      []ToolField
+	Actions     []ToolAction
+	FieldValues map[string]string
+	Busy        bool
 }
 
 type toolResult struct {
@@ -58,6 +61,7 @@ func (s *Shell) consumeToolResult(result toolResult) {
 		return
 	}
 	if result.err != nil {
+		s.panel.Busy = false
 		s.panel.Lines = []string{
 			"Backend tool request failed:",
 			"",
@@ -70,20 +74,59 @@ func (s *Shell) consumeToolResult(result toolResult) {
 		s.panel.Title = result.snapshot.Title
 	}
 	s.panel.Lines = append([]string(nil), result.snapshot.Lines...)
+	s.panel.Fields = append([]ToolField(nil), result.snapshot.Fields...)
+	s.panel.Actions = append([]ToolAction(nil), result.snapshot.Actions...)
+	s.panel.FieldValues = make(map[string]string, len(result.snapshot.Fields))
+	for _, field := range result.snapshot.Fields {
+		s.panel.FieldValues[field.ID] = field.Value
+	}
+	s.panel.Busy = false
 	s.setStatus(toolTitle(result.kind) + " refreshed")
 }
 
-func (s *Shell) openControllerPanel() {
-	s.panel = &Panel{
-		Kind:  "controller",
-		Title: "Controller Settings",
+func (s *Shell) executeToolAction(action string, fields map[string]string) {
+	if s.panel == nil || s.panel.Kind != "tool" || s.panel.Busy {
+		return
 	}
+	backend, ok := s.backend.(ToolActionBackend)
+	if !ok {
+		s.setStatus(toolTitle(s.panel.Tool) + ": backend actions are unavailable")
+		return
+	}
+	request := ToolRequest{
+		Kind:   s.panel.Tool,
+		Action: action,
+		Fields: cloneStringMap(fields),
+	}
+	s.panel.Busy = true
+	s.setStatus(toolTitle(s.panel.Tool) + ": " + action + "...")
+	go func() {
+		snapshot, err := backend.ExecuteToolAction(context.Background(), request)
+		s.toolResults <- toolResult{kind: request.Kind, snapshot: snapshot, err: err}
+	}()
+}
+
+func (s *Shell) openControllerPanel() {
+	s.openSettingsSection("Controls")
 }
 
 func (s *Shell) openAudioPanel() {
+	s.openSettingsSection("Audio")
+}
+
+func (s *Shell) openSettingsPanel() {
+	s.openSettingsSection("General")
+}
+
+func (s *Shell) openSettingsSection(section string) {
+	s.settingsSection = section
+	if s.interfaceUI != nil {
+		s.interfaceUI.settingsSection = section
+		s.interfaceUI.panelSignature = ""
+	}
 	s.panel = &Panel{
-		Kind:  "audio",
-		Title: "Audio Settings",
+		Kind:  "settings",
+		Title: "Configure ARAM",
 	}
 }
 
@@ -108,18 +151,6 @@ func (s *Shell) handlePanelShortcuts(control bool) {
 		return
 	}
 	switch s.panel.Kind {
-	case "audio":
-		s.handleAudioPanelShortcuts()
-	case "controller":
-		if inpututil.IsKeyJustPressed(ebiten.KeyP) {
-			if s.settings.KeyboardProfile == "default" {
-				s.settings.KeyboardProfile = "wasd"
-			} else {
-				s.settings.KeyboardProfile = "default"
-			}
-			_ = s.settings.save()
-			s.setStatus("Keyboard profile: " + s.settings.KeyboardProfile)
-		}
 	case "compatibility":
 		if inpututil.IsKeyJustPressed(ebiten.KeyS) {
 			s.saveCompatibilityReport()
@@ -136,65 +167,331 @@ func (s *Shell) handlePanelShortcuts(control bool) {
 	}
 }
 
-func (s *Shell) handleAudioPanelShortcuts() {
-	changed := false
-	switch {
-	case inpututil.IsKeyJustPressed(ebiten.KeyM):
-		s.settings.Muted = !s.settings.Muted
-		changed = true
-	case inpututil.IsKeyJustPressed(ebiten.KeyArrowUp):
-		s.settings.Volume = min(100, s.settings.Volume+5)
-		changed = true
-	case inpututil.IsKeyJustPressed(ebiten.KeyArrowDown):
-		s.settings.Volume = max(0, s.settings.Volume-5)
-		changed = true
-	case inpututil.IsKeyJustPressed(ebiten.KeyArrowRight):
-		s.settings.AudioLatencyMS = min(250, s.settings.AudioLatencyMS+10)
-		changed = true
-	case inpututil.IsKeyJustPressed(ebiten.KeyArrowLeft):
-		s.settings.AudioLatencyMS = max(20, s.settings.AudioLatencyMS-10)
-		changed = true
-	}
-	if !changed {
-		return
-	}
+func (s *Shell) applyAudioSettings() {
 	_ = s.settings.save()
+	settings := s.currentAudioSettings()
 	if backend, ok := s.backend.(AudioBackend); ok {
-		if err := backend.ConfigureAudio(AudioSettings{
-			Muted:   s.settings.Muted,
-			Volume:  s.settings.Volume,
-			Latency: time.Duration(s.settings.AudioLatencyMS) * time.Millisecond,
-		}); err != nil {
+		if err := backend.ConfigureAudio(settings); err != nil {
 			s.setStatus("Audio settings: " + err.Error())
 			return
 		}
 	}
+	if s.audioOutput != nil {
+		s.audioOutput.configure(settings)
+	}
 	s.setStatus(fmt.Sprintf(
-		"Audio: muted=%t volume=%d latency=%dms",
+		"Audio: muted=%t volume=%d latency=%dms device=%s",
 		s.settings.Muted,
 		s.settings.Volume,
 		s.settings.AudioLatencyMS,
+		s.audioDeviceLabel(),
 	))
 }
 
-func (s *Shell) drawPanel(screen *ebiten.Image) {
-	x, y, width, height := 110, 70, 740, 580
-	ebitenutil.DrawRect(screen, 0, 0, logicalWidth, logicalHeight, colorOverlay)
-	ebitenutil.DrawRect(screen, float64(x-2), float64(y-2), float64(width+4), float64(height+4), borderColor)
-	ebitenutil.DrawRect(screen, float64(x), float64(y), float64(width), float64(height), panelColor)
-	ebitenutil.DrawRect(screen, float64(x), float64(y), float64(width), 38, accentColor)
-	ebitenutil.DebugPrintAt(screen, s.panel.Title, x+16, y+15)
-
-	lines := s.panelLines()
-	lines = wrapPanelLines(lines, 84, 29)
-	ebitenutil.DebugPrintAt(screen, strings.Join(lines, "\n"), x+22, y+58)
-
-	footer := s.panelFooter()
-	if footer != "" {
-		ebitenutil.DebugPrintAt(screen, footer, x+22, y+height-30)
+func (s *Shell) currentAudioSettings() AudioSettings {
+	return AudioSettings{
+		Muted:    s.settings.Muted,
+		Volume:   s.settings.Volume,
+		Latency:  time.Duration(s.settings.AudioLatencyMS) * time.Millisecond,
+		DeviceID: s.settings.AudioDeviceID,
 	}
-	ebitenutil.DrawRect(screen, 760, 612, 90, 36, menuActiveColor)
-	ebitenutil.DebugPrintAt(screen, "Close", 785, 626)
+}
+
+func (s *Shell) toggleMuted() {
+	s.settings.Muted = !s.settings.Muted
+	s.applyAudioSettings()
+}
+
+func (s *Shell) cycleVolume() {
+	s.settings.Volume += 5
+	if s.settings.Volume > 100 {
+		s.settings.Volume = 0
+	}
+	s.applyAudioSettings()
+}
+
+func (s *Shell) cycleAudioLatency() {
+	s.settings.AudioLatencyMS += 10
+	if s.settings.AudioLatencyMS > 250 {
+		s.settings.AudioLatencyMS = 20
+	}
+	s.applyAudioSettings()
+}
+
+func (s *Shell) cycleAudioDevice() {
+	devices := s.audioDevices()
+	current := -1
+	for index, device := range devices {
+		if device.ID == s.settings.AudioDeviceID {
+			current = index
+			break
+		}
+	}
+	s.settings.AudioDeviceID = devices[(current+1)%len(devices)].ID
+	s.applyAudioSettings()
+}
+
+func (s *Shell) audioDevices() []AudioDevice {
+	devices := []AudioDevice{{Name: "System default"}}
+	backend, ok := s.backend.(AudioDeviceBackend)
+	if !ok {
+		return devices
+	}
+	seen := map[string]bool{"": true}
+	for _, device := range backend.AudioDevices() {
+		if device.ID == "" || seen[device.ID] {
+			continue
+		}
+		if device.Name == "" {
+			device.Name = device.ID
+		}
+		seen[device.ID] = true
+		devices = append(devices, device)
+	}
+	return devices
+}
+
+func (s *Shell) audioDeviceLabel() string {
+	for _, device := range s.audioDevices() {
+		if device.ID == s.settings.AudioDeviceID {
+			return device.Name
+		}
+	}
+	return "System default"
+}
+
+func (s *Shell) cycleKeyboardProfile() {
+	s.updateControllerProfile(func(profile *ControllerProfile) {
+		if profile.KeyboardProfile == "default" {
+			profile.KeyboardProfile = "wasd"
+		} else {
+			profile.KeyboardProfile = "default"
+		}
+		profile.KeyboardBindings = nil
+	}, "Keyboard profile updated")
+}
+
+func (s *Shell) toggleVirtualKeypad() {
+	s.settings.ShowVirtualKeypad = !s.settings.ShowVirtualKeypad
+	s.saveControllerSettings("Virtual keypad: " + onOff(s.settings.ShowVirtualKeypad))
+}
+
+func (s *Shell) toggleGamepadEnabled() {
+	s.updateControllerProfile(func(profile *ControllerProfile) {
+		profile.GamepadEnabled = !profile.GamepadEnabled
+	}, "Gamepad input updated")
+}
+
+func (s *Shell) cycleGamepadLayout() {
+	s.updateControllerProfile(func(profile *ControllerProfile) {
+		if profile.GamepadLayout == "standard" {
+			profile.GamepadLayout = "swapped"
+		} else {
+			profile.GamepadLayout = "standard"
+		}
+		delete(profile.GamepadBindings, "ok")
+		delete(profile.GamepadBindings, "back")
+	}, "Gamepad confirm/back layout updated")
+}
+
+func (s *Shell) toggleGamepadAnalog() {
+	s.updateControllerProfile(func(profile *ControllerProfile) {
+		profile.GamepadAnalog = !profile.GamepadAnalog
+	}, "Analog directions updated")
+}
+
+func (s *Shell) cycleGamepadDeadzone() {
+	s.updateControllerProfile(func(profile *ControllerProfile) {
+		profile.GamepadDeadzone += 5
+		if profile.GamepadDeadzone > 50 {
+			profile.GamepadDeadzone = 15
+		}
+	}, "Gamepad dead zone updated")
+}
+
+func (s *Shell) resetControllerBindings() {
+	s.bindingCapture = nil
+	key := s.controllerProfileKey()
+	if key != "" {
+		delete(s.settings.TitleControllers, key)
+	} else {
+		s.settings.setGlobalControllerProfile(defaultSettings().globalControllerProfile())
+	}
+	s.saveControllerSettings("Controller bindings reset")
+}
+
+func (s *Shell) reloadGamepadMappings() {
+	applied, err := loadCustomGamepadMappings()
+	if err != nil {
+		s.setStatus("Controller database: " + err.Error())
+		return
+	}
+	s.gamepadMappingsLoaded = applied
+	if !applied {
+		path, pathErr := customGamepadMappingsPath()
+		if pathErr != nil {
+			s.setStatus("Controller database: " + pathErr.Error())
+			return
+		}
+		s.setStatus("Controller database: no mapping file at " + path)
+		return
+	}
+	s.setStatus("Custom controller database reloaded")
+}
+
+func (s *Shell) togglePerTitleControls() {
+	if s.settings.PerTitleControls {
+		s.settings.PerTitleControls = false
+		s.saveControllerSettings("Controller profile scope: global")
+		return
+	}
+	key := s.titleControllerKey()
+	if key == "" {
+		s.setStatus("Controller profile: open an identified title first")
+		return
+	}
+	s.settings.PerTitleControls = true
+	if _, ok := s.settings.TitleControllers[key]; !ok {
+		s.settings.TitleControllers[key] = s.settings.globalControllerProfile()
+	}
+	s.saveControllerSettings("Controller profile scope: this title")
+}
+
+func (s *Shell) controllerProfile() ControllerProfile {
+	global := s.settings.globalControllerProfile()
+	key := s.controllerProfileKey()
+	if key == "" {
+		return global
+	}
+	profile, ok := s.settings.TitleControllers[key]
+	if !ok {
+		return global
+	}
+	profile.normalize()
+	return profile
+}
+
+func (s *Shell) updateControllerProfile(update func(*ControllerProfile), status string) {
+	profile := s.controllerProfile()
+	update(&profile)
+	profile.normalize()
+	if key := s.controllerProfileKey(); key != "" {
+		if s.settings.TitleControllers == nil {
+			s.settings.TitleControllers = make(map[string]ControllerProfile)
+		}
+		s.settings.TitleControllers[key] = profile
+	} else {
+		s.settings.setGlobalControllerProfile(profile)
+	}
+	s.saveControllerSettings(status)
+}
+
+func (s *Shell) titleControllerKey() string {
+	if s.input == nil {
+		return ""
+	}
+	if s.input.SHA256 != "" {
+		return "sha256:" + strings.ToLower(s.input.SHA256)
+	}
+	if s.input.DisplayName != "" {
+		return "title:" + strings.ToLower(s.input.DisplayName)
+	}
+	return ""
+}
+
+func (s *Shell) controllerProfileKey() string {
+	if !s.settings.PerTitleControls {
+		return ""
+	}
+	return s.titleControllerKey()
+}
+
+func (s *Shell) controllerProfileScopeLabel() string {
+	if s.controllerProfileKey() != "" {
+		return "This title"
+	}
+	return "Global"
+}
+
+func (s *Shell) gamepadBindingLabel(control string) string {
+	for _, binding := range gamepadBindingsForProfile(s.controllerProfile()) {
+		if binding.Control == control {
+			return binding.Label
+		}
+	}
+	return "Unassigned"
+}
+
+func (s *Shell) saveControllerSettings(status string) {
+	if err := s.settings.save(); err != nil {
+		s.setStatus("Controller settings: " + err.Error())
+		return
+	}
+	s.setStatus(status)
+}
+
+func gamepadLayoutLabel(layout string) string {
+	switch layout {
+	case "swapped":
+		return "East confirm"
+	case "custom":
+		return "Custom"
+	default:
+		return "South confirm"
+	}
+}
+
+func keyboardProfileLabel(profile string) string {
+	switch profile {
+	case "wasd":
+		return "WASD"
+	case "custom":
+		return "Custom"
+	default:
+		return "Arrow keys"
+	}
+}
+
+func controlDisplayName(control string) string {
+	switch control {
+	case "up":
+		return "Up"
+	case "down":
+		return "Down"
+	case "left":
+		return "Left"
+	case "right":
+		return "Right"
+	case "ok":
+		return "Confirm"
+	case "back":
+		return "Back"
+	case "soft-left":
+		return "Soft key left"
+	case "soft-right":
+		return "Soft key right"
+	case "menu":
+		return "Menu"
+	case "star":
+		return "Star"
+	case "hash":
+		return "Hash"
+	default:
+		if strings.HasPrefix(control, "num") && len(control) == 4 {
+			return "Number " + strings.TrimPrefix(control, "num")
+		}
+		return control
+	}
+}
+
+func (s *Shell) cycleThemeMode() {
+	if s.settings.ThemeMode == "light" {
+		s.settings.ThemeMode = "dark"
+	} else {
+		s.settings.ThemeMode = "light"
+	}
+	_ = s.settings.save()
+	s.setStatus("Appearance: " + strings.Title(s.settings.ThemeMode))
 }
 
 func (s *Shell) panelLines() []string {
@@ -208,34 +505,6 @@ func (s *Shell) panelLines() []string {
 			return []string{"No frontend log entries."}
 		}
 		return append([]string(nil), s.logs[start:]...)
-	case "controller":
-		lines := []string{
-			"Keyboard profile: " + s.settings.KeyboardProfile,
-			fmt.Sprintf("Connected gamepads: %d", len(ebiten.AppendGamepadIDs(nil))),
-			"",
-			"Normalized control bindings:",
-		}
-		for _, binding := range keyboardBindings(s.settings.KeyboardProfile) {
-			lines = append(lines, fmt.Sprintf("  %-12s  %s", binding.Control, binding.Label))
-		}
-		lines = append(lines,
-			"",
-			"Standard gamepad layout: D-pad, A/B, shoulders, and Menu.",
-			"Keyboard and gamepad state are merged before events reach the backend.",
-		)
-		return lines
-	case "audio":
-		backendStatus := "The current backend does not expose live audio configuration."
-		if _, ok := s.backend.(AudioBackend); ok {
-			backendStatus = "Changes are applied to the connected backend immediately."
-		}
-		return []string{
-			fmt.Sprintf("Muted: %t", s.settings.Muted),
-			fmt.Sprintf("Volume: %d%%", s.settings.Volume),
-			fmt.Sprintf("Requested latency: %d ms", s.settings.AudioLatencyMS),
-			"",
-			backendStatus,
-		}
 	case "properties":
 		if s.input == nil {
 			return []string{"No input is selected."}
@@ -284,10 +553,6 @@ func (s *Shell) panelFooter() string {
 		return ""
 	}
 	switch s.panel.Kind {
-	case "audio":
-		return "M: mute  Up/Down: volume  Left/Right: latency  Esc: close"
-	case "controller":
-		return "P: switch keyboard profile  Esc: close"
 	case "compatibility":
 		return "S: save report  Esc: close"
 	case "tool":

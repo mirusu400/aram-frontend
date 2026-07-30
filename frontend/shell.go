@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"image/color"
 	"path/filepath"
 	"strings"
 	"time"
@@ -16,22 +15,10 @@ import (
 const (
 	logicalWidth   = 960
 	logicalHeight  = 720
-	menuHeight     = 28
-	statusHeight   = 24
-	menuItemHeight = 26
-	dropdownWidth  = 310
-)
-
-var (
-	backgroundColor = color.RGBA{R: 0x18, G: 0x1b, B: 0x20, A: 0xff}
-	menuColor       = color.RGBA{R: 0x27, G: 0x2b, B: 0x33, A: 0xff}
-	menuActiveColor = color.RGBA{R: 0x3a, G: 0x61, B: 0x8f, A: 0xff}
-	panelColor      = color.RGBA{R: 0x20, G: 0x24, B: 0x2b, A: 0xff}
-	borderColor     = color.RGBA{R: 0x51, G: 0x58, B: 0x65, A: 0xff}
-	disabledColor   = color.RGBA{R: 0x52, G: 0x56, B: 0x5f, A: 0xff}
-	accentColor     = color.RGBA{R: 0x52, G: 0x86, B: 0xbd, A: 0xff}
-	faultColor      = color.RGBA{R: 0x8f, G: 0x3f, B: 0x46, A: 0xff}
-	colorOverlay    = color.RGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x99}
+	menuHeight     = menuBarHeight
+	statusHeight   = statusBarHeight
+	menuItemHeight = 40
+	dropdownWidth  = 330
 )
 
 type operation uint8
@@ -59,42 +46,58 @@ type commandResult struct {
 	err     error
 }
 
+type frameRunResult struct {
+	generation uint64
+	err        error
+}
+
 type Shell struct {
-	backend          Backend
-	picker           Picker
-	menus            []Menu
-	settings         Settings
-	state            FrontendState
-	problem          *FrontendProblem
-	activeMenu       int
-	status           string
-	input            *InputInfo
-	selectedPath     string
-	temporaryPath    string
-	dialogOpen       bool
-	loading          bool
-	quitting         bool
-	hostActive       bool
-	hostPaused       bool
-	preDialogState   FrontendState
-	panel            *Panel
-	logs             []string
-	startedAt        time.Time
-	frame            VideoFrame
-	frameImage       *ebiten.Image
-	controlState     map[string]bool
-	touchControls    map[ebiten.TouchID]string
-	busyCommands     map[BackendCommand]bool
-	pickerResults    chan pickerResult
-	backendResults   chan backendResult
-	commandResults   chan commandResult
-	openStageResults chan OpenStage
-	externalOpen     chan OpenRequest
-	externalCommands chan string
-	hostLifecycle    chan bool
-	dropResults      chan dropResult
-	artifactResults  chan artifactResult
-	toolResults      chan toolResult
+	backend                   Backend
+	picker                    Picker
+	design                    *ARAMDesignSystem
+	interfaceUI               *shellUI
+	menus                     []Menu
+	settings                  Settings
+	state                     FrontendState
+	problem                   *FrontendProblem
+	activeMenu                int
+	status                    string
+	input                     *InputInfo
+	selectedPath              string
+	temporaryPath             string
+	dialogOpen                bool
+	loading                   bool
+	quitting                  bool
+	hostActive                bool
+	hostPaused                bool
+	preDialogState            FrontendState
+	panel                     *Panel
+	settingsSection           string
+	layoutWidth               int
+	layoutHeight              int
+	logs                      []string
+	frame                     VideoFrame
+	frameImage                *ebiten.Image
+	audioOutput               *audioOutput
+	controlState              map[string]bool
+	bindingCapture            *bindingCapture
+	gamepadMappingsLoaded     bool
+	touchControls             map[ebiten.TouchID]string
+	busyCommands              map[BackendCommand]bool
+	frameRunPending           bool
+	frameGeneration           uint64
+	pickerResults             chan pickerResult
+	backendResults            chan backendResult
+	commandResults            chan commandResult
+	frameRunResults           chan frameRunResult
+	openStageResults          chan OpenStage
+	externalOpen              chan OpenRequest
+	externalCommands          chan string
+	externalSelectionCanceled chan struct{}
+	hostLifecycle             chan bool
+	dropResults               chan dropResult
+	artifactResults           chan artifactResult
+	toolResults               chan toolResult
 }
 
 func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
@@ -105,29 +108,46 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		picker = NewPlatformPicker()
 	}
 	shell := &Shell{
-		backend:          backend,
-		picker:           picker,
-		settings:         loadSettings(),
-		state:            FrontendEmpty,
-		activeMenu:       -1,
-		status:           "Ready - use File > Open File...",
-		startedAt:        time.Now(),
-		hostActive:       true,
-		controlState:     make(map[string]bool),
-		touchControls:    make(map[ebiten.TouchID]string),
-		busyCommands:     make(map[BackendCommand]bool),
-		pickerResults:    make(chan pickerResult, 2),
-		backendResults:   make(chan backendResult, 2),
-		commandResults:   make(chan commandResult, 8),
-		openStageResults: make(chan OpenStage, 4),
-		externalOpen:     make(chan OpenRequest, 2),
-		externalCommands: make(chan string, 4),
-		hostLifecycle:    make(chan bool, 2),
-		dropResults:      make(chan dropResult, 2),
-		artifactResults:  make(chan artifactResult, 4),
-		toolResults:      make(chan toolResult, 2),
+		backend:                   backend,
+		picker:                    picker,
+		settings:                  loadSettings(),
+		state:                     FrontendEmpty,
+		activeMenu:                -1,
+		status:                    "Ready - use File > Open File...",
+		settingsSection:           "General",
+		layoutWidth:               logicalWidth,
+		layoutHeight:              logicalHeight,
+		hostActive:                true,
+		controlState:              make(map[string]bool),
+		touchControls:             make(map[ebiten.TouchID]string),
+		busyCommands:              make(map[BackendCommand]bool),
+		pickerResults:             make(chan pickerResult, 2),
+		backendResults:            make(chan backendResult, 2),
+		commandResults:            make(chan commandResult, 8),
+		frameRunResults:           make(chan frameRunResult, 2),
+		openStageResults:          make(chan OpenStage, 4),
+		externalOpen:              make(chan OpenRequest, 2),
+		externalCommands:          make(chan string, 4),
+		externalSelectionCanceled: make(chan struct{}, 1),
+		hostLifecycle:             make(chan bool, 2),
+		dropResults:               make(chan dropResult, 2),
+		artifactResults:           make(chan artifactResult, 4),
+		toolResults:               make(chan toolResult, 2),
 	}
 	shell.menus = defaultMenus()
+	shell.design = newARAMDesignSystem(shell.settings.ThemeMode)
+	shell.interfaceUI = newShellUI(shell, shell.design)
+	if audio, ok := shell.backend.(AudioBackend); ok {
+		if err := audio.ConfigureAudio(shell.currentAudioSettings()); err != nil {
+			shell.appendLog("Audio settings: " + err.Error())
+		}
+	}
+	if applied, err := loadCustomGamepadMappings(); err != nil {
+		shell.appendLog("Controller database: " + err.Error())
+	} else if applied {
+		shell.gamepadMappingsLoaded = true
+		shell.appendLog("Custom controller database loaded")
+	}
 	shell.appendLog(shell.status)
 	if initialPath != "" {
 		shell.openRequest(OpenRequest{Path: initialPath})
@@ -164,6 +184,15 @@ func (s *Shell) SetHostActive(active bool) {
 	}
 }
 
+// CancelExternalDocumentSelection lets a native picker restore the shell
+// after the user dismisses its platform-owned document UI.
+func (s *Shell) CancelExternalDocumentSelection() {
+	select {
+	case s.externalSelectionCanceled <- struct{}{}:
+	default:
+	}
+}
+
 func (s *Shell) Update() error {
 	if s.quitting {
 		return ebiten.Termination
@@ -172,30 +201,61 @@ func (s *Shell) Update() error {
 	s.syncBackendState()
 	s.syncHostLifecycle()
 	s.updateVideo()
+	s.updateAudio()
 	s.handleDroppedFiles()
-	s.handleShortcuts()
+	if !s.handleBindingCapture() {
+		s.handleShortcuts()
+	}
 	s.handleTouch()
+	s.syncDesignSystem()
+	if s.interfaceUI != nil {
+		s.interfaceUI.sync(s)
+		s.interfaceUI.ui.Update()
+	} else {
+		s.handleMouse()
+	}
 	s.handleMappedInput()
-	s.handleMouse()
+	s.scheduleRunningFrame()
 	return nil
 }
 
+func (s *Shell) syncDesignSystem() {
+	if s.design != nil && s.design.Mode == s.settings.ThemeMode {
+		return
+	}
+	s.design = newARAMDesignSystem(s.settings.ThemeMode)
+	s.interfaceUI = newShellUI(s, s.design)
+}
+
 func (s *Shell) Draw(screen *ebiten.Image) {
-	screen.Fill(backgroundColor)
-	s.drawMenuBar(screen)
+	palette := defaultARAMPalette()
+	if s.design != nil {
+		palette = s.design.Palette
+	}
+	screen.Fill(palette.Canvas)
 	s.drawWorkspace(screen)
 	s.drawTouchControls(screen)
-	s.drawStatusBar(screen)
-	if s.activeMenu >= 0 {
-		s.drawDropdown(screen, s.activeMenu)
-	}
-	if s.panel != nil {
-		s.drawPanel(screen)
+	s.drawVirtualKeypad(screen)
+	if s.interfaceUI != nil {
+		s.interfaceUI.ui.Draw(screen)
 	}
 }
 
-func (s *Shell) Layout(int, int) (int, int) {
-	return logicalWidth, logicalHeight
+func (s *Shell) Layout(outsideWidth, outsideHeight int) (int, int) {
+	if outsideWidth <= 0 || outsideHeight <= 0 {
+		outsideWidth, outsideHeight = logicalWidth, logicalHeight
+	}
+	s.layoutWidth = outsideWidth
+	s.layoutHeight = outsideHeight
+	return outsideWidth, outsideHeight
+}
+
+func (s *Shell) viewportSize() (int, int) {
+	width, height := s.layoutWidth, s.layoutHeight
+	if width <= 0 || height <= 0 {
+		return logicalWidth, logicalHeight
+	}
+	return width, height
 }
 
 func (s *Shell) handleShortcuts() {
@@ -348,6 +408,10 @@ func (s *Shell) consumeResults() {
 			s.openRequest(request)
 		case commandID := <-s.externalCommands:
 			s.dispatchCommand(commandID)
+		case <-s.externalSelectionCanceled:
+			s.dialogOpen = false
+			s.state = s.preDialogState
+			s.setStatus("Selection canceled")
 		case active := <-s.hostLifecycle:
 			s.hostActive = active
 		case stage := <-s.openStageResults:
@@ -372,6 +436,22 @@ func (s *Shell) consumeResults() {
 			}
 			s.state = s.stableState()
 			s.setStatus(string(result.command) + ": complete")
+		case result := <-s.frameRunResults:
+			if result.generation != s.frameGeneration {
+				continue
+			}
+			s.frameRunPending = false
+			if result.err != nil {
+				s.state = frontendStateForError(result.err)
+				s.problem = &FrontendProblem{
+					State:       s.state,
+					Input:       displayNameForInfo(s.input),
+					Backend:     s.backendName(),
+					Reason:      result.err.Error(),
+					Recoverable: true,
+				}
+				s.setStatus("Run frame: " + result.err.Error())
+			}
 		case result := <-s.dropResults:
 			if result.err != nil {
 				s.setStatus("Drop: " + result.err.Error())
@@ -403,6 +483,8 @@ func (s *Shell) consumePickerResult(result pickerResult) {
 		switch {
 		case errors.Is(result.err, ErrPickerCanceled):
 			s.setStatus("Selection canceled")
+		case errors.Is(result.err, ErrPickerDeferred):
+			s.setStatus("Waiting for the native document picker...")
 		case errors.Is(result.err, ErrPickerUnavailable):
 			s.setStatus("Use the native mobile document picker")
 		default:
@@ -449,6 +531,8 @@ func (s *Shell) consumeBackendResult(result backendResult) {
 	}
 
 	s.problem = nil
+	s.frameGeneration++
+	s.frameRunPending = false
 	s.state = s.stableState()
 	if s.state == FrontendEmpty {
 		s.state = FrontendReady
@@ -460,6 +544,12 @@ func (s *Shell) consumeBackendResult(result backendResult) {
 		emptyFallback(result.info.ProfileID, "auto"),
 	))
 	setPlatformWindowTitle("ARAM - " + result.info.DisplayName)
+
+	backendState := s.backend.State()
+	if (backendState == StateReady || backendState == StatePaused) &&
+		s.backend.Supports(CommandStart) {
+		s.executeBackend(CommandStart)
+	}
 }
 
 func (s *Shell) chooseFile() {
@@ -494,6 +584,14 @@ func (s *Shell) chooseRecent() {
 	if s.dialogOpen || len(s.settings.RecentFiles) == 0 {
 		return
 	}
+	if s.interfaceUI != nil {
+		s.panel = &Panel{
+			Kind:  "recent",
+			Title: "Open Recent",
+		}
+		s.setStatus("Select a recent input")
+		return
+	}
 	s.preDialogState = s.state
 	s.state = FrontendSelecting
 	s.dialogOpen = true
@@ -503,6 +601,16 @@ func (s *Shell) chooseRecent() {
 		path, err := s.picker.ChooseRecent(recent)
 		s.pickerResults <- pickerResult{operation: operationRecent, path: path, err: err}
 	}()
+}
+
+func (s *Shell) openRecentPath(path string) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		s.setStatus("Open recent: no input selected")
+		return
+	}
+	s.panel = nil
+	s.openRequest(OpenRequest{Path: path})
 }
 
 func (s *Shell) openRequest(request OpenRequest) {
@@ -580,6 +688,9 @@ func (s *Shell) releaseCurrentInput() error {
 	if err := s.backend.Close(); err != nil {
 		return err
 	}
+	if s.audioOutput != nil {
+		s.audioOutput.flush()
+	}
 	if s.temporaryPath != "" {
 		removeTemporaryDrop(s.temporaryPath)
 		s.temporaryPath = ""
@@ -588,11 +699,51 @@ func (s *Shell) releaseCurrentInput() error {
 	s.selectedPath = ""
 	s.problem = nil
 	s.hostPaused = false
+	s.frameGeneration++
+	s.frameRunPending = false
 	s.frame = VideoFrame{}
 	s.frameImage = nil
 	s.state = FrontendEmpty
 	setPlatformWindowTitle("ARAM - Archived Runtime for ARM Mobiles")
 	return nil
+}
+
+func (s *Shell) updateAudio() {
+	if s.loading || s.input == nil || s.frameRunPending {
+		return
+	}
+	backend, ok := s.backend.(AudioStreamBackend)
+	if !ok {
+		return
+	}
+	chunk := backend.DrainAudio()
+	if len(chunk.PCM16) == 0 {
+		if s.audioOutput != nil {
+			s.audioOutput.startIfReady(time.Now())
+		}
+		return
+	}
+	if s.audioOutput == nil {
+		output, err := newAudioOutput(s.currentAudioSettings())
+		if err != nil {
+			s.appendLog("Audio output: " + err.Error())
+			return
+		}
+		s.audioOutput = output
+	}
+	if err := s.audioOutput.enqueue(chunk); err != nil {
+		s.appendLog("Audio stream: " + err.Error())
+	}
+	s.audioOutput.startIfReady(time.Now())
+}
+
+func (s *Shell) closeAudio() error {
+	if s.audioOutput == nil {
+		return nil
+	}
+	err := s.audioOutput.close()
+	s.audioOutput = nil
+	return err
 }
 
 func (s *Shell) syncBackendState() {
@@ -658,6 +809,33 @@ func (s *Shell) updateVideo() {
 	}
 	s.frame = frame
 	s.frameImage = ebiten.NewImageFromImage(frame.Image)
+}
+
+func (s *Shell) scheduleRunningFrame() {
+	if !s.hostActive ||
+		s.hostPaused ||
+		s.loading ||
+		s.dialogOpen ||
+		s.problem != nil ||
+		s.input == nil ||
+		s.frameRunPending ||
+		len(s.busyCommands) != 0 ||
+		s.backend.State() != StateRunning {
+		return
+	}
+	backend, ok := s.backend.(FrameBackend)
+	if !ok {
+		return
+	}
+	generation := s.frameGeneration
+	s.frameRunPending = true
+	go func() {
+		err := backend.RunFrame(context.Background())
+		s.frameRunResults <- frameRunResult{
+			generation: generation,
+			err:        err,
+		}
+	}()
 }
 
 func (s *Shell) handleDroppedFiles() {
@@ -789,9 +967,9 @@ func (s *Shell) appendLog(message string) {
 func menuWidths(menus []Menu) []int {
 	widths := make([]int, len(menus))
 	for index, menu := range menus {
-		width := len(menu.Label)*8 + 28
-		if width < 68 {
-			width = 68
+		width := len(menu.Label)*7 + 22
+		if width < 58 {
+			width = 58
 		}
 		widths[index] = width
 	}
@@ -815,6 +993,13 @@ func displayName(request OpenRequest) string {
 		return filepath.Base(request.Path)
 	}
 	return "document"
+}
+
+func displayNameForInfo(info *InputInfo) string {
+	if info == nil {
+		return ""
+	}
+	return info.DisplayName
 }
 
 func emptyFallback(value, fallback string) string {
