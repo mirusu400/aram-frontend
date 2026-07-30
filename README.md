@@ -1,5 +1,7 @@
 # ARAM Frontend
 
+[![ci](https://github.com/mirusu400/aram-frontend/actions/workflows/ci.yml/badge.svg)](https://github.com/mirusu400/aram-frontend/actions/workflows/ci.yml)
+
 Cross-platform product frontend for **ARAM — Archived Runtime for ARM
 Mobiles**.
 
@@ -69,6 +71,13 @@ The generated mobile API accepts a native `Host` callback for document-picker
 requests and exposes completion, cancellation, lifecycle, and audio-focus
 entry points.
 
-The CI workflow builds the Android AAR as a first-class portability check.
+Every push and pull request tests, vets, and builds the standalone frontend on
+Windows x64, Linux x64, and macOS arm64. Compressed desktop artifacts, the
+Android AAR, and the iOS XCFramework are retained for 14 days. The standalone
+desktop artifacts use the null backend; the runnable integrated emulator is
+published by `aram-emu`.
+
+The CI workflow builds the Android AAR and iOS XCFramework as first-class
+portability checks.
 The native Android host project and release signing remain integration
 responsibilities rather than frontend-library concerns.

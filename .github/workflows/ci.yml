@@ -3,18 +3,44 @@ name: ci
 on:
   push:
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   desktop:
+    name: ${{ matrix.name }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+        include:
+          - name: Windows x64
+            runner: windows-latest
+            platform: windows-amd64
+            executable: aram-frontend.exe
+            archive: aram-frontend-windows-amd64.zip
+          - name: Linux x64
+            runner: ubuntu-latest
+            platform: linux-amd64
+            executable: aram-frontend
+            archive: aram-frontend-linux-amd64.tar.gz
+          - name: macOS arm64
+            runner: macos-latest
+            platform: macos-arm64
+            executable: aram-frontend
+            archive: aram-frontend-macos-arm64.tar.gz
+    runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.25.x"
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
@@ -29,15 +55,43 @@ jobs:
       - name: Test under Xvfb
         if: runner.os == 'Linux'
         run: xvfb-run -a go test ./...
-      - run: go vet ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Build standalone frontend
+        shell: bash
+        run: |
+          mkdir -p build/package dist
+          go build -trimpath -ldflags="-s -w" \
+            -o "build/package/${{ matrix.executable }}" \
+            ./cmd/aram-frontend
+          cp README.md build/package/
+      - name: Package Windows frontend
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path 'build/package/*' `
+            -DestinationPath 'dist/${{ matrix.archive }}'
+      - name: Package Unix frontend
+        if: runner.os != 'Windows'
+        shell: bash
+        run: tar -C build/package -czf "dist/${{ matrix.archive }}" .
+      - name: Upload standalone frontend
+        uses: actions/upload-artifact@v7
+        with:
+          name: aram-frontend-${{ matrix.platform }}
+          path: dist/${{ matrix.archive }}
+          if-no-files-found: error
+          retention-days: 14
 
   android-binding:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.25.x"
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
       - name: Install Ebitengine mobile binder
         run: go install github.com/hajimehoshi/ebiten/v2/cmd/ebitenmobile@v2.9.9
       - name: Build Android AAR
@@ -48,19 +102,21 @@ jobs:
             -javapkg io.github.mirusu400.aram \
             -o build/aram.aar \
             ./mobile
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: aram-frontend-android-aar
           path: build/aram.aar
           if-no-files-found: error
+          retention-days: 14
 
   ios-binding:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.25.x"
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
       - name: Install Ebitengine mobile binder
         run: go install github.com/hajimehoshi/ebiten/v2/cmd/ebitenmobile@v2.9.9
       - name: Build iOS XCFramework
@@ -70,8 +126,9 @@ jobs:
             -target ios \
             -o build/ARAM.xcframework \
             ./mobile
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: aram-frontend-ios-xcframework
           path: build/ARAM.xcframework
           if-no-files-found: error
+          retention-days: 14
