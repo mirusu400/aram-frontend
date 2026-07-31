@@ -130,10 +130,13 @@ requests and exposes completion, cancellation, lifecycle, and audio-focus
 entry points.
 
 Every push and pull request tests, vets, and builds the standalone frontend on
-Windows x64, Linux x64, and macOS arm64. Compressed desktop artifacts, the
-Android AAR, and the iOS XCFramework are retained for 14 days. The standalone
-desktop artifacts use the null backend; the runnable integrated emulator is
-published by `aram-emu`.
+Windows x64, Linux x64, and macOS arm64. Branch and pull-request builds do not
+upload GitHub Actions artifacts. Main and Stable release runs use the three
+desktop archives only as a temporary cross-job handoff, delete those workflow
+artifacts immediately after publishing, and keep the resulting files only on
+the GitHub Release. The Android AAR and iOS XCFramework are build gates and are
+not uploaded as workflow artifacts. The standalone desktop builds use the null
+backend; the runnable integrated emulator is published by `aram-emu`.
 
 After every successful push to `main`, CI moves the `nightly` tag to that
 commit and updates the rolling Nightly prerelease with the exact three desktop

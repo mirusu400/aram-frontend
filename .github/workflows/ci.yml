@@ -95,12 +95,16 @@ jobs:
         shell: bash
         run: tar -C build/package -czf "dist/${{ matrix.archive }}" .
       - name: Upload standalone frontend
+        if: >-
+          (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'release' &&
+          github.event.release.tag_name != 'nightly')
         uses: actions/upload-artifact@v7
         with:
           name: aram-frontend-${{ matrix.platform }}
           path: dist/${{ matrix.archive }}
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 1
 
   android-binding:
     runs-on: ubuntu-latest
@@ -133,13 +137,6 @@ jobs:
             -javapkg io.github.mirusu400.aram \
             -o build/aram.aar \
             ./mobile
-      - uses: actions/upload-artifact@v7
-        with:
-          name: aram-frontend-android-aar
-          path: build/aram.aar
-          if-no-files-found: error
-          retention-days: 14
-
   ios-binding:
     runs-on: macos-latest
     steps:
@@ -170,13 +167,6 @@ jobs:
             -ldflags="-s -w -X=github.com/mirusu400/aram-frontend/frontend.BuildVersion=${ARAM_BUILD_VERSION}" \
             -o build/ARAM.xcframework \
             ./mobile
-      - uses: actions/upload-artifact@v7
-        with:
-          name: aram-frontend-ios-xcframework
-          path: build/ARAM.xcframework
-          if-no-files-found: error
-          retention-days: 14
-
   publish-nightly:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs:
@@ -185,6 +175,7 @@ jobs:
       - ios-binding
     runs-on: ubuntu-latest
     permissions:
+      actions: write
       contents: write
     steps:
       - uses: actions/checkout@v6
@@ -242,6 +233,22 @@ jobs:
           mapfile -t assets < <(find release-assets -type f -print)
           test "${#assets[@]}" -gt 0
           gh release upload nightly "${assets[@]}" --clobber
+      - name: Delete temporary workflow artifacts
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          mapfile -t artifact_ids < <(
+            gh api --paginate \
+              "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts?per_page=100" \
+              --jq '.artifacts[].id'
+          )
+          for artifact_id in "${artifact_ids[@]}"; do
+            gh api --method DELETE \
+              "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}"
+          done
+          echo "Deleted ${#artifact_ids[@]} temporary artifact(s)."
 
   publish-stable:
     if: github.event_name == 'release' && github.event.release.tag_name != 'nightly'
@@ -251,6 +258,7 @@ jobs:
       - ios-binding
     runs-on: ubuntu-latest
     permissions:
+      actions: write
       contents: write
     steps:
       - uses: actions/checkout@v6
@@ -287,3 +295,58 @@ jobs:
           mapfile -t assets < <(find release-assets -type f -print)
           test "${#assets[@]}" -gt 0
           gh release upload "${RELEASE_TAG}" "${assets[@]}" --clobber
+      - name: Delete temporary workflow artifacts
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          mapfile -t artifact_ids < <(
+            gh api --paginate \
+              "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts?per_page=100" \
+              --jq '.artifacts[].id'
+          )
+          for artifact_id in "${artifact_ids[@]}"; do
+            gh api --method DELETE \
+              "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}"
+          done
+          echo "Deleted ${#artifact_ids[@]} temporary artifact(s)."
+
+  cleanup-artifacts:
+    name: Delete artifacts after a failed publish
+    if: >-
+      always() &&
+      (
+        (
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' &&
+          needs.publish-nightly.result != 'success'
+        ) ||
+        (github.event_name == 'release' &&
+        github.event.release.tag_name != 'nightly' &&
+        needs.publish-stable.result != 'success')
+      )
+    needs:
+      - desktop
+      - publish-nightly
+      - publish-stable
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Delete this run's temporary artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          mapfile -t artifact_ids < <(
+            gh api --paginate \
+              "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts?per_page=100" \
+              --jq '.artifacts[].id'
+          )
+          for artifact_id in "${artifact_ids[@]}"; do
+            gh api --method DELETE \
+              "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}"
+          done
+          echo "Deleted ${#artifact_ids[@]} temporary artifact(s)."
