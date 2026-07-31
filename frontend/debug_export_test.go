@@ -2,7 +2,11 @@ package frontend
 
 import (
 	"archive/zip"
+	"bytes"
 	"encoding/json"
+	"image"
+	"image/color"
+	"image/png"
 	"io"
 	"os"
 	"path/filepath"
@@ -38,6 +42,11 @@ func TestWriteDebugBundleIncludesManifestLogsAndBackendArtifacts(t *testing.T) {
 		},
 		Settings:     debugSettingsReport{Language: "en", Speed: 1, Volume: 80},
 		FrontendLogs: []string{"01:02:03  Loaded synthetic.dat", "01:02:04  synthetic fault"},
+		Screenshot: func() *image.RGBA {
+			frame := image.NewRGBA(image.Rect(0, 0, 2, 2))
+			frame.Set(1, 0, color.RGBA{R: 0x12, G: 0x34, B: 0x56, A: 0xff})
+			return frame
+		}(),
 	}
 	path, warning, err := writeDebugBundle(snapshot, []DebugArtifact{
 		{
@@ -67,6 +76,7 @@ func TestWriteDebugBundleIncludesManifestLogsAndBackendArtifacts(t *testing.T) {
 		"core.log",
 		"frontend.log",
 		"manifest.json",
+		"screenshot.png",
 	}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("entries = %v, want %v", got, want)
 	}
@@ -87,13 +97,33 @@ func TestWriteDebugBundleIncludesManifestLogsAndBackendArtifacts(t *testing.T) {
 		manifest.Session.Problem == nil {
 		t.Fatalf("manifest = %+v", manifest)
 	}
-	if len(manifest.Files) != 3 {
+	if len(manifest.Files) != 4 {
 		t.Fatalf("manifest files = %+v", manifest.Files)
 	}
 	for _, file := range manifest.Files {
 		if file.SHA256 == "" || file.Size != len(entries[file.Name]) {
 			t.Fatalf("manifest file = %+v", file)
 		}
+	}
+	screenshot, err := png.Decode(bytes.NewReader(entries["screenshot.png"]))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, g, b, a := screenshot.At(1, 0).RGBA()
+	if r != 0x1212 || g != 0x3434 || b != 0x5656 || a != 0xffff {
+		t.Fatalf("screenshot pixel = %#04x %#04x %#04x %#04x", r, g, b, a)
+	}
+	var screenshotReport *debugFileReport
+	for index := range manifest.Files {
+		if manifest.Files[index].Name == "screenshot.png" {
+			screenshotReport = &manifest.Files[index]
+			break
+		}
+	}
+	if screenshotReport == nil ||
+		screenshotReport.Source != "frontend" ||
+		screenshotReport.MediaType != "image/png" {
+		t.Fatalf("screenshot manifest entry = %+v", screenshotReport)
 	}
 }
 
@@ -179,6 +209,28 @@ func TestCaptureDebugBundleRedactsHostPaths(t *testing.T) {
 			joined,
 			snapshot.Problem.Reason,
 		)
+	}
+}
+
+func TestCaptureDebugBundleCopiesGuestNativeScreenshot(t *testing.T) {
+	source := image.NewRGBA(image.Rect(10, 20, 12, 22))
+	source.Set(10, 20, color.RGBA{R: 0xaa, G: 0xbb, B: 0xcc, A: 0xff})
+	shell := &Shell{
+		backend:  NullBackend{},
+		settings: defaultSettings(),
+		frame:    VideoFrame{Image: source, Sequence: 1},
+	}
+
+	snapshot := shell.captureDebugBundleSnapshot(time.Now().UTC())
+	source.Set(10, 20, color.RGBA{R: 0, G: 0, B: 0, A: 0xff})
+
+	if snapshot.Screenshot == nil ||
+		snapshot.Screenshot.Bounds() != image.Rect(0, 0, 2, 2) {
+		t.Fatalf("captured screenshot = %#v", snapshot.Screenshot)
+	}
+	r, g, b, a := snapshot.Screenshot.At(0, 0).RGBA()
+	if r != 0xaaaa || g != 0xbbbb || b != 0xcccc || a != 0xffff {
+		t.Fatalf("captured pixel = %#04x %#04x %#04x %#04x", r, g, b, a)
 	}
 }
 

@@ -2,11 +2,14 @@ package frontend
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"image"
+	"image/png"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -34,6 +37,7 @@ type debugBundleSnapshot struct {
 	Build         debugBuildReport
 	FrontendLogs  []string
 	Redactions    []string
+	Screenshot    *image.RGBA
 }
 
 type debugBundleManifest struct {
@@ -174,6 +178,10 @@ func (s *Shell) captureDebugBundleSnapshot(createdAt time.Time) debugBundleSnaps
 	}
 	build := currentDebugBuildReport()
 	redactDebugBuildReport(&build, redactions)
+	var screenshot *image.RGBA
+	if frame := s.currentFrame(); frame.Image != nil {
+		screenshot = cloneImage(frame.Image)
+	}
 
 	return debugBundleSnapshot{
 		CreatedAt:     createdAt,
@@ -199,6 +207,7 @@ func (s *Shell) captureDebugBundleSnapshot(createdAt time.Time) debugBundleSnaps
 		Build:        build,
 		FrontendLogs: logs,
 		Redactions:   redactions,
+		Screenshot:   screenshot,
 	}
 }
 
@@ -217,6 +226,18 @@ func writeDebugBundle(
 		mediaType: "text/plain; charset=utf-8",
 		data:      frontendLog,
 	}}
+	if snapshot.Screenshot != nil {
+		var screenshot bytes.Buffer
+		if err := png.Encode(&screenshot, snapshot.Screenshot); err != nil {
+			return "", "", fmt.Errorf("encode debug screenshot: %w", err)
+		}
+		files = append(files, debugBundleFile{
+			name:      "screenshot.png",
+			source:    "frontend",
+			mediaType: "image/png",
+			data:      screenshot.Bytes(),
+		})
+	}
 	warnings := make([]string, 0, 2)
 	if backendErr != nil {
 		warnings = append(
@@ -289,8 +310,9 @@ func validateDebugArtifacts(artifacts []DebugArtifact) ([]debugBundleFile, []str
 	files := make([]debugBundleFile, 0, len(artifacts))
 	warnings := make([]string, 0)
 	names := map[string]bool{
-		"manifest.json": true,
-		"frontend.log":  true,
+		"manifest.json":  true,
+		"frontend.log":   true,
+		"screenshot.png": true,
 	}
 	total := 0
 	for _, artifact := range artifacts {

@@ -14,7 +14,8 @@ This repository owns:
   controller configuration, cheats, debugger, and compatibility reporting.
 
 The Tools menu can export one attachable debug ZIP containing redacted
-frontend event logs plus bounded diagnostics supplied by the active backend.
+frontend event logs, the current guest-native screenshot when available, and
+bounded diagnostics supplied by the active backend.
 
 The presentation layer uses Ebitengine with EbitenUI and an ARAM-specific
 design system. Semantic palette, typography, spacing, radius, and component
@@ -56,8 +57,9 @@ format inspection and safe loading.
 `Tools > Export Debug Bundle...` (`Ctrl+Shift+D`) writes an `aram-debug-*.zip`
 below the platform configuration directory. The bundle contains a JSON
 manifest, redacted frontend logs, build/runtime metadata, input identity
-metadata, and checked backend diagnostic files. It never copies the selected
-game or firmware bytes, guest memory, framebuffer pixels, save data, or media.
+metadata, the current guest-native screenshot when available, and checked
+backend diagnostic files. It never copies the selected game or firmware bytes,
+guest memory, save data, or other proprietary media.
 `Tools > Open Debug Bundle Folder` creates that directory when necessary and
 opens it in Explorer, Finder, or the desktop file manager.
 

@@ -165,8 +165,10 @@ folder. Reports contain hashes and metadata only, never input bytes.
 
 Debug bundles are ZIP files below `ARAM/debug`. Each bundle contains a
 versioned JSON manifest, a redacted frontend event log, host/build metadata,
-input hash and profile, and bounded files returned by `DebugExportBackend`.
-Backend collection failures become manifest warnings instead of discarding the
-frontend evidence. Attachment names and sizes are validated before writing.
-The bundle excludes input bytes, guest memory, framebuffer pixels, save data,
-and proprietary media.
+input hash and profile, the current guest-native frame as `screenshot.png`
+when available, and bounded files returned by `DebugExportBackend`. The
+screenshot is copied before asynchronous bundle collection so it represents
+the frame visible when export was requested. Backend collection failures
+become manifest warnings instead of discarding the frontend evidence.
+Attachment names and sizes are validated before writing. The bundle excludes
+input bytes, guest memory, save data, and other proprietary media.
