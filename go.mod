@@ -7,6 +7,7 @@ require (
 	github.com/hajimehoshi/ebiten/v2 v2.9.9
 	github.com/ncruces/zenity v0.10.14
 	golang.org/x/image v0.31.0
+	golang.org/x/sys v0.36.0
 )
 
 require (
@@ -24,6 +25,5 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394 // indirect
 	golang.org/x/sync v0.17.0 // indirect
-	golang.org/x/sys v0.36.0 // indirect
 	golang.org/x/text v0.29.0 // indirect
 )
