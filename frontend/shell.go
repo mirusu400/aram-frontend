@@ -298,6 +298,8 @@ func (s *Shell) handleShortcuts() {
 	}
 
 	switch {
+	case control && shift && inpututil.IsKeyJustPressed(ebiten.KeyD):
+		s.dispatchCommand("tools.export_debug")
 	case control && shift && inpututil.IsKeyJustPressed(ebiten.KeyS):
 		s.dispatchCommand("view.screenshot")
 	case control && inpututil.IsKeyJustPressed(ebiten.KeyO):
@@ -508,6 +510,15 @@ func (s *Shell) consumeResults() {
 					"%s: %s",
 					s.tr(settingValueLabel(result.kind)),
 					result.err.Error(),
+				))
+				continue
+			}
+			if result.warning != "" {
+				s.setStatus(s.trf(
+					"%s saved with warning: %s (%s)",
+					s.tr(settingValueLabel(result.kind)),
+					result.path,
+					result.warning,
 				))
 				continue
 			}

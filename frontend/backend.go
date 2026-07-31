@@ -178,6 +178,15 @@ type ToolRequest struct {
 	Fields map[string]string
 }
 
+// DebugArtifact is a backend-owned diagnostic file for a user-exported debug
+// bundle. Data must contain logs or metadata only, never source images,
+// framebuffer pixels, guest memory dumps, persistence, or proprietary media.
+type DebugArtifact struct {
+	Name      string
+	MediaType string
+	Data      []byte
+}
+
 type Backend interface {
 	Open(context.Context, OpenRequest) (InputInfo, error)
 	State() BackendState
@@ -250,6 +259,13 @@ type ToolBackend interface {
 // remains behind the backend boundary.
 type ToolActionBackend interface {
 	ExecuteToolAction(context.Context, ToolRequest) (ToolSnapshot, error)
+}
+
+// DebugExportBackend contributes bounded backend diagnostics to the
+// frontend-owned ZIP bundle. Collection errors are recorded as warnings so
+// frontend logs can still be exported after a backend fault.
+type DebugExportBackend interface {
+	DebugArtifacts(context.Context) ([]DebugArtifact, error)
 }
 
 type BackendNamer interface {

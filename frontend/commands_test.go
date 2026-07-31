@@ -33,6 +33,7 @@ func TestGenericEmulatorCommandsRemainPresent(t *testing.T) {
 		"tools.controller":    false,
 		"tools.audio":         false,
 		"tools.logs":          false,
+		"tools.export_debug":  false,
 		"tools.compatibility": false,
 		"view.fullscreen":     false,
 		"view.rotation":       false,

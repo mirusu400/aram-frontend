@@ -16,9 +16,10 @@ import (
 )
 
 type artifactResult struct {
-	kind string
-	path string
-	err  error
+	kind    string
+	path    string
+	warning string
+	err     error
 }
 
 type dropResult struct {

@@ -57,6 +57,7 @@ entire 960x720 interface.
 - Title Properties
 - Compatibility Report
 - Logs
+- Export Debug Bundle (`Ctrl+Shift+D`)
 
 The menu model is shared. Mobile may present the same commands as a drawer or
 overlay rather than a desktop top bar, but the feature IDs remain identical.
@@ -146,3 +147,11 @@ Screenshots are encoded from the guest-native frame before frontend scaling,
 rotation, or filtering. Screenshots, compatibility reports, and exported logs
 are stored below the platform user configuration directory in the `ARAM`
 folder. Reports contain hashes and metadata only, never input bytes.
+
+Debug bundles are ZIP files below `ARAM/debug`. Each bundle contains a
+versioned JSON manifest, a redacted frontend event log, host/build metadata,
+input hash and profile, and bounded files returned by `DebugExportBackend`.
+Backend collection failures become manifest warnings instead of discarding the
+frontend evidence. Attachment names and sizes are validated before writing.
+The bundle excludes input bytes, guest memory, framebuffer pixels, save data,
+and proprietary media.
