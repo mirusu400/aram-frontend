@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestAddRecentDeduplicatesAndLimits(t *testing.T) {
@@ -58,6 +60,52 @@ func TestDefaultSettingsRequireIntegratedWelcome(t *testing.T) {
 	}
 	if settings.UpdateChannel != string(updateChannelStable) {
 		t.Fatalf("fresh update channel = %q", settings.UpdateChannel)
+	}
+}
+
+func TestIssueReportHistoryDeduplicatesValidEntriesAndLimitsSize(t *testing.T) {
+	settings := defaultSettings()
+	for index := 0; index < issueReportHistoryLimit+3; index++ {
+		settings.rememberIssueReport(IssueReportRecord{
+			ReportID: fmt.Sprintf(
+				"%08x-1111-4111-8111-111111111111",
+				index,
+			),
+			IssueURL: fmt.Sprintf(
+				"https://github.com/mirusu400/aram-frontend/issues/%d",
+				index+1,
+			),
+			Capability: "aram_rpt_" + strings.Repeat("A", 43),
+			Repository: "aram-frontend",
+			Situation:  fmt.Sprintf("Report %d", index),
+			CreatedAt:  time.Unix(int64(index+1), 0).UTC(),
+		})
+	}
+	if len(settings.IssueReports) != issueReportHistoryLimit {
+		t.Fatalf(
+			"report history count = %d, want %d",
+			len(settings.IssueReports),
+			issueReportHistoryLimit,
+		)
+	}
+	latest := settings.IssueReports[0]
+	settings.rememberIssueReport(latest)
+	if len(settings.IssueReports) != issueReportHistoryLimit ||
+		settings.IssueReports[0] != latest {
+		t.Fatalf("deduplicated report history = %#v", settings.IssueReports)
+	}
+
+	settings.IssueReports = append(settings.IssueReports, IssueReportRecord{
+		ReportID:   "not-a-report-id",
+		IssueURL:   "https://example.com/not-an-issue",
+		Capability: "invalid",
+		Repository: "aram-frontend",
+		Situation:  "Invalid",
+		CreatedAt:  time.Now(),
+	})
+	settings.normalize()
+	if len(settings.IssueReports) != issueReportHistoryLimit {
+		t.Fatalf("invalid report survived normalization: %#v", settings.IssueReports)
 	}
 }
 

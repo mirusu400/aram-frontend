@@ -615,3 +615,52 @@ func TestIssueReportFormRendersAtCompactSize(t *testing.T) {
 		)
 	}
 }
+
+func TestSubmittedReportHistoryRendersScrollableDropdownAtCompactSize(
+	t *testing.T,
+) {
+	shell := NewShell(NullBackend{}, nil, "")
+	shell.Layout(390, 844)
+	for index := 0; index < issueReportHistoryLimit; index++ {
+		shell.settings.rememberIssueReport(IssueReportRecord{
+			ReportID: fmt.Sprintf(
+				"%08x-1111-4111-8111-111111111111",
+				index,
+			),
+			IssueURL: fmt.Sprintf(
+				"https://github.com/mirusu400/aram-frontend/issues/%d",
+				index+1,
+			),
+			Capability: "aram_rpt_" + strings.Repeat("A", 43),
+			Repository: "aram-frontend",
+			Situation:  fmt.Sprintf("Report %d", index),
+			CreatedAt:  time.Unix(int64(index+1), 0).UTC(),
+		})
+	}
+	shell.openIssueReportHistory()
+	shell.interfaceUI.sync(shell)
+	shell.interfaceUI.ui.Update()
+	shell.Draw(ebiten.NewImage(390, 844))
+
+	dropdown := shell.interfaceUI.panelDropdowns[issueReportHistoryField]
+	if shell.interfaceUI.panelWindow == nil || dropdown == nil {
+		t.Fatal("compact submitted-report history was not created")
+	}
+	if got := len(shell.panel.Fields[0].Options); got != issueReportHistoryLimit {
+		t.Fatalf(
+			"submitted-report options = %d, want %d",
+			got,
+			issueReportHistoryLimit,
+		)
+	}
+	selected := shell.panel.Fields[0].Options[5]
+	dropdown.SetSelectedEntry(selected)
+	shell.interfaceUI.ui.Update()
+	if shell.panel.FieldValues[issueReportHistoryField] != selected.Value {
+		t.Fatalf(
+			"selected report = %q, want %q",
+			shell.panel.FieldValues[issueReportHistoryField],
+			selected.Value,
+		)
+	}
+}

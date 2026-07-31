@@ -17,6 +17,7 @@ type fakeIssueRelay struct {
 	report     issueRelayReport
 	submitErr  error
 	submission issueRelaySubmission
+	commentFor issueRelayReport
 	comment    string
 	commentKey string
 	commentURL string
@@ -33,10 +34,11 @@ func (relay *fakeIssueRelay) Submit(
 
 func (relay *fakeIssueRelay) AddComment(
 	_ context.Context,
-	_ issueRelayReport,
+	report issueRelayReport,
 	comment string,
 	idempotencyKey string,
 ) (string, error) {
+	relay.commentFor = report
 	relay.comment = comment
 	relay.commentKey = idempotencyKey
 	return relay.commentURL, relay.commentErr
@@ -225,12 +227,90 @@ func TestPrepareIssueReportUploadsBundleAndOpensCreatedIssue(t *testing.T) {
 		relay.report.Capability {
 		t.Fatalf("completed issue panel = %#v", shell.panel.FieldValues)
 	}
+	if len(shell.settings.IssueReports) != 1 ||
+		shell.settings.IssueReports[0].ReportID != relay.report.ReportID ||
+		shell.settings.IssueReports[0].Situation !=
+			"The screen is incorrect." {
+		t.Fatalf("saved report history = %#v", shell.settings.IssueReports)
+	}
 	shell.executeIssueReportAction(
 		issueReportFolderAction,
 		shell.panel.FieldValues,
 	)
 	if filepath.Clean(openedFolder) != filepath.Clean(filepath.Dir(bundlePath)) {
 		t.Fatalf("opened folder = %q, bundle = %q", openedFolder, bundlePath)
+	}
+}
+
+func TestSubmittedReportHistorySurvivesRestartAndCanComment(t *testing.T) {
+	config := t.TempDir()
+	t.Setenv("APPDATA", config)
+	t.Setenv("XDG_CONFIG_HOME", config)
+	t.Setenv("HOME", config)
+
+	originalURL := openExternalURL
+	t.Cleanup(func() { openExternalURL = originalURL })
+	openExternalURL = func(string) error { return nil }
+
+	first := NewShell(NullBackend{}, nil, "")
+	firstRelay := successfulFakeIssueRelay()
+	first.issueRelay = firstRelay
+	first.openIssueTracker()
+	first.executeIssueReportAction(issueReportPrepareAction, map[string]string{
+		"situation":  "The screen is incorrect after reset.",
+		"game_title": "Synthetic",
+		"repository": "frontend",
+	})
+	select {
+	case result := <-first.issueReportResults:
+		first.consumeIssueReportResult(result)
+	case <-time.After(2 * time.Second):
+		t.Fatal("issue report did not complete")
+	}
+	first.panel = nil
+
+	restarted := NewShell(NullBackend{}, nil, "")
+	commentRelay := successfulFakeIssueRelay()
+	restarted.issueRelay = commentRelay
+	restarted.openIssueReportHistory()
+	if restarted.panel == nil ||
+		len(restarted.panel.Fields) != 1 ||
+		len(restarted.panel.Fields[0].Options) != 1 ||
+		restarted.panel.Fields[0].Options[0].Value !=
+			firstRelay.report.ReportID {
+		t.Fatalf("reloaded report history = %#v", restarted.panel)
+	}
+
+	restarted.executeIssueReportAction(
+		issueReportHistoryView,
+		restarted.panel.FieldValues,
+	)
+	if restarted.panel.FieldValues[issueReportCapabilityField] !=
+		firstRelay.report.Capability {
+		t.Fatalf("restored report fields = %#v", restarted.panel.FieldValues)
+	}
+	restarted.panel.FieldValues[issueReportCommentField] =
+		"It also happens after reopening ARAM."
+	restarted.executeIssueReportAction(
+		issueReportCommentAction,
+		restarted.panel.FieldValues,
+	)
+	select {
+	case result := <-restarted.issueCommentResults:
+		restarted.consumeIssueCommentResult(result)
+	case <-time.After(2 * time.Second):
+		t.Fatal("issue comment did not complete")
+	}
+
+	if commentRelay.commentFor != firstRelay.report ||
+		commentRelay.comment != "It also happens after reopening ARAM." ||
+		!validIssueUUID(commentRelay.commentKey) {
+		t.Fatalf(
+			"reopened comment report=%#v body=%q key=%q",
+			commentRelay.commentFor,
+			commentRelay.comment,
+			commentRelay.commentKey,
+		)
 	}
 }
 

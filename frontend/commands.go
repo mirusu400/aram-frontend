@@ -153,6 +153,7 @@ func defaultMenus() []Menu {
 				{ID: "help.updates", Label: "Check for Updates...", Action: (*Shell).openUpdatesPanel},
 				{ID: "help.documentation", Label: "Documentation", Action: (*Shell).openDocumentation},
 				{ID: "help.issue", Label: "Report Issue", Action: (*Shell).openIssueTracker},
+				{ID: "help.issue_history", Label: "Submitted Reports...", Action: (*Shell).openIssueReportHistory},
 				{ID: "help.about", Label: "About ARAM", Action: (*Shell).showAbout},
 			},
 		},

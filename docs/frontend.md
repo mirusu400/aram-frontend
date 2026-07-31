@@ -189,8 +189,12 @@ issue, captures the same redacted debug bundle and current screenshot when
 available, and streams them to
 `https://aram-report-relay.mirusu400.workers.dev`. The relay creates the
 selected repository issue and returns a report-scoped capability; the frontend
-keeps that capability only in the current panel so the user can add follow-up
-comments without exposing a GitHub credential.
+stores that capability in the user-private settings file so the user can add
+follow-up comments without exposing a GitHub credential. The most recent 20
+reports are available from `Help > Submitted Reports...`; selecting one
+restores its GitHub link and follow-up comment form even after the original
+panel or application was closed. Each capability is limited to its report and
+is not included in exported debug bundles.
 
 The finished issue opens in the browser. Its Worker-served attachment links
 expire after 30 days. If upload or relay authentication fails, the bundle

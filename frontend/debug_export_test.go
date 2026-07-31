@@ -234,6 +234,40 @@ func TestCaptureDebugBundleCopiesGuestNativeScreenshot(t *testing.T) {
 	}
 }
 
+func TestDebugBundleDoesNotExposeSavedReportCapability(t *testing.T) {
+	config := t.TempDir()
+	t.Setenv("APPDATA", config)
+	t.Setenv("XDG_CONFIG_HOME", config)
+	t.Setenv("HOME", config)
+
+	capability := "aram_rpt_" + strings.Repeat("S", 43)
+	settings := defaultSettings()
+	settings.IssueReports = []IssueReportRecord{{
+		ReportID:   "11111111-1111-4111-8111-111111111111",
+		IssueURL:   "https://github.com/mirusu400/aram-frontend/issues/42",
+		Capability: capability,
+		Repository: "aram-frontend",
+		Situation:  "Secret history regression",
+		CreatedAt:  time.Now().UTC(),
+	}}
+	shell := &Shell{
+		backend:  NullBackend{},
+		settings: settings,
+	}
+	path, _, err := collectDebugBundle(
+		shell.captureDebugBundleSnapshot(time.Now().UTC()),
+		shell.backend,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, data := range readDebugZIP(t, path) {
+		if bytes.Contains(data, []byte(capability)) {
+			t.Fatalf("saved report capability leaked through %s", name)
+		}
+	}
+}
+
 func readDebugZIP(t *testing.T, path string) map[string][]byte {
 	t.Helper()
 	archive, err := zip.OpenReader(path)

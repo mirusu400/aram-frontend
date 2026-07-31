@@ -69,8 +69,11 @@ Relay, creates the GitHub issue automatically, and opens the finished issue in
 the browser. Screenshot transfer is enabled by default and can be turned off
 in the report form; disabling it also removes the image from the uploaded ZIP.
 The completed panel can add capability-authorized follow-up comments without a
-GitHub login. If the relay is unavailable, ARAM preserves the bundle, opens its
-folder, and falls back to a prefilled GitHub draft for manual submission.
+GitHub login. The latest 20 successful submissions are saved locally and can
+be reopened from `Help > Submitted Reports...` to visit the issue or add
+another relay-authorized comment after closing the original panel or
+restarting ARAM. If the relay is unavailable, ARAM preserves the bundle, opens
+its folder, and falls back to a prefilled GitHub draft for manual submission.
 Uploaded attachments are publicly linked from the issue and expire after 30
 days; the selected game and firmware bytes are never included.
 

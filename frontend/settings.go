@@ -47,6 +47,7 @@ type Settings struct {
 	ShowVirtualKeypad bool                         `json:"show_virtual_keypad"`
 	UpdateChannel     string                       `json:"update_channel"`
 	WelcomeCompleted  bool                         `json:"welcome_completed"`
+	IssueReports      []IssueReportRecord          `json:"issue_reports,omitempty"`
 }
 
 func defaultSettings() Settings {
@@ -130,6 +131,7 @@ func (s *Settings) normalize() {
 		s.GamepadDeadzone = 30
 	}
 	s.UpdateChannel = string(normalizeUpdateChannel(s.UpdateChannel))
+	s.normalizeIssueReports()
 	s.KeyboardBindings = normalizeKeyboardBindingIDs(s.KeyboardBindings)
 	s.GamepadBindings = normalizeGamepadBindingIDs(s.GamepadBindings)
 	if s.TitleControllers == nil {

@@ -17,11 +17,16 @@ const (
 	issueReportDraftAction     = "open_report_draft"
 	issueReportOpenIssueAction = "open_created_issue"
 	issueReportCommentAction   = "add_issue_comment"
+	issueReportHistoryAction   = "open_report_history"
+	issueReportHistoryView     = "view_saved_report"
+	issueReportHistoryForget   = "forget_saved_report"
+	issueReportNewAction       = "new_issue_report"
 
 	issueReportPathField           = "_report_path"
 	issueReportDraftURLField       = "_draft_url"
 	issueReportIssueURLField       = "_issue_url"
 	issueReportIDField             = "_report_id"
+	issueReportHistoryField        = "_saved_report_id"
 	issueReportCapabilityField     = "_report_capability"
 	issueReportIdempotencyField    = "_report_idempotency"
 	issueCommentIdempotencyField   = "_comment_idempotency"
@@ -29,6 +34,7 @@ const (
 	issueReportScreenshotField     = "include_screenshot"
 	issueDraftURLLimit             = 7500
 	issueReportCommentMaximumRunes = 5000
+	issueReportHistoryLimit        = 20
 )
 
 type issueReportDraft struct {
@@ -36,6 +42,19 @@ type issueReportDraft struct {
 	GameTitle  string
 	Carrier    string
 	Repository string
+}
+
+// IssueReportRecord is the local handle for a report created through the
+// relay. Capability authorizes comments for this report only; it is kept in
+// the user-private settings file and is never included in a debug bundle.
+type IssueReportRecord struct {
+	ReportID   string    `json:"report_id"`
+	IssueURL   string    `json:"issue_url"`
+	Capability string    `json:"capability"`
+	Repository string    `json:"repository"`
+	Situation  string    `json:"situation"`
+	GameTitle  string    `json:"game_title,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 type issueReportResult struct {
@@ -47,6 +66,7 @@ type issueReportResult struct {
 	warning        string
 	report         issueRelayReport
 	relayErr       error
+	createdAt      time.Time
 	idempotencyKey string
 	err            error
 }
@@ -106,11 +126,13 @@ func (s *Shell) openIssueTracker() {
 				Checkbox: true,
 			},
 		},
-		Actions: []ToolAction{{
-			ID:      issueReportPrepareAction,
-			Label:   "Submit Report",
-			Enabled: true,
-		}},
+		Actions: []ToolAction{
+			{
+				ID:      issueReportPrepareAction,
+				Label:   "Submit Report",
+				Enabled: true,
+			},
+		},
 		FieldValues: map[string]string{
 			"situation":                "",
 			"game_title":               gameTitle,
@@ -118,6 +140,13 @@ func (s *Shell) openIssueTracker() {
 			"repository":               "aram-frontend",
 			issueReportScreenshotField: "true",
 		},
+	}
+	if len(s.settings.IssueReports) > 0 {
+		s.panel.Actions = append(s.panel.Actions, ToolAction{
+			ID:      issueReportHistoryAction,
+			Label:   "Submitted Reports",
+			Enabled: true,
+		})
 	}
 }
 
@@ -139,6 +168,14 @@ func (s *Shell) executeIssueReportAction(
 		s.openCreatedIssue()
 	case issueReportCommentAction:
 		s.addIssueComment(fields)
+	case issueReportHistoryAction:
+		s.openIssueReportHistory()
+	case issueReportHistoryView:
+		s.openSavedIssueReport(fields[issueReportHistoryField])
+	case issueReportHistoryForget:
+		s.forgetSavedIssueReport(fields[issueReportHistoryField])
+	case issueReportNewAction:
+		s.openIssueTracker()
 	case issueReportPrepareAction:
 		s.prepareIssueReport(fields)
 	}
@@ -171,7 +208,8 @@ func (s *Shell) prepareIssueReport(fields map[string]string) {
 	s.panel.FieldValues[issueReportIdempotencyField] = idempotencyKey
 	s.setStatus(s.tr("Uploading issue report..."))
 
-	snapshot := s.captureDebugBundleSnapshot(time.Now().UTC())
+	createdAt := time.Now().UTC()
+	snapshot := s.captureDebugBundleSnapshot(createdAt)
 	if !issueReportScreenshotEnabled(fields) {
 		snapshot.Screenshot = nil
 	}
@@ -189,6 +227,7 @@ func (s *Shell) prepareIssueReport(fields map[string]string) {
 			state:          snapshot.FrontendState,
 			path:           path,
 			warning:        warning,
+			createdAt:      createdAt,
 			idempotencyKey: idempotencyKey,
 			err:            bundleErr,
 		}
@@ -243,54 +282,302 @@ func (s *Shell) consumeIssueReportResult(result issueReportResult) {
 }
 
 func (s *Shell) consumeUploadedIssueReport(result issueReportResult) {
+	record := IssueReportRecord{
+		ReportID:   result.report.ReportID,
+		IssueURL:   result.report.IssueURL,
+		Capability: result.report.Capability,
+		Repository: result.draft.Repository,
+		Situation:  result.draft.Situation,
+		GameTitle:  result.draft.GameTitle,
+		CreatedAt:  result.createdAt,
+	}
+	s.settings.rememberIssueReport(record)
+	historyErr := s.settings.save()
 	openErr := openExternalURL(result.report.IssueURL)
 	if s.panel != nil && s.panel.Kind == "issue-report" {
-		s.panel.Busy = false
-		s.panel.Lines = []string{
-			"Issue created with the debug bundle.",
-			s.trf("GitHub issue: %s", result.report.IssueURL),
-		}
-		if result.warning != "" {
-			s.panel.Lines = append(
-				s.panel.Lines,
-				s.trf("Collection warning: %s", result.warning),
-			)
-		}
-		s.panel.Fields = []ToolField{{
-			ID:          issueReportCommentField,
-			Label:       "Follow-up comment",
-			Placeholder: "Add more details to the created issue",
-		}}
-		s.panel.Actions = []ToolAction{
-			{
-				ID:      issueReportOpenIssueAction,
-				Label:   "Open GitHub Issue",
-				Enabled: true,
-			},
-			{
-				ID:      issueReportCommentAction,
-				Label:   "Add Comment",
-				Enabled: true,
-			},
-			{
-				ID:      issueReportFolderAction,
-				Label:   "Open Bundle Folder",
-				Enabled: true,
-			},
-		}
-		s.panel.FieldValues = map[string]string{
-			issueReportCommentField:    "",
-			issueReportPathField:       result.path,
-			issueReportIssueURLField:   result.report.IssueURL,
-			issueReportIDField:         result.report.ReportID,
-			issueReportCapabilityField: result.report.Capability,
-		}
+		s.showIssueReportRecord(
+			record,
+			result.path,
+			result.warning,
+			historyErr,
+		)
 	}
 	if openErr != nil {
 		s.setStatus(s.tr("GitHub issue: ") + openErr.Error())
 		return
 	}
+	if historyErr != nil {
+		s.setStatus(s.tr("Report history: ") + historyErr.Error())
+		return
+	}
 	s.setStatus(s.tr("Issue created and opened in GitHub"))
+}
+
+func (s *Shell) openIssueReportHistory() {
+	reports := s.settings.IssueReports
+	if len(reports) == 0 {
+		s.panel = &Panel{
+			Kind:  "issue-report",
+			Title: "Submitted Reports",
+			Lines: []string{
+				"No submitted reports are saved on this device.",
+				"Reports created through the relay will appear here.",
+			},
+			Actions: []ToolAction{{
+				ID:      issueReportNewAction,
+				Label:   "New Report",
+				Enabled: true,
+			}},
+		}
+		s.setStatus(s.tr("No submitted reports are saved on this device."))
+		return
+	}
+
+	options := make([]ToolFieldOption, 0, len(reports))
+	for _, record := range reports {
+		options = append(options, ToolFieldOption{
+			Value: record.ReportID,
+			Label: issueReportHistoryLabel(record),
+		})
+	}
+	s.panel = &Panel{
+		Kind:  "issue-report",
+		Title: "Submitted Reports",
+		Lines: []string{
+			"Choose a submitted report to reopen it or add a comment.",
+			"Comment access is stored only on this device.",
+		},
+		Fields: []ToolField{{
+			ID:      issueReportHistoryField,
+			Label:   "Submitted report",
+			Value:   reports[0].ReportID,
+			Options: options,
+		}},
+		Actions: []ToolAction{
+			{
+				ID:      issueReportHistoryView,
+				Label:   "View Report",
+				Enabled: true,
+			},
+			{
+				ID:      issueReportNewAction,
+				Label:   "New Report",
+				Enabled: true,
+			},
+			{
+				ID:      issueReportHistoryForget,
+				Label:   "Forget Report",
+				Enabled: true,
+			},
+		},
+		FieldValues: map[string]string{
+			issueReportHistoryField: reports[0].ReportID,
+		},
+	}
+	s.setStatus(s.tr("Submitted report history opened"))
+}
+
+func (s *Shell) openSavedIssueReport(reportID string) {
+	record, ok := s.settings.issueReport(reportID)
+	if !ok {
+		s.setStatus(s.tr("Report history: selected report was not found"))
+		s.openIssueReportHistory()
+		return
+	}
+	s.showIssueReportRecord(record, "", "", nil)
+	s.setStatus(s.tr("Submitted report opened"))
+}
+
+func (s *Shell) forgetSavedIssueReport(reportID string) {
+	previous := append([]IssueReportRecord(nil), s.settings.IssueReports...)
+	if !s.settings.forgetIssueReport(reportID) {
+		s.setStatus(s.tr("Report history: selected report was not found"))
+		return
+	}
+	if err := s.settings.save(); err != nil {
+		s.settings.IssueReports = previous
+		s.setStatus(s.tr("Report history: ") + err.Error())
+		return
+	}
+	s.openIssueReportHistory()
+	s.setStatus(s.tr("Submitted report removed from this device"))
+}
+
+func (s *Shell) showIssueReportRecord(
+	record IssueReportRecord,
+	bundlePath string,
+	warning string,
+	historyErr error,
+) {
+	lines := []string{
+		"Issue created with the debug bundle.",
+		s.trf("GitHub issue: %s", record.IssueURL),
+		s.trf(
+			"Submitted: %s",
+			record.CreatedAt.Local().Format("2006-01-02 15:04 MST"),
+		),
+		s.trf("Repository: %s", record.Repository),
+		s.trf("Situation: %s", record.Situation),
+	}
+	if warning != "" {
+		lines = append(lines, s.trf("Collection warning: %s", warning))
+	}
+	if historyErr != nil {
+		lines = append(
+			lines,
+			s.trf("Could not save this report to history: %s", historyErr),
+		)
+	} else {
+		lines = append(
+			lines,
+			"This report is saved under Help > Submitted Reports.",
+		)
+	}
+	actions := []ToolAction{
+		{
+			ID:      issueReportOpenIssueAction,
+			Label:   "Open GitHub Issue",
+			Enabled: true,
+		},
+		{
+			ID:      issueReportCommentAction,
+			Label:   "Add Comment",
+			Enabled: true,
+		},
+	}
+	if bundlePath != "" {
+		actions = append(actions, ToolAction{
+			ID:      issueReportFolderAction,
+			Label:   "Open Bundle Folder",
+			Enabled: true,
+		})
+	}
+	if bundlePath == "" {
+		actions = append(actions, ToolAction{
+			ID:      issueReportHistoryAction,
+			Label:   "Submitted Reports",
+			Enabled: true,
+		})
+	}
+
+	s.panel = &Panel{
+		Kind:  "issue-report",
+		Title: "Submitted Report",
+		Lines: lines,
+		Fields: []ToolField{{
+			ID:          issueReportCommentField,
+			Label:       "Follow-up comment",
+			Placeholder: "Add more details to the created issue",
+		}},
+		Actions: actions,
+		FieldValues: map[string]string{
+			issueReportCommentField:    "",
+			issueReportPathField:       bundlePath,
+			issueReportIssueURLField:   record.IssueURL,
+			issueReportIDField:         record.ReportID,
+			issueReportCapabilityField: record.Capability,
+		},
+	}
+}
+
+func issueReportHistoryLabel(record IssueReportRecord) string {
+	title := strings.TrimSpace(record.GameTitle)
+	if title == "" {
+		title = strings.TrimSpace(record.Situation)
+	}
+	if title == "" {
+		title = "Unknown report"
+	}
+	return fmt.Sprintf(
+		"%s  -  %s  -  %s",
+		record.CreatedAt.Local().Format("2006-01-02 15:04"),
+		record.Repository,
+		shorten(strings.ReplaceAll(title, "\n", " "), 42),
+	)
+}
+
+func (s *Settings) normalizeIssueReports() {
+	normalized := make([]IssueReportRecord, 0, min(
+		len(s.IssueReports),
+		issueReportHistoryLimit,
+	))
+	seen := make(map[string]bool)
+	for _, record := range s.IssueReports {
+		record.ReportID = strings.TrimSpace(record.ReportID)
+		record.IssueURL = strings.TrimSpace(record.IssueURL)
+		record.Capability = strings.TrimSpace(record.Capability)
+		record.Repository = normalizeIssueRepository(record.Repository)
+		record.Situation = strings.TrimSpace(record.Situation)
+		record.GameTitle = strings.TrimSpace(record.GameTitle)
+		if record.Repository == "" ||
+			record.CreatedAt.IsZero() ||
+			seen[record.ReportID] ||
+			utf8.RuneCountInString(record.Situation) > 500 ||
+			utf8.RuneCountInString(record.GameTitle) > 200 ||
+			validateIssueRelayReport(
+				record.relayReport(),
+				record.Repository,
+			) != nil {
+			continue
+		}
+		seen[record.ReportID] = true
+		normalized = append(normalized, record)
+		if len(normalized) == issueReportHistoryLimit {
+			break
+		}
+	}
+	s.IssueReports = normalized
+}
+
+func (s *Settings) rememberIssueReport(record IssueReportRecord) {
+	reports := make(
+		[]IssueReportRecord,
+		0,
+		min(len(s.IssueReports)+1, issueReportHistoryLimit),
+	)
+	reports = append(reports, record)
+	for _, existing := range s.IssueReports {
+		if existing.ReportID == record.ReportID {
+			continue
+		}
+		reports = append(reports, existing)
+		if len(reports) == issueReportHistoryLimit {
+			break
+		}
+	}
+	s.IssueReports = reports
+	s.normalizeIssueReports()
+}
+
+func (s Settings) issueReport(reportID string) (IssueReportRecord, bool) {
+	for _, record := range s.IssueReports {
+		if record.ReportID == reportID {
+			return record, true
+		}
+	}
+	return IssueReportRecord{}, false
+}
+
+func (s *Settings) forgetIssueReport(reportID string) bool {
+	for index, record := range s.IssueReports {
+		if record.ReportID != reportID {
+			continue
+		}
+		s.IssueReports = append(
+			s.IssueReports[:index],
+			s.IssueReports[index+1:]...,
+		)
+		return true
+	}
+	return false
+}
+
+func (record IssueReportRecord) relayReport() issueRelayReport {
+	return issueRelayReport{
+		ReportID:   record.ReportID,
+		IssueURL:   record.IssueURL,
+		Capability: record.Capability,
+	}
 }
 
 func (s *Shell) consumeIssueReportFallback(result issueReportResult) {
