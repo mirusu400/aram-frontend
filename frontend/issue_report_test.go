@@ -63,10 +63,11 @@ func TestOpenIssueTrackerShowsReportFormWithCurrentTitle(t *testing.T) {
 		t.Fatalf("issue panel = %#v", shell.panel)
 	}
 	if shell.panel.FieldValues["game_title"] != "Maple Archer" ||
-		shell.panel.FieldValues["repository"] != "aram-frontend" {
+		shell.panel.FieldValues["repository"] != "aram-frontend" ||
+		shell.panel.FieldValues[issueReportScreenshotField] != "true" {
 		t.Fatalf("issue form values = %#v", shell.panel.FieldValues)
 	}
-	if len(shell.panel.Fields) != 4 || len(shell.panel.Actions) != 1 {
+	if len(shell.panel.Fields) != 5 || len(shell.panel.Actions) != 1 {
 		t.Fatalf("issue form = %#v", shell.panel)
 	}
 	repository := shell.panel.Fields[3]
@@ -75,6 +76,12 @@ func TestOpenIssueTrackerShowsReportFormWithCurrentTitle(t *testing.T) {
 		repository.Options[1].Value != "aram-emu" ||
 		repository.Options[2].Value != "aram-core" {
 		t.Fatalf("repository options = %#v", repository.Options)
+	}
+	screenshot := shell.panel.Fields[4]
+	if screenshot.ID != issueReportScreenshotField ||
+		!screenshot.Checkbox ||
+		screenshot.Value != "true" {
+		t.Fatalf("screenshot field = %#v", screenshot)
 	}
 }
 
@@ -224,6 +231,45 @@ func TestPrepareIssueReportUploadsBundleAndOpensCreatedIssue(t *testing.T) {
 	)
 	if filepath.Clean(openedFolder) != filepath.Clean(filepath.Dir(bundlePath)) {
 		t.Fatalf("opened folder = %q, bundle = %q", openedFolder, bundlePath)
+	}
+}
+
+func TestPrepareIssueReportOmitsScreenshotWhenDisabled(t *testing.T) {
+	config := t.TempDir()
+	t.Setenv("APPDATA", config)
+	t.Setenv("XDG_CONFIG_HOME", config)
+	t.Setenv("HOME", config)
+
+	originalURL := openExternalURL
+	t.Cleanup(func() { openExternalURL = originalURL })
+	openExternalURL = func(string) error { return nil }
+
+	frame := image.NewRGBA(image.Rect(0, 0, 2, 2))
+	frame.Set(0, 0, color.RGBA{R: 0xee, G: 0x11, B: 0x22, A: 0xff})
+	shell := NewShell(NullBackend{}, nil, "")
+	relay := successfulFakeIssueRelay()
+	shell.issueRelay = relay
+	shell.frame = VideoFrame{Image: frame, Sequence: 1}
+	shell.openIssueTracker()
+	shell.executeIssueReportAction(issueReportPrepareAction, map[string]string{
+		"situation":                "The screen is incorrect.",
+		"repository":               "frontend",
+		issueReportScreenshotField: "false",
+	})
+
+	select {
+	case result := <-shell.issueReportResults:
+		shell.consumeIssueReportResult(result)
+	case <-time.After(2 * time.Second):
+		t.Fatal("issue report did not complete")
+	}
+
+	if relay.submission.BundlePath == "" {
+		t.Fatal("relay received no debug bundle")
+	}
+	entries := readDebugZIP(t, relay.submission.BundlePath)
+	if _, ok := entries["screenshot.png"]; ok {
+		t.Fatal("disabled screenshot was included in the uploaded bundle")
 	}
 }
 

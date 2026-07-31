@@ -10,6 +10,7 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
+	"github.com/hajimehoshi/ebiten/v2/vector"
 	"golang.org/x/image/font/gofont/gobold"
 	"golang.org/x/image/font/gofont/goregular"
 )
@@ -87,6 +88,7 @@ type ARAMComponents struct {
 	ControlGroup  *euiimage.NineSlice
 	Scrim         *euiimage.NineSlice
 	Scroll        *widget.ScrollContainerImage
+	Checkbox      *widget.CheckboxImage
 	MenuButton    ARAMButtonStyle
 	CommandButton ARAMButtonStyle
 	SubtleButton  ARAMButtonStyle
@@ -165,6 +167,7 @@ func newARAMDesignSystem(mode string) *ARAMDesignSystem {
 			Idle: euiimage.NewNineSliceColor(color.NRGBA{}),
 			Mask: euiimage.NewNineSliceColor(color.White),
 		},
+		Checkbox: checkboxImages(palette),
 		MenuButton: ARAMButtonStyle{
 			Image:     buttonImages(menuIdle, menuHover, menuPressed, menuPressed, commandDisabled),
 			Text:      buttonTextColors(palette.TextMuted, palette.Text, palette.Text, palette.TextDisabled),
@@ -302,6 +305,63 @@ func buttonTextColors(idle, hover, pressed, disabled color.Color) *widget.Button
 		Pressed:  pressed,
 		Disabled: disabled,
 	}
+}
+
+func checkboxImages(palette ARAMPalette) *widget.CheckboxImage {
+	unchecked := checkboxImage(
+		palette.SurfaceRaised,
+		palette.BorderStrong,
+		nil,
+	)
+	uncheckedHover := checkboxImage(
+		palette.SurfaceHover,
+		palette.Accent,
+		nil,
+	)
+	checked := checkboxImage(
+		palette.Accent,
+		palette.Accent,
+		palette.OnAccent,
+	)
+	checkedHover := checkboxImage(
+		palette.AccentHover,
+		palette.AccentHover,
+		palette.OnAccent,
+	)
+	uncheckedDisabled := checkboxImage(
+		palette.Surface,
+		palette.Border,
+		nil,
+	)
+	checkedDisabled := checkboxImage(
+		palette.Border,
+		palette.Border,
+		palette.TextDisabled,
+	)
+	return &widget.CheckboxImage{
+		Unchecked:         unchecked,
+		UncheckedHovered:  uncheckedHover,
+		UncheckedDisabled: uncheckedDisabled,
+		Checked:           checked,
+		CheckedHovered:    checkedHover,
+		CheckedDisabled:   checkedDisabled,
+	}
+}
+
+func checkboxImage(
+	fill color.Color,
+	border color.Color,
+	checkmark color.Color,
+) *euiimage.NineSlice {
+	const size = 24
+	result := ebiten.NewImage(size, size)
+	euiimage.NewBorderedNineSliceColor(fill, border, 2).
+		Draw(result, size, size, nil)
+	if checkmark != nil {
+		vector.StrokeLine(result, 5, 12, 10, 17, 2.5, checkmark, true)
+		vector.StrokeLine(result, 10, 17, 20, 7, 2.5, checkmark, true)
+	}
+	return euiimage.NewFixedNineSlice(result)
 }
 
 // roundedNineSlice rasterizes a small scalable rounded surface once. Runtime

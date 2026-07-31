@@ -584,7 +584,7 @@ func TestIssueReportFormRendersAtCompactSize(t *testing.T) {
 	}
 	if shell.panel == nil ||
 		shell.panel.Kind != "issue-report" ||
-		len(shell.panel.Fields) != 4 {
+		len(shell.panel.Fields) != 5 {
 		t.Fatalf("compact issue report panel = %#v", shell.panel)
 	}
 	dropdown := shell.interfaceUI.panelDropdowns["repository"]
@@ -598,6 +598,20 @@ func TestIssueReportFormRendersAtCompactSize(t *testing.T) {
 		t.Fatalf(
 			"repository selection = %q",
 			shell.panel.FieldValues["repository"],
+		)
+	}
+	screenshot := shell.interfaceUI.panelCheckboxes[issueReportScreenshotField]
+	if screenshot == nil || screenshot.State() != widget.WidgetChecked {
+		t.Fatalf("screenshot checkbox = %#v", screenshot)
+	}
+	screenshot.Click()
+	shell.interfaceUI.ui.Update()
+	if shell.panel.FieldValues[issueReportScreenshotField] != "false" {
+		t.Fatalf(
+			"screenshot selection = %q, state = %v, disabled = %t",
+			shell.panel.FieldValues[issueReportScreenshotField],
+			screenshot.State(),
+			screenshot.GetWidget().Disabled,
 		)
 	}
 }

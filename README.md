@@ -66,7 +66,8 @@ opens it in Explorer, Finder, or the desktop file manager.
 ARAM repository in-app. Submitting creates the same redacted debug ZIP,
 uploads it and the current screenshot when available through the ARAM Report
 Relay, creates the GitHub issue automatically, and opens the finished issue in
-the browser.
+the browser. Screenshot transfer is enabled by default and can be turned off
+in the report form; disabling it also removes the image from the uploaded ZIP.
 The completed panel can add capability-authorized follow-up comments without a
 GitHub login. If the relay is unavailable, ARAM preserves the bundle, opens its
 folder, and falls back to a prefilled GitHub draft for manual submission.

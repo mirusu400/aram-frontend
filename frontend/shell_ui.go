@@ -33,6 +33,7 @@ type shellUI struct {
 	panelWindow          *widget.Window
 	panelSignature       string
 	panelDropdowns       map[string]*widget.ListComboButton
+	panelCheckboxes      map[string]*widget.Checkbox
 	settingsSection      string
 	bindingDevice        bindingDevice
 	scrim                *widget.Container
@@ -1127,6 +1128,55 @@ func newToolFieldDropdown(
 	)
 }
 
+func newToolFieldCheckbox(
+	design *ARAMDesignSystem,
+	panel *Panel,
+	field ToolField,
+	translateLabel func(string) string,
+) *widget.Checkbox {
+	value := field.Value
+	if current, ok := panel.FieldValues[field.ID]; ok {
+		value = current
+	}
+	checked := strings.EqualFold(strings.TrimSpace(value), "true")
+	if panel.FieldValues == nil {
+		panel.FieldValues = make(map[string]string)
+	}
+	panel.FieldValues[field.ID] = fmt.Sprintf("%t", checked)
+	initialState := widget.WidgetUnchecked
+	if checked {
+		initialState = widget.WidgetChecked
+	}
+	return widget.NewCheckbox(
+		widget.CheckboxOpts.Image(design.Components.Checkbox),
+		widget.CheckboxOpts.InitialState(initialState),
+		widget.CheckboxOpts.Spacing(design.Space.S),
+		widget.CheckboxOpts.Text(
+			translateLabel(field.Label),
+			design.Type.Body,
+			&widget.LabelColor{
+				Idle:     design.Palette.Text,
+				Disabled: design.Palette.TextDisabled,
+			},
+		),
+		widget.CheckboxOpts.WidgetOpts(
+			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
+			widget.WidgetOpts.MinSize(0, 34),
+		),
+		widget.CheckboxOpts.StateChangedHandler(
+			func(args *widget.CheckboxChangedEventArgs) {
+				if panel.FieldValues == nil {
+					panel.FieldValues = make(map[string]string)
+				}
+				panel.FieldValues[field.ID] = fmt.Sprintf(
+					"%t",
+					args.State == widget.WidgetChecked,
+				)
+			},
+		),
+	)
+}
+
 func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 	panel := shell.panel
 	var signatureParts []string
@@ -1138,7 +1188,16 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 		fmt.Sprintf("busy=%t", panel.Busy),
 	)
 	for _, field := range panel.Fields {
-		signatureParts = append(signatureParts, "field:"+field.ID+":"+field.Label+":"+field.Placeholder)
+		signatureParts = append(
+			signatureParts,
+			fmt.Sprintf(
+				"field:%s:%s:%s:checkbox=%t",
+				field.ID,
+				field.Label,
+				field.Placeholder,
+				field.Checkbox,
+			),
+		)
 		for _, option := range field.Options {
 			signatureParts = append(
 				signatureParts,
@@ -1160,6 +1219,7 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 	u.closePanel()
 	u.panelSignature = signature
 	u.panelDropdowns = make(map[string]*widget.ListComboButton)
+	u.panelCheckboxes = make(map[string]*widget.Checkbox)
 	u.scrim.GetWidget().SetVisibility(widget.Visibility_Show)
 	design := u.design
 	contents := widget.NewContainer(
@@ -1208,6 +1268,19 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 				Stretch: true,
 			})),
 		)
+		if field.Checkbox {
+			checkbox := newToolFieldCheckbox(
+				design,
+				panel,
+				field,
+				shell.tr,
+			)
+			checkbox.GetWidget().Disabled = panel.Busy
+			u.panelCheckboxes[field.ID] = checkbox
+			fieldBlock.AddChild(checkbox)
+			form.AddChild(fieldBlock)
+			continue
+		}
 		fieldBlock.AddChild(design.text(
 			shell.tr(field.Label),
 			design.Type.Strong,
@@ -2063,6 +2136,7 @@ func (u *shellUI) closePanel() {
 	u.panelWindow = nil
 	u.panelSignature = ""
 	u.panelDropdowns = nil
+	u.panelCheckboxes = nil
 	u.settingsScroll = nil
 	u.recentList = nil
 	u.welcomeStableButton = nil

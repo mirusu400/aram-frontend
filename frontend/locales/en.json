@@ -1,7 +1,8 @@
 {
-  "Describe the problem. ARAM will upload a redacted debug bundle and a screenshot when available.": "Describe the problem. ARAM will upload a redacted debug bundle and a screenshot when available.",
+  "Describe the problem. ARAM will upload a redacted debug bundle and an optional screenshot.": "Describe the problem. ARAM will upload a redacted debug bundle and an optional screenshot.",
   "Submit Report creates a public GitHub issue. Do not include personal or proprietary data.": "Submit Report creates a public GitHub issue. Do not include personal or proprietary data.",
   "Submit Report": "Submit Report",
+  "Send screenshot": "Send screenshot",
   "Collecting and uploading issue report...": "Collecting and uploading issue report...",
   "Uploading issue report...": "Uploading issue report...",
   "Issue created with the debug bundle.": "Issue created with the debug bundle.",

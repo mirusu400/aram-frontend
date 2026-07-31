@@ -165,6 +165,7 @@ type ToolField struct {
 	Value       string
 	Placeholder string
 	Options     []ToolFieldOption
+	Checkbox    bool
 }
 
 type ToolFieldOption struct {

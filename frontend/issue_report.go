@@ -26,6 +26,7 @@ const (
 	issueReportIdempotencyField    = "_report_idempotency"
 	issueCommentIdempotencyField   = "_comment_idempotency"
 	issueReportCommentField        = "comment"
+	issueReportScreenshotField     = "include_screenshot"
 	issueDraftURLLimit             = 7500
 	issueReportCommentMaximumRunes = 5000
 )
@@ -68,7 +69,7 @@ func (s *Shell) openIssueTracker() {
 		Kind:  "issue-report",
 		Title: "Report Issue",
 		Lines: []string{
-			"Describe the problem. ARAM will upload a redacted debug bundle and a screenshot when available.",
+			"Describe the problem. ARAM will upload a redacted debug bundle and an optional screenshot.",
 			"Submit Report creates a public GitHub issue. Do not include personal or proprietary data.",
 		},
 		Fields: []ToolField{
@@ -98,6 +99,12 @@ func (s *Shell) openIssueTracker() {
 					{Value: "aram-core", Label: "ARAM Core"},
 				},
 			},
+			{
+				ID:       issueReportScreenshotField,
+				Label:    "Send screenshot",
+				Value:    "true",
+				Checkbox: true,
+			},
 		},
 		Actions: []ToolAction{{
 			ID:      issueReportPrepareAction,
@@ -105,10 +112,11 @@ func (s *Shell) openIssueTracker() {
 			Enabled: true,
 		}},
 		FieldValues: map[string]string{
-			"situation":  "",
-			"game_title": gameTitle,
-			"carrier":    "",
-			"repository": "aram-frontend",
+			"situation":                "",
+			"game_title":               gameTitle,
+			"carrier":                  "",
+			"repository":               "aram-frontend",
+			issueReportScreenshotField: "true",
 		},
 	}
 }
@@ -164,6 +172,9 @@ func (s *Shell) prepareIssueReport(fields map[string]string) {
 	s.setStatus(s.tr("Uploading issue report..."))
 
 	snapshot := s.captureDebugBundleSnapshot(time.Now().UTC())
+	if !issueReportScreenshotEnabled(fields) {
+		snapshot.Screenshot = nil
+	}
 	backend := s.backend
 	relay := s.issueRelay
 	if relay == nil {
@@ -197,6 +208,14 @@ func (s *Shell) prepareIssueReport(fields map[string]string) {
 		}
 		s.issueReportResults <- result
 	}()
+}
+
+func issueReportScreenshotEnabled(fields map[string]string) bool {
+	value, ok := fields[issueReportScreenshotField]
+	if !ok {
+		return true
+	}
+	return !strings.EqualFold(strings.TrimSpace(value), "false")
 }
 
 func (s *Shell) consumeIssueReportResult(result issueReportResult) {
@@ -548,7 +567,7 @@ func buildIssueDraftURL(
 	}
 	fmt.Fprintf(
 		&body,
-		"- Debug bundle: `%s`\n\n> ARAM prepared this redacted ZIP with `screenshot.png` when a guest frame was available. Drag the ZIP into this issue before submitting.\n",
+		"- Debug bundle: `%s`\n\n> ARAM prepared this redacted ZIP with `screenshot.png` only when image transfer was enabled and a guest frame was available. Drag the ZIP into this issue before submitting.\n",
 		filepath.Base(bundlePath),
 	)
 	if warning != "" {
