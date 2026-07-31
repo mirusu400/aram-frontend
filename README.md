@@ -72,19 +72,25 @@ downloads public archives for the integrated `aram-emu` product, the
 optional `aram-core` developer tools, and the standalone `aram-frontend`.
 
 On the first integrated `aram-emu` launch, a responsive Welcome dialog asks
-for the Stable or Nightly channel and persists that choice. `aram-core` is
-already compiled into the ARAM product, so no separate core download is
-required for gameplay. Choosing a channel does not silently download or
-replace executables; updates remain explicit from the Updates page.
+for the Stable or Nightly channel. The integrated desktop host then downloads
+the latest `aram-emu` archive for that channel, verifies its GitHub SHA-256
+digest, installs it into a content-addressed runtime directory, and relaunches
+ARAM. That archive already contains a mutually compatible `aram-core` and
+`aram-frontend`; downloading their standalone developer artifacts would not
+change the running Go executable. If no Stable release exists yet, ARAM keeps
+using the bundled build. The standalone Null-backend frontend preview does not
+perform product installation.
 
 - **Stable** selects the latest published GitHub Release.
 - **Nightly** selects the rolling `nightly` prerelease produced from the latest
   successful `main` build.
 
-Downloads are stored below `Downloads/ARAM` and never replace the running
-application. GitHub-provided SHA-256 digests are checked before an archive is
-made visible. Windows amd64, Linux amd64, and macOS arm64 use the matching CI
-archive; unsupported host combinations are disabled in the UI.
+Downloads are stored below `Downloads/ARAM`. First-run product installation
+extracts the verified archive below the platform `ARAM/runtime/versions`
+configuration directory instead of overwriting a running executable. The
+original bootstrap delegates future launches to the selected runtime. Windows
+amd64, Linux amd64, and macOS arm64 use the matching CI archive; unsupported
+host combinations are disabled in the UI.
 
 ## Mobile
 

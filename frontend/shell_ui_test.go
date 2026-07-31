@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -17,6 +18,19 @@ type integratedWelcomeBackend struct {
 
 func (integratedWelcomeBackend) BackendName() string {
 	return "aram-core"
+}
+
+type installingWelcomeBackend struct {
+	integratedWelcomeBackend
+	updates chan ProductUpdate
+	err     error
+}
+
+func (backend *installingWelcomeBackend) InstallProductUpdate(
+	update ProductUpdate,
+) error {
+	backend.updates <- update
+	return backend.err
 }
 
 func isolateSettings(t *testing.T) {
@@ -87,6 +101,117 @@ func TestWelcomeChannelSelectionPersistsAndDoesNotDownloadCoreTools(t *testing.T
 	if !reloaded.WelcomeCompleted ||
 		reloaded.UpdateChannel != string(updateChannelNightly) {
 		t.Fatalf("reloaded Welcome settings = %#v", reloaded)
+	}
+}
+
+func TestWelcomeNightlyDownloadsInstallsAndRestartsIntegratedProduct(t *testing.T) {
+	isolateSettings(t)
+	backend := &installingWelcomeBackend{
+		updates: make(chan ProductUpdate, 1),
+	}
+	downloader := &fakeUpdateDownloader{
+		download: updateDownload{
+			Component: updateComponentProduct,
+			Channel:   updateChannelNightly,
+			Version:   "Nightly 10261b2",
+			Path:      filepath.Join(t.TempDir(), "aram-windows-amd64.zip"),
+		},
+		requests: make(chan updateDownload, 1),
+	}
+	shell := NewShell(backend, nil, "")
+	shell.updater = downloader
+
+	shell.completeWelcome(updateChannelNightly)
+	if !shell.welcomeInstalling || shell.settings.WelcomeCompleted ||
+		shell.panel == nil {
+		t.Fatalf(
+			"installing Welcome state = installing:%t settings:%#v panel:%#v",
+			shell.welcomeInstalling,
+			shell.settings,
+			shell.panel,
+		)
+	}
+	select {
+	case request := <-downloader.requests:
+		if request.Component != updateComponentProduct ||
+			request.Channel != updateChannelNightly {
+			t.Fatalf("Welcome update request = %#v", request)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Welcome did not request the integrated Nightly product")
+	}
+	var result updateResult
+	select {
+	case result = <-shell.updateResults:
+	case <-time.After(time.Second):
+		t.Fatal("Welcome product download did not complete")
+	}
+	shell.consumeUpdateResult(result)
+
+	select {
+	case installed := <-backend.updates:
+		if installed.Channel != string(updateChannelNightly) ||
+			installed.Version != downloader.download.Version ||
+			installed.ArchivePath != downloader.download.Path {
+			t.Fatalf("installed product = %#v", installed)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Welcome did not install the downloaded product")
+	}
+	if !shell.settings.WelcomeCompleted || shell.panel != nil ||
+		!shell.quitting || shell.welcomeInstalling {
+		t.Fatalf(
+			"installed Welcome state = settings:%#v panel:%#v quitting:%t installing:%t",
+			shell.settings,
+			shell.panel,
+			shell.quitting,
+			shell.welcomeInstalling,
+		)
+	}
+}
+
+func TestWelcomeStableUsesBundledBuildBeforeFirstStableRelease(t *testing.T) {
+	isolateSettings(t)
+	backend := &installingWelcomeBackend{
+		updates: make(chan ProductUpdate, 1),
+	}
+	downloader := &fakeUpdateDownloader{
+		err: &releaseNotFoundError{
+			repository: "aram-emu",
+			channel:    updateChannelStable,
+		},
+		requests: make(chan updateDownload, 1),
+	}
+	shell := NewShell(backend, nil, "")
+	shell.updater = downloader
+
+	shell.completeWelcome(updateChannelStable)
+	select {
+	case <-downloader.requests:
+	case <-time.After(time.Second):
+		t.Fatal("Welcome did not check for a Stable product")
+	}
+	select {
+	case result := <-shell.updateResults:
+		shell.consumeUpdateResult(result)
+	case <-time.After(time.Second):
+		t.Fatal("Stable lookup did not complete")
+	}
+
+	if !shell.settings.WelcomeCompleted || shell.panel != nil ||
+		shell.quitting || shell.welcomeInstalling {
+		t.Fatalf(
+			"Stable fallback state = settings:%#v panel:%#v quitting:%t installing:%t",
+			shell.settings,
+			shell.panel,
+			shell.quitting,
+			shell.welcomeInstalling,
+		)
+	}
+	select {
+	case installed := <-backend.updates:
+		t.Fatalf("Stable fallback unexpectedly installed %#v", installed)
+	default:
 	}
 }
 

@@ -86,6 +86,7 @@ type Shell struct {
 	busyCommands              map[BackendCommand]bool
 	frameRunPending           bool
 	frameGeneration           uint64
+	welcomeInstalling         bool
 	updater                   updateDownloader
 	updateProgress            map[updateComponent]updateProgress
 	pickerResults             chan pickerResult

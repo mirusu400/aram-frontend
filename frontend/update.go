@@ -93,6 +93,26 @@ type gitHubReleaseAsset struct {
 	Digest             string `json:"digest"`
 }
 
+type releaseNotFoundError struct {
+	repository string
+	channel    updateChannel
+}
+
+func (err *releaseNotFoundError) Error() string {
+	if err.channel == updateChannelNightly {
+		return fmt.Sprintf(
+			"%s has no published Nightly release yet; push its "+
+				"main-branch Nightly workflow to publish one",
+			err.repository,
+		)
+	}
+	return fmt.Sprintf(
+		"no %s release is published for %s",
+		updateChannelLabel(err.channel),
+		err.repository,
+	)
+}
+
 func newGitHubUpdater() *gitHubUpdater {
 	return &gitHubUpdater{
 		client: &http.Client{
@@ -259,18 +279,10 @@ func (updater *gitHubUpdater) fetchRelease(
 	}
 	defer response.Body.Close()
 	if response.StatusCode == http.StatusNotFound {
-		if channel == updateChannelNightly {
-			return gitHubRelease{}, fmt.Errorf(
-				"%s has no published Nightly release yet; push its "+
-					"main-branch Nightly workflow to publish one",
-				repository,
-			)
+		return gitHubRelease{}, &releaseNotFoundError{
+			repository: repository,
+			channel:    channel,
 		}
-		return gitHubRelease{}, fmt.Errorf(
-			"no %s release is published for %s",
-			updateChannelLabel(channel),
-			repository,
-		)
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return gitHubRelease{}, gitHubStatusError("release lookup", response)
@@ -518,15 +530,15 @@ func (s *Shell) cycleUpdateChannel() {
 	))
 }
 
-func (s *Shell) downloadUpdate(component updateComponent) {
+func (s *Shell) downloadUpdate(component updateComponent) bool {
 	if _, err := updateAssetName(component, runtime.GOOS, runtime.GOARCH); err != nil {
 		s.setStatus(s.tr("Update: ") + err.Error())
-		return
+		return false
 	}
 	progress := s.updateProgress[component]
 	if progress.Busy {
 		s.setStatus(s.tr("Update download is already in progress"))
-		return
+		return false
 	}
 	channel := normalizeUpdateChannel(s.settings.UpdateChannel)
 	progress.Busy = true
@@ -557,6 +569,7 @@ func (s *Shell) downloadUpdate(component updateComponent) {
 			err:       err,
 		}
 	}()
+	return true
 }
 
 func (s *Shell) consumeUpdateResult(result updateResult) {
@@ -565,6 +578,16 @@ func (s *Shell) consumeUpdateResult(result updateResult) {
 	progress.Busy = false
 	info, _ := updateInfo(component)
 	if result.err != nil {
+		if component == updateComponentProduct && s.welcomeInstalling {
+			var notFound *releaseNotFoundError
+			if normalizeUpdateChannel(s.settings.UpdateChannel) ==
+				updateChannelStable &&
+				errors.As(result.err, &notFound) {
+				s.completeWelcomeWithBundledStable()
+				return
+			}
+			s.welcomeInstalling = false
+		}
 		progress.Message = shorten(result.err.Error(), 100)
 		s.updateProgress[component] = progress
 		s.invalidateSettingsPanel()
@@ -578,6 +601,10 @@ func (s *Shell) consumeUpdateResult(result updateResult) {
 			s.tr(info.DisplayName),
 			result.err.Error(),
 		))
+		return
+	}
+	if component == updateComponentProduct && s.welcomeInstalling {
+		s.installWelcomeProductUpdate(result.download)
 		return
 	}
 	progress.Message = s.trf(
@@ -598,6 +625,60 @@ func (s *Shell) consumeUpdateResult(result updateResult) {
 		s.tr(info.DisplayName),
 		result.download.Path,
 	))
+}
+
+func (s *Shell) installWelcomeProductUpdate(download updateDownload) {
+	progress := s.updateProgress[updateComponentProduct]
+	progress.Busy = true
+	progress.Message = s.tr("Installing the integrated ARAM build...")
+	s.updateProgress[updateComponentProduct] = progress
+	s.invalidateSettingsPanel()
+
+	installer, ok := s.backend.(ProductUpdateInstaller)
+	if !ok {
+		s.failWelcomeInstall(errors.New(
+			"the integrated product installer is not available",
+		))
+		return
+	}
+	previousCompleted := s.settings.WelcomeCompleted
+	s.settings.WelcomeCompleted = true
+	if err := s.settings.save(); err != nil {
+		s.settings.WelcomeCompleted = previousCompleted
+		s.failWelcomeInstall(fmt.Errorf("save Welcome settings: %w", err))
+		return
+	}
+	err := installer.InstallProductUpdate(ProductUpdate{
+		Channel:     string(download.Channel),
+		Version:     download.Version,
+		ArchivePath: download.Path,
+	})
+	if err != nil {
+		s.settings.WelcomeCompleted = false
+		_ = s.settings.save()
+		s.failWelcomeInstall(err)
+		return
+	}
+
+	progress.Busy = false
+	progress.Message = s.tr("Installed; restarting ARAM...")
+	progress.Path = download.Path
+	progress.Version = download.Version
+	s.updateProgress[updateComponentProduct] = progress
+	s.welcomeInstalling = false
+	s.panel = nil
+	s.quitting = true
+	s.setStatus(s.tr("Installed; restarting ARAM..."))
+}
+
+func (s *Shell) failWelcomeInstall(err error) {
+	progress := s.updateProgress[updateComponentProduct]
+	progress.Busy = false
+	progress.Message = shorten(err.Error(), 100)
+	s.updateProgress[updateComponentProduct] = progress
+	s.welcomeInstalling = false
+	s.appendLog(s.tr("First-run update: ") + err.Error())
+	s.setStatus(s.tr("First-run update: ") + err.Error())
 }
 
 func (s *Shell) updateProgressSignature() string {

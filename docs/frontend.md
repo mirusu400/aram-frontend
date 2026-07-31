@@ -108,8 +108,12 @@ The first integrated launch opens a Welcome modal with Stable, Nightly, and
 Decide later actions. The selection is persisted in `settings.json`; Decide
 later closes the modal for the current session and presents it again next
 launch. The standalone Null-backend frontend preview skips this Welcome.
-Channel selection does not download anything automatically because the
-matching `aram-core` runtime is already compiled into each `aram-emu` build.
+When the backend implements `ProductUpdateInstaller`, selecting a channel
+automatically downloads the matching integrated `aram-emu` archive. The host
+installs and relaunches that verified build, which already contains compatible
+`aram-core` and `aram-frontend` revisions. A missing Stable release falls back
+to the bundled build; a Nightly or network failure keeps the Welcome open for
+retry or Decide later.
 
 The channel selector switches between the latest non-prerelease GitHub Release
 (`Stable`) and the rolling release tagged `nightly` (`Nightly`). Each repository
@@ -120,7 +124,9 @@ expected by the frontend. The download path is
 Downloads use a temporary file, enforce a size limit, validate a GitHub
 SHA-256 digest when one is present, and only then rename the archive into its
 final path. Existing downloads are preserved with a numbered filename. The
-running executable and loaded title are never replaced or restarted.
+desktop product host extracts first-run updates into a content-addressed
+runtime directory and relaunches it; manual developer-tool and standalone
+frontend downloads never replace the running executable.
 
 ## Audio
 

@@ -24,11 +24,24 @@ func fitPlatformWindow() string {
 func platformUsesTouchLayout() bool { return false }
 
 func Run(backend Backend, initialPath string) error {
+	return RunWithOptions(backend, initialPath, false)
+}
+
+// RunWithOptions lets the integrated desktop bootstrap reopen the native file
+// picker after it installs and relaunches a selected update channel.
+func RunWithOptions(
+	backend Backend,
+	initialPath string,
+	openOnStart bool,
+) error {
 	ebiten.SetWindowTitle("ARAM - Archived Runtime for ARM Mobiles")
 	ebiten.SetWindowSize(logicalWidth, logicalHeight)
 	ebiten.SetWindowSizeLimits(720, 540, -1, -1)
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 	shell := NewShell(backend, NewPlatformPicker(), initialPath)
+	if openOnStart && initialPath == "" {
+		shell.DispatchExternalCommand("file.open")
+	}
 	defer shell.closeAudio()
 	return ebiten.RunGame(shell)
 }

@@ -272,6 +272,19 @@ type BackendNamer interface {
 	BackendName() string
 }
 
+// ProductUpdate is a verified integrated ARAM archive selected by the shared
+// frontend. ProductUpdateInstaller is implemented by the desktop integration
+// host because only that host knows how to install and relaunch its executable.
+type ProductUpdate struct {
+	Channel     string
+	Version     string
+	ArchivePath string
+}
+
+type ProductUpdateInstaller interface {
+	InstallProductUpdate(ProductUpdate) error
+}
+
 type NullBackend struct{}
 
 func (NullBackend) Open(_ context.Context, request OpenRequest) (InputInfo, error) {

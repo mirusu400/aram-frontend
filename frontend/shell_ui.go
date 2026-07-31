@@ -564,11 +564,14 @@ func (u *shellUI) syncPanel(shell *Shell) {
 }
 
 func (u *shellUI) syncWelcomePanel(shell *Shell) {
+	progress := shell.updateProgress[updateComponentProduct]
 	signature := fmt.Sprintf(
-		"welcome|%dx%d|%s",
+		"welcome|%dx%d|%s|%t|%s",
 		u.viewportWidth,
 		u.viewportHeight,
 		shell.settings.UpdateChannel,
+		shell.welcomeInstalling,
+		progress.Message,
 	)
 	if signature == u.panelSignature && u.panelWindow != nil {
 		return
@@ -592,17 +595,38 @@ func (u *shellUI) syncWelcomePanel(shell *Shell) {
 		actionDirection = widget.DirectionVertical
 		actionWidth = min(280, max(190, u.viewportWidth-88))
 	}
+	bodyText := shell.tr(
+		"Choose the update channel for the integrated ARAM product.\n\n" +
+			"Stable is recommended for normal play. Nightly follows the latest " +
+			"successful main-branch build and may contain experimental changes.\n\n" +
+			"aram-core is already compiled into aram-emu; no separate core " +
+			"download is required. The optional aram-core tools archive only " +
+			"contains developer CLI utilities.\n\n" +
+			"You can change this later in Settings > Updates.",
+	)
+	if _, ok := shell.backend.(ProductUpdateInstaller); ok {
+		bodyText = shell.tr(
+			"Choose Stable or Nightly for the integrated ARAM product.\n\n" +
+				"ARAM downloads the latest build for that channel, including its " +
+				"compatible aram-core and aram-frontend revisions, then installs " +
+				"and restarts automatically.\n\n" +
+				"If no Stable release exists yet, ARAM continues with the bundled " +
+				"build. Nightly follows the latest successful integration build.",
+		)
+	}
+	if shell.welcomeInstalling {
+		message := progress.Message
+		if message == "" {
+			message = shell.tr("Preparing the integrated ARAM update...")
+		}
+		bodyText = shell.tr("Setting up ARAM") + "\n\n" + message + "\n\n" +
+			shell.tr("The verified integrated build contains compatible aram-core and "+
+				"aram-frontend revisions. ARAM will restart automatically when "+
+				"installation finishes.")
+	}
 	body := widget.NewText(
 		widget.TextOpts.Text(
-			shell.tr(
-				"Choose the update channel for the integrated ARAM product.\n\n"+
-					"Stable is recommended for normal play. Nightly follows the latest "+
-					"successful main-branch build and may contain experimental changes.\n\n"+
-					"aram-core is already compiled into aram-emu; no separate core "+
-					"download is required. The optional aram-core tools archive only "+
-					"contains developer CLI utilities.\n\n"+
-					"You can change this later in Settings > Updates.",
-			),
+			bodyText,
 			design.Type.Body,
 			design.Palette.TextMuted,
 		),
@@ -665,6 +689,9 @@ func (u *shellUI) syncWelcomePanel(shell *Shell) {
 			closeWindow()
 		},
 	)
+	u.welcomeStableButton.GetWidget().Disabled = shell.welcomeInstalling
+	u.welcomeNightlyButton.GetWidget().Disabled = shell.welcomeInstalling
+	u.welcomeLaterButton.GetWidget().Disabled = shell.welcomeInstalling
 	actions := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(actionDirection),
