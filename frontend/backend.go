@@ -164,6 +164,12 @@ type ToolField struct {
 	Label       string
 	Value       string
 	Placeholder string
+	Options     []ToolFieldOption
+}
+
+type ToolFieldOption struct {
+	Value string
+	Label string
 }
 
 type ToolAction struct {

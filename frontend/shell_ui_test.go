@@ -566,4 +566,17 @@ func TestIssueReportFormRendersAtCompactSize(t *testing.T) {
 		len(shell.panel.Fields) != 4 {
 		t.Fatalf("compact issue report panel = %#v", shell.panel)
 	}
+	dropdown := shell.interfaceUI.panelDropdowns["repository"]
+	if dropdown == nil {
+		t.Fatal("repository dropdown was not created")
+	}
+	core := shell.panel.Fields[3].Options[2]
+	dropdown.SetSelectedEntry(core)
+	shell.interfaceUI.ui.Update()
+	if shell.panel.FieldValues["repository"] != "aram-core" {
+		t.Fatalf(
+			"repository selection = %q",
+			shell.panel.FieldValues["repository"],
+		)
+	}
 }

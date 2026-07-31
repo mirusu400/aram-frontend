@@ -89,10 +89,14 @@ func (s *Shell) openIssueTracker() {
 				Placeholder: "SKT, KTF, LGT, or unknown",
 			},
 			{
-				ID:          "repository",
-				Label:       "Expected repository",
-				Value:       "frontend",
-				Placeholder: "frontend, emu, or core",
+				ID:    "repository",
+				Label: "Expected repository",
+				Value: "aram-frontend",
+				Options: []ToolFieldOption{
+					{Value: "aram-frontend", Label: "ARAM Frontend"},
+					{Value: "aram-emu", Label: "ARAM Emulator"},
+					{Value: "aram-core", Label: "ARAM Core"},
+				},
 			},
 		},
 		Actions: []ToolAction{{
@@ -104,7 +108,7 @@ func (s *Shell) openIssueTracker() {
 			"situation":  "",
 			"game_title": gameTitle,
 			"carrier":    "",
-			"repository": "frontend",
+			"repository": "aram-frontend",
 		},
 	}
 }

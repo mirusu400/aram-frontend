@@ -32,6 +32,7 @@ type shellUI struct {
 	statusMeta           *widget.Text
 	panelWindow          *widget.Window
 	panelSignature       string
+	panelDropdowns       map[string]*widget.ListComboButton
 	settingsSection      string
 	bindingDevice        bindingDevice
 	scrim                *widget.Container
@@ -1019,6 +1020,113 @@ func intPointer(value int) *int {
 	return &value
 }
 
+func newToolFieldDropdown(
+	design *ARAMDesignSystem,
+	panel *Panel,
+	field ToolField,
+	translateLabel func(string) string,
+) *widget.ListComboButton {
+	entries := make([]any, len(field.Options))
+	initial := field.Options[0]
+	current := panel.FieldValues[field.ID]
+	for index, option := range field.Options {
+		entries[index] = option
+		if option.Value == current {
+			initial = option
+		}
+	}
+	if panel.FieldValues == nil {
+		panel.FieldValues = make(map[string]string)
+	}
+	panel.FieldValues[field.ID] = initial.Value
+
+	trackIdle := euiimage.NewNineSliceColor(design.Palette.Border)
+	trackHover := euiimage.NewNineSliceColor(design.Palette.BorderStrong)
+	return widget.NewListComboButton(
+		widget.ListComboButtonOpts.Entries(entries),
+		widget.ListComboButtonOpts.InitialEntry(initial),
+		widget.ListComboButtonOpts.MaxContentHeight(132),
+		widget.ListComboButtonOpts.WidgetOpts(
+			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
+			widget.WidgetOpts.MinSize(0, 34),
+		),
+		widget.ListComboButtonOpts.ButtonParams(&widget.ButtonParams{
+			Image: buttonImages(
+				design.Components.ControlGroup,
+				design.Components.Dropdown,
+				design.Components.Dropdown,
+				design.Components.Dropdown,
+				design.Components.ControlGroup,
+			),
+			TextColor: design.Components.CommandButton.Text,
+			TextFace:  design.Type.Body,
+			TextPadding: &widget.Insets{
+				Left: design.Space.S, Right: design.Space.S,
+			},
+			TextPosition: &widget.TextPositioning{
+				HTextPosition: widget.TextPositionStart,
+				VTextPosition: widget.TextPositionCenter,
+			},
+			MinSize: &image.Point{Y: 34},
+		}),
+		widget.ListComboButtonOpts.ListParams(&widget.ListParams{
+			ScrollContainerImage: design.Components.Scroll,
+			Slider: &widget.SliderParams{
+				TrackImage: &widget.SliderTrackImage{
+					Idle:     trackIdle,
+					Hover:    trackHover,
+					Disabled: trackIdle,
+				},
+				HandleImage:   design.Components.TouchButton.Image,
+				MinHandleSize: intPointer(24),
+				TrackPadding:  &widget.Insets{Left: 3, Right: 3},
+			},
+			EntryFace: design.Type.Body,
+			EntryColor: &widget.ListEntryColor{
+				Unselected:                 design.Palette.Text,
+				Selected:                   design.Palette.Text,
+				DisabledUnselected:         design.Palette.TextDisabled,
+				DisabledSelected:           design.Palette.TextDisabled,
+				SelectingBackground:        design.Palette.SurfaceHover,
+				SelectedBackground:         design.Palette.AccentSoft,
+				FocusedBackground:          design.Palette.SurfaceHover,
+				SelectingFocusedBackground: design.Palette.AccentSoft,
+				SelectedFocusedBackground:  design.Palette.AccentSoft,
+				DisabledSelectedBackground: design.Palette.Surface,
+			},
+			EntryTextPadding: &widget.Insets{
+				Left:   design.Space.S,
+				Top:    design.Space.S,
+				Right:  design.Space.S,
+				Bottom: design.Space.S,
+			},
+			MinSize: &image.Point{X: 240},
+		}),
+		widget.ListComboButtonOpts.EntryLabelFunc(
+			func(entry any) string {
+				option, _ := entry.(ToolFieldOption)
+				return translateLabel(option.Label)
+			},
+			func(entry any) string {
+				option, _ := entry.(ToolFieldOption)
+				return translateLabel(option.Label)
+			},
+		),
+		widget.ListComboButtonOpts.EntrySelectedHandler(
+			func(args *widget.ListComboButtonEntrySelectedEventArgs) {
+				option, ok := args.Entry.(ToolFieldOption)
+				if !ok {
+					return
+				}
+				if panel.FieldValues == nil {
+					panel.FieldValues = make(map[string]string)
+				}
+				panel.FieldValues[field.ID] = option.Value
+			},
+		),
+	)
+}
+
 func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 	panel := shell.panel
 	var signatureParts []string
@@ -1031,6 +1139,12 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 	)
 	for _, field := range panel.Fields {
 		signatureParts = append(signatureParts, "field:"+field.ID+":"+field.Label+":"+field.Placeholder)
+		for _, option := range field.Options {
+			signatureParts = append(
+				signatureParts,
+				"option:"+field.ID+":"+option.Value+":"+option.Label,
+			)
+		}
 	}
 	for _, action := range panel.Actions {
 		signatureParts = append(
@@ -1045,6 +1159,7 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 
 	u.closePanel()
 	u.panelSignature = signature
+	u.panelDropdowns = make(map[string]*widget.ListComboButton)
 	u.scrim.GetWidget().SetVisibility(widget.Visibility_Show)
 	design := u.design
 	contents := widget.NewContainer(
@@ -1099,6 +1214,14 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 			design.Palette.Text,
 			widget.RowLayoutData{Stretch: true},
 		))
+		if len(field.Options) > 0 {
+			dropdown := newToolFieldDropdown(design, panel, field, shell.tr)
+			dropdown.GetWidget().Disabled = panel.Busy
+			u.panelDropdowns[field.ID] = dropdown
+			fieldBlock.AddChild(dropdown)
+			form.AddChild(fieldBlock)
+			continue
+		}
 		input := widget.NewTextInput(
 			widget.TextInputOpts.WidgetOpts(
 				widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
@@ -1930,6 +2053,7 @@ func (u *shellUI) closePanel() {
 	window := u.panelWindow
 	u.panelWindow = nil
 	u.panelSignature = ""
+	u.panelDropdowns = nil
 	u.settingsScroll = nil
 	u.recentList = nil
 	u.welcomeStableButton = nil
