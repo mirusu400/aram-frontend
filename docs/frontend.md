@@ -130,6 +130,12 @@ publishes the exact Windows amd64, Linux amd64, and macOS arm64 archive names
 expected by the frontend. The download path is
 `Downloads/ARAM/<repository>/<channel>/<version>`.
 
+Successful core and frontend Nightlies are also the inputs to the integrated
+product pipeline. `aram-emu` records their exact revisions, rebuilds the whole
+statically linked product, and publishes a new product Nightly. Downloading a
+standalone core or frontend archive remains a developer action and never
+changes the code inside a running integrated ARAM app.
+
 Downloads use a temporary file, enforce a size limit, validate a GitHub
 SHA-256 digest when one is present, and only then rename the archive into its
 final path. Existing downloads are preserved with a numbered filename. The

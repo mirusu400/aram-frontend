@@ -1735,7 +1735,7 @@ func (u *shellUI) settingsRows(shell *Shell) []*widget.Container {
 				label: "ARAM product",
 				description: shell.updateRowDescription(
 					updateComponentProduct,
-					"Integrated aram-emu build with aram-core and aram-frontend.",
+					"Integrated app, rebuilt from successful aram-core and aram-frontend Nightlies.",
 				),
 				value:    shell.updateActionLabel(updateComponentProduct),
 				action:   func() { shell.downloadUpdate(updateComponentProduct) },
@@ -1755,7 +1755,7 @@ func (u *shellUI) settingsRows(shell *Shell) []*widget.Container {
 				label: "aram-frontend",
 				description: shell.updateRowDescription(
 					updateComponentFrontend,
-					"Standalone frontend archive without the integrated emulator backend.",
+					"Optional standalone UI archive; it does not update the integrated ARAM app.",
 				),
 				value:    shell.updateActionLabel(updateComponentFrontend),
 				action:   func() { shell.downloadUpdate(updateComponentFrontend) },
