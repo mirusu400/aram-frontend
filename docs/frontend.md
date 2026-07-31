@@ -107,6 +107,12 @@ It exposes downloads for:
 - the optional `aram-core` headless developer tools;
 - the standalone `aram-frontend`.
 
+When `ProductUpdateInstaller` is available, the ARAM product row is an
+**Install & Restart** action rather than a download-only action. A successful
+manual product update installs the selected channel immediately and passes the
+current input path to the relaunched runtime. Developer tools and standalone
+frontend archives remain download-only.
+
 The first integrated launch opens a Welcome modal with Stable, Nightly, and
 Decide later actions. The selection is persisted in `settings.json`; Decide
 later closes the modal for the current session and presents it again next

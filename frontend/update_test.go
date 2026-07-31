@@ -301,6 +301,60 @@ func TestShellUpdateDownloadKeepsErrorsScopedToOriginatingComponent(t *testing.T
 	}
 }
 
+func TestManualProductDownloadInstallsRestartsAndReopensCurrentInput(t *testing.T) {
+	isolateSettings(t)
+	settings := defaultSettings()
+	settings.WelcomeCompleted = true
+	settings.UpdateChannel = string(updateChannelNightly)
+	if err := settings.save(); err != nil {
+		t.Fatal(err)
+	}
+	backend := &installingWelcomeBackend{
+		updates: make(chan ProductUpdate, 1),
+	}
+	download := updateDownload{
+		Component: updateComponentProduct,
+		Channel:   updateChannelNightly,
+		Version:   "Nightly 760f53f",
+		Path:      filepath.Join(t.TempDir(), "aram-windows-amd64.zip"),
+	}
+	downloader := &fakeUpdateDownloader{
+		download: download,
+		requests: make(chan updateDownload, 1),
+	}
+	shell := NewShell(backend, nil, "")
+	shell.updater = downloader
+	shell.selectedPath = filepath.Join(t.TempDir(), "game.zip")
+
+	shell.downloadUpdate(updateComponentProduct)
+	select {
+	case request := <-downloader.requests:
+		if request.Component != updateComponentProduct {
+			t.Fatalf("manual product request = %#v", request)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("manual product download was not dispatched")
+	}
+	select {
+	case result := <-shell.updateResults:
+		shell.consumeUpdateResult(result)
+	case <-time.After(time.Second):
+		t.Fatal("manual product download did not complete")
+	}
+	select {
+	case installed := <-backend.updates:
+		if installed.ArchivePath != download.Path ||
+			installed.RelaunchPath != shell.selectedPath {
+			t.Fatalf("manual installed product = %#v", installed)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("manual product download was not installed")
+	}
+	if !shell.quitting {
+		t.Fatal("manual product install did not request restart")
+	}
+}
+
 func TestSettingsNormalizeUpdateChannel(t *testing.T) {
 	settings := defaultSettings()
 	if settings.UpdateChannel != string(updateChannelStable) {

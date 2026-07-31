@@ -276,9 +276,10 @@ type BackendNamer interface {
 // frontend. ProductUpdateInstaller is implemented by the desktop integration
 // host because only that host knows how to install and relaunch its executable.
 type ProductUpdate struct {
-	Channel     string
-	Version     string
-	ArchivePath string
+	Channel      string
+	Version      string
+	ArchivePath  string
+	RelaunchPath string
 }
 
 type ProductUpdateInstaller interface {

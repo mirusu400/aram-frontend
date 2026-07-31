@@ -603,9 +603,11 @@ func (s *Shell) consumeUpdateResult(result updateResult) {
 		))
 		return
 	}
-	if component == updateComponentProduct && s.welcomeInstalling {
-		s.installWelcomeProductUpdate(result.download)
-		return
+	if component == updateComponentProduct {
+		if _, ok := s.backend.(ProductUpdateInstaller); ok {
+			s.installProductUpdate(result.download, s.welcomeInstalling)
+			return
+		}
 	}
 	progress.Message = s.trf(
 		"%s saved successfully",
@@ -627,7 +629,10 @@ func (s *Shell) consumeUpdateResult(result updateResult) {
 	))
 }
 
-func (s *Shell) installWelcomeProductUpdate(download updateDownload) {
+func (s *Shell) installProductUpdate(
+	download updateDownload,
+	firstRun bool,
+) {
 	progress := s.updateProgress[updateComponentProduct]
 	progress.Busy = true
 	progress.Message = s.tr("Installing the integrated ARAM build...")
@@ -636,27 +641,35 @@ func (s *Shell) installWelcomeProductUpdate(download updateDownload) {
 
 	installer, ok := s.backend.(ProductUpdateInstaller)
 	if !ok {
-		s.failWelcomeInstall(errors.New(
+		s.failProductInstall(errors.New(
 			"the integrated product installer is not available",
-		))
+		), firstRun)
 		return
 	}
 	previousCompleted := s.settings.WelcomeCompleted
-	s.settings.WelcomeCompleted = true
-	if err := s.settings.save(); err != nil {
-		s.settings.WelcomeCompleted = previousCompleted
-		s.failWelcomeInstall(fmt.Errorf("save Welcome settings: %w", err))
-		return
+	if firstRun {
+		s.settings.WelcomeCompleted = true
+		if err := s.settings.save(); err != nil {
+			s.settings.WelcomeCompleted = previousCompleted
+			s.failProductInstall(
+				fmt.Errorf("save Welcome settings: %w", err),
+				firstRun,
+			)
+			return
+		}
 	}
 	err := installer.InstallProductUpdate(ProductUpdate{
-		Channel:     string(download.Channel),
-		Version:     download.Version,
-		ArchivePath: download.Path,
+		Channel:      string(download.Channel),
+		Version:      download.Version,
+		ArchivePath:  download.Path,
+		RelaunchPath: s.selectedPath,
 	})
 	if err != nil {
-		s.settings.WelcomeCompleted = false
-		_ = s.settings.save()
-		s.failWelcomeInstall(err)
+		if firstRun {
+			s.settings.WelcomeCompleted = false
+			_ = s.settings.save()
+		}
+		s.failProductInstall(err, firstRun)
 		return
 	}
 
@@ -665,20 +678,26 @@ func (s *Shell) installWelcomeProductUpdate(download updateDownload) {
 	progress.Path = download.Path
 	progress.Version = download.Version
 	s.updateProgress[updateComponentProduct] = progress
-	s.welcomeInstalling = false
-	s.panel = nil
+	if firstRun {
+		s.welcomeInstalling = false
+		s.panel = nil
+	}
 	s.quitting = true
 	s.setStatus(s.tr("Installed; restarting ARAM..."))
 }
 
-func (s *Shell) failWelcomeInstall(err error) {
+func (s *Shell) failProductInstall(err error, firstRun bool) {
 	progress := s.updateProgress[updateComponentProduct]
 	progress.Busy = false
 	progress.Message = shorten(err.Error(), 100)
 	s.updateProgress[updateComponentProduct] = progress
-	s.welcomeInstalling = false
-	s.appendLog(s.tr("First-run update: ") + err.Error())
-	s.setStatus(s.tr("First-run update: ") + err.Error())
+	prefix := s.tr("Product update: ")
+	if firstRun {
+		s.welcomeInstalling = false
+		prefix = s.tr("First-run update: ")
+	}
+	s.appendLog(prefix + err.Error())
+	s.setStatus(prefix + err.Error())
 }
 
 func (s *Shell) updateProgressSignature() string {
@@ -718,6 +737,11 @@ func (s *Shell) updateActionLabel(component updateComponent) string {
 	}
 	if s.updateProgress[component].Busy {
 		return "Downloading..."
+	}
+	if component == updateComponentProduct {
+		if _, ok := s.backend.(ProductUpdateInstaller); ok {
+			return "Install & Restart"
+		}
 	}
 	return "Download"
 }

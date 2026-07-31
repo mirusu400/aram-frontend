@@ -70,7 +70,10 @@ func (s *Shell) completeWelcomeWithBundledStable() {
 	s.settings.WelcomeCompleted = true
 	if err := s.settings.save(); err != nil {
 		s.settings.WelcomeCompleted = false
-		s.failWelcomeInstall(fmt.Errorf("save Welcome settings: %w", err))
+		s.failProductInstall(
+			fmt.Errorf("save Welcome settings: %w", err),
+			true,
+		)
 		return
 	}
 	s.welcomeInstalling = false
