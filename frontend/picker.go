@@ -13,3 +13,19 @@ type Picker interface {
 	OpenFirmwareDirectory(previous string) (string, error)
 	ChooseRecent([]string) (string, error)
 }
+
+type languageAwarePicker interface {
+	SetLanguage(Language)
+}
+
+func supportedInputPatterns() []string {
+	return append(wipiPackagePatterns(), firmwareImagePatterns()...)
+}
+
+func wipiPackagePatterns() []string {
+	return []string{"*.dat", "*.jar", "*.zip", "*.ZIP"}
+}
+
+func firmwareImagePatterns() []string {
+	return []string{"*.wbin", "*.wbt", "*.bin", "*.rom", "*.img", "*.mbn"}
+}

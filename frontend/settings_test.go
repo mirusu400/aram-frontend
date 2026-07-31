@@ -32,6 +32,7 @@ func TestSettingsNormalizePreservesMutedZeroVolume(t *testing.T) {
 
 func TestSettingsNormalizeRepairsDisplayOptions(t *testing.T) {
 	settings := defaultSettings()
+	settings.Language = "fr"
 	settings.ThemeMode = "blue"
 	settings.Rotation = 17
 	settings.ScreenLayout = "broken"
@@ -40,12 +41,23 @@ func TestSettingsNormalizeRepairsDisplayOptions(t *testing.T) {
 	settings.Speed = 3
 	settings.normalize()
 	if settings.Rotation != 0 ||
+		settings.Language != string(LanguageEnglish) ||
 		settings.ThemeMode != "light" ||
 		settings.ScreenLayout != "center" ||
 		settings.Filter != "nearest" ||
 		settings.StateSlot != 0 ||
 		settings.Speed != 1 {
 		t.Fatalf("normalized settings = %#v", settings)
+	}
+}
+
+func TestDefaultSettingsRequireIntegratedWelcome(t *testing.T) {
+	settings := defaultSettings()
+	if settings.WelcomeCompleted {
+		t.Fatal("fresh settings unexpectedly skip the integrated Welcome")
+	}
+	if settings.UpdateChannel != string(updateChannelStable) {
+		t.Fatalf("fresh update channel = %q", settings.UpdateChannel)
 	}
 }
 

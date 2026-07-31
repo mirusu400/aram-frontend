@@ -10,6 +10,10 @@
 
 Desktop file dialogs, mobile document pickers, file association, drag-and-drop,
 and command-line paths converge on one backend open request.
+The desktop picker accepts direct WIPI `.zip`/`.ZIP` packages in addition to
+DAT, JAR, and firmware inputs. ZIP archives remain intact and are inspected by
+the backend loader rather than unpacked by the presentation layer. Native
+mobile hosts should include `application/zip` in their document picker.
 
 ## Emulation
 
@@ -89,6 +93,33 @@ Additional SDL-compatible mappings can be placed at
 restarting. The optional virtual keypad reserves a responsive rail to the
 right of the guest display and exposes direction, soft, action, menu, and
 phone-number controls to mouse or touch input.
+
+## Updates
+
+`Help > Check for Updates...` opens the `Updates` category in `Configure ARAM`.
+It exposes downloads for:
+
+- the integrated `aram-emu` product;
+- the optional `aram-core` headless developer tools;
+- the standalone `aram-frontend`.
+
+The first integrated launch opens a Welcome modal with Stable, Nightly, and
+Decide later actions. The selection is persisted in `settings.json`; Decide
+later closes the modal for the current session and presents it again next
+launch. The standalone Null-backend frontend preview skips this Welcome.
+Channel selection does not download anything automatically because the
+matching `aram-core` runtime is already compiled into each `aram-emu` build.
+
+The channel selector switches between the latest non-prerelease GitHub Release
+(`Stable`) and the rolling release tagged `nightly` (`Nightly`). Each repository
+publishes the exact Windows amd64, Linux amd64, and macOS arm64 archive names
+expected by the frontend. The download path is
+`Downloads/ARAM/<repository>/<channel>/<version>`.
+
+Downloads use a temporary file, enforce a size limit, validate a GitHub
+SHA-256 digest when one is present, and only then rename the archive into its
+final path. Existing downloads are preserved with a numbered filename. The
+running executable and loaded title are never replaced or restarted.
 
 ## Audio
 

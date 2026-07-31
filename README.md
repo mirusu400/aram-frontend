@@ -26,33 +26,56 @@ release plan live in [`aram-emu`](https://github.com/mirusu400/aram-emu).
 
 ## Desktop
 
-```powershell
-go run ./cmd/aram-frontend
-go test ./...
-```
-
-The standalone command uses a null backend, so menus and file selection work
-while execution reports that an integration backend is not attached.
-
-The runnable product command lives in the sibling `aram-emu` integration
-repository. It attaches the portable `aram-core` application machine:
+Run the integrated emulator from the sibling `aram-emu` repository:
 
 ```powershell
 cd ..\aram-emu
 go run ./cmd/aram
 ```
 
+The command in this repository is only a frontend preview. It intentionally
+uses a null backend, so it can exercise menus, layout, and file selection but
+cannot execute a game:
+
+```powershell
+go run ./cmd/aram-frontend
+go test ./...
+```
+
 On Windows the shared shell supports native file and firmware selection,
 command-line inputs, drag-and-drop, the full emulator command model, guest
 frame rendering, keyboard/gamepad input, native-resolution screenshots, and
 frontend tool panels. Backend-dependent operations stay visible and explain
-why they are unavailable.
+why they are unavailable. File/Open includes direct WIPI ZIP packages alongside
+DAT and JAR packages; the selected archive is passed intact to `aram-core` for
+format inspection and safe loading.
 
 Desktop resizing uses the available window as the internal canvas: the guest
 viewport expands while menus, text, centered dialogs, and scrollable settings
 remain readable. Controller bindings use press-to-capture keyboard/gamepad
 remapping with global and per-title profiles. An optional responsive virtual
 phone keypad can be shown beside the guest display.
+
+## Updates
+
+`Help > Check for Updates...` (or `Emulation > Configure ARAM > Updates`)
+downloads public archives for the integrated `aram-emu` product, the
+optional `aram-core` developer tools, and the standalone `aram-frontend`.
+
+On the first integrated `aram-emu` launch, a responsive Welcome dialog asks
+for the Stable or Nightly channel and persists that choice. `aram-core` is
+already compiled into the ARAM product, so no separate core download is
+required for gameplay. Choosing a channel does not silently download or
+replace executables; updates remain explicit from the Updates page.
+
+- **Stable** selects the latest published GitHub Release.
+- **Nightly** selects the rolling `nightly` prerelease produced from the latest
+  successful `main` build.
+
+Downloads are stored below `Downloads/ARAM` and never replace the running
+application. GitHub-provided SHA-256 digests are checked before an archive is
+made visible. Windows amd64, Linux amd64, and macOS arm64 use the matching CI
+archive; unsupported host combinations are disabled in the UI.
 
 ## Mobile
 
@@ -77,7 +100,14 @@ Android AAR, and the iOS XCFramework are retained for 14 days. The standalone
 desktop artifacts use the null backend; the runnable integrated emulator is
 published by `aram-emu`.
 
-The CI workflow builds the Android AAR and iOS XCFramework as first-class
-portability checks.
+After every successful push to `main`, CI moves the `nightly` tag to that
+commit and updates the rolling Nightly prerelease with the exact three desktop
+archives produced by the run plus `SHA256SUMS.txt`. The Android AAR and iOS
+XCFramework remain first-class portability gates, so a failed mobile binding
+prevents a broken frontend Nightly from being published.
+
+Publishing any GitHub Release other than `nightly` builds that tag and attaches
+the same desktop archives to the release for the Stable channel.
+
 The native Android host project and release signing remain integration
 responsibilities rather than frontend-library concerns.

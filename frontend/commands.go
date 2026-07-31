@@ -1,7 +1,5 @@
 package frontend
 
-import "fmt"
-
 type Command struct {
 	ID           string
 	Label        string
@@ -16,27 +14,29 @@ func (c Command) DisplayLabel(shell *Shell) string {
 	if c.DynamicLabel != nil {
 		return c.DynamicLabel(shell)
 	}
-	return c.Label
+	return shell.tr(c.Label)
 }
 
 func (c Command) Availability(shell *Shell) Capability {
 	if c.Enabled != nil && !c.Enabled(shell) {
-		return Capability{Reason: "This command is not available in the current frontend state"}
+		return Capability{Reason: shell.tr("This command is not available in the current frontend state")}
 	}
 	if c.Backend != "" {
 		if shell.input == nil {
-			return Capability{Reason: "Open a title or firmware input first"}
+			return Capability{Reason: shell.tr("Open a title or firmware input first")}
 		}
 		if capabilities, ok := shell.backend.(CapabilityBackend); ok {
-			return capabilities.Capability(c.Backend)
+			capability := capabilities.Capability(c.Backend)
+			capability.Reason = shell.tr(capability.Reason)
+			return capability
 		}
 		if !shell.backend.Supports(c.Backend) {
-			return Capability{Reason: "The selected backend does not support this command"}
+			return Capability{Reason: shell.tr("The selected backend does not support this command")}
 		}
 		return Capability{Supported: true}
 	}
 	if c.Action == nil {
-		return Capability{Reason: "This frontend command is not implemented"}
+		return Capability{Reason: shell.tr("This frontend command is not implemented")}
 	}
 	return Capability{Supported: true}
 }
@@ -80,14 +80,14 @@ func defaultMenus() []Menu {
 					ID:     "emu.state_slot",
 					Action: (*Shell).cycleStateSlot,
 					DynamicLabel: func(shell *Shell) string {
-						return fmt.Sprintf("State Slot: %d", shell.settings.StateSlot)
+						return shell.trf("State Slot: %d", shell.settings.StateSlot)
 					},
 				},
 				{
 					ID:     "emu.speed",
 					Action: (*Shell).cycleSpeed,
 					DynamicLabel: func(shell *Shell) string {
-						return fmt.Sprintf("Speed: %gx", shell.settings.Speed)
+						return shell.trf("Speed: %gx", shell.settings.Speed)
 					},
 				},
 				{ID: "emu.rewind", Label: "Rewind", Backend: CommandRewind},
@@ -105,21 +105,27 @@ func defaultMenus() []Menu {
 					ID:     "view.rotation",
 					Action: (*Shell).cycleRotation,
 					DynamicLabel: func(shell *Shell) string {
-						return fmt.Sprintf("Rotation: %d°", shell.settings.Rotation)
+						return shell.trf("Rotation: %d°", shell.settings.Rotation)
 					},
 				},
 				{
 					ID:     "view.layout",
 					Action: (*Shell).cycleScreenLayout,
 					DynamicLabel: func(shell *Shell) string {
-						return "Screen Layout: " + shell.settings.ScreenLayout
+						return shell.trf(
+							"Screen Layout: %s",
+							shell.tr(settingValueLabel(shell.settings.ScreenLayout)),
+						)
 					},
 				},
 				{
 					ID:     "view.filter",
 					Action: (*Shell).cycleFilter,
 					DynamicLabel: func(shell *Shell) string {
-						return "Filter: " + shell.settings.Filter
+						return shell.trf(
+							"Filter: %s",
+							shell.tr(settingValueLabel(shell.settings.Filter)),
+						)
 					},
 				},
 				{ID: "view.screenshot", Label: "Screenshot", Shortcut: "Ctrl+Shift+S", Enabled: hasFrame, Action: (*Shell).saveScreenshot},
@@ -142,6 +148,7 @@ func defaultMenus() []Menu {
 		{
 			Label: "Help",
 			Commands: []Command{
+				{ID: "help.updates", Label: "Check for Updates...", Action: (*Shell).openUpdatesPanel},
 				{ID: "help.documentation", Label: "Documentation", Action: (*Shell).openDocumentation},
 				{ID: "help.issue", Label: "Report Issue", Action: (*Shell).openIssueTracker},
 				{ID: "help.about", Label: "About ARAM", Action: (*Shell).showAbout},

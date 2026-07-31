@@ -19,28 +19,31 @@ const (
 )
 
 type shellUI struct {
-	owner           *Shell
-	ui              *ebitenui.UI
-	design          *ARAMDesignSystem
-	menuButtons     []*widget.Button
-	menuWindow      *widget.Window
-	menuIndex       int
-	commandButtons  map[string]*widget.Button
-	toolbarButtons  map[string]*widget.Button
-	toolbarTitle    *widget.Text
-	statusText      *widget.Text
-	statusMeta      *widget.Text
-	panelWindow     *widget.Window
-	panelSignature  string
-	settingsSection string
-	bindingDevice   bindingDevice
-	scrim           *widget.Container
-	viewportWidth   int
-	viewportHeight  int
-	compact         bool
-	settingsScroll  *widget.ScrollContainer
-	settingsOffsets map[string]float64
-	recentList      *widget.List
+	owner                *Shell
+	ui                   *ebitenui.UI
+	design               *ARAMDesignSystem
+	menuButtons          []*widget.Button
+	menuWindow           *widget.Window
+	menuIndex            int
+	commandButtons       map[string]*widget.Button
+	toolbarButtons       map[string]*widget.Button
+	toolbarTitle         *widget.Text
+	statusText           *widget.Text
+	statusMeta           *widget.Text
+	panelWindow          *widget.Window
+	panelSignature       string
+	settingsSection      string
+	bindingDevice        bindingDevice
+	scrim                *widget.Container
+	viewportWidth        int
+	viewportHeight       int
+	compact              bool
+	settingsScroll       *widget.ScrollContainer
+	settingsOffsets      map[string]float64
+	recentList           *widget.List
+	welcomeStableButton  *widget.Button
+	welcomeNightlyButton *widget.Button
+	welcomeLaterButton   *widget.Button
 }
 
 func newShellUI(shell *Shell, design *ARAMDesignSystem) *shellUI {
@@ -112,7 +115,7 @@ func (u *shellUI) buildTopBar(shell *Shell) *widget.Container {
 	for index, menu := range shell.menus {
 		menuIndex := index
 		button := design.button(
-			menu.Label,
+			shell.tr(menu.Label),
 			design.Components.MenuButton,
 			design.Type.Strong,
 			widths[index],
@@ -187,14 +190,14 @@ func (u *shellUI) buildApplicationToolbar(shell *Shell) *widget.Container {
 		))
 	}
 
-	addAction("file.open", "Open", 68)
+	addAction("file.open", shell.tr("Open"), 68)
 	addSeparator()
-	addAction("emu.start", "Start", 64)
-	addAction("emu.pause", "Pause", 64)
-	addAction("emu.stop", "Stop", 60)
-	addAction("emu.reset", "Reset", 62)
+	addAction("emu.start", shell.tr("Start"), 64)
+	addAction("emu.pause", shell.tr("Pause"), 64)
+	addAction("emu.stop", shell.tr("Stop"), 60)
+	addAction("emu.reset", shell.tr("Reset"), 62)
 	addSeparator()
-	addAction("emu.configure", "Settings", 82)
+	addAction("emu.configure", shell.tr("Settings"), 82)
 
 	u.toolbarTitle = design.text(
 		"",
@@ -273,12 +276,12 @@ func (u *shellUI) sync(shell *Shell) {
 	u.statusText.Label = shorten(shell.status, statusLimit)
 	u.statusMeta.Label = fmt.Sprintf(
 		"%s  •  %gx  •  %s",
-		strings.ToUpper(string(shell.backend.State())),
+		strings.ToUpper(shell.tr(stateValueLabel(string(shell.backend.State())))),
 		shell.settings.Speed,
-		strings.ToUpper(shell.settings.Filter),
+		strings.ToUpper(shell.tr(settingValueLabel(shell.settings.Filter))),
 	)
 	if shell.input == nil {
-		u.toolbarTitle.Label = "No title loaded"
+		u.toolbarTitle.Label = shell.tr("No title loaded")
 	} else {
 		u.toolbarTitle.Label = shorten(shell.input.DisplayName, 52)
 	}
@@ -435,6 +438,10 @@ func (u *shellUI) syncPanel(shell *Shell) {
 		u.syncSettingsPanel(shell)
 		return
 	}
+	if shell.panel.Kind == "welcome" {
+		u.syncWelcomePanel(shell)
+		return
+	}
 	if shell.panel.Kind == "recent" {
 		u.syncRecentPanel(shell)
 		return
@@ -446,14 +453,14 @@ func (u *shellUI) syncPanel(shell *Shell) {
 	}
 	wrapWidth := max(28, min(78, (u.viewportWidth-72)/7))
 	lineLimit := max(8, min(29, (u.viewportHeight-150)/16))
-	lines := wrapPanelLines(shell.panelLines(), wrapWidth, lineLimit)
+	lines := wrapPanelLines(shell.trLines(shell.panelLines()), wrapWidth, lineLimit)
 	signature := fmt.Sprintf(
 		"%dx%d\x00%s\x00%s\x00%s",
 		u.viewportWidth,
 		u.viewportHeight,
-		shell.panel.Title,
+		shell.tr(shell.panel.Title),
 		strings.Join(lines, "\x00"),
-		shell.panelFooter(),
+		shell.tr(shell.panelFooter()),
 	)
 	if signature == u.panelSignature && u.panelWindow != nil {
 		return
@@ -482,7 +489,7 @@ func (u *shellUI) syncPanel(shell *Shell) {
 		})),
 	)
 	contents.AddChild(body)
-	footer := shell.panelFooter()
+	footer := shell.tr(shell.panelFooter())
 	if footer != "" {
 		contents.AddChild(design.text(
 			footer,
@@ -501,7 +508,7 @@ func (u *shellUI) syncPanel(shell *Shell) {
 
 	var panelWindow *widget.Window
 	closeButton := design.button(
-		"Close",
+		shell.tr("Close"),
 		design.Components.PrimaryButton,
 		design.Type.Strong,
 		96,
@@ -532,7 +539,7 @@ func (u *shellUI) syncPanel(shell *Shell) {
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 	titleBar.AddChild(design.text(
-		shell.panel.Title,
+		shell.tr(shell.panel.Title),
 		design.Type.Heading,
 		design.Palette.Text,
 		widget.AnchorLayoutData{
@@ -556,6 +563,157 @@ func (u *shellUI) syncPanel(shell *Shell) {
 	u.ui.AddWindow(panelWindow)
 }
 
+func (u *shellUI) syncWelcomePanel(shell *Shell) {
+	signature := fmt.Sprintf(
+		"welcome|%dx%d|%s",
+		u.viewportWidth,
+		u.viewportHeight,
+		shell.settings.UpdateChannel,
+	)
+	if signature == u.panelSignature && u.panelWindow != nil {
+		return
+	}
+
+	u.closePanel()
+	u.panelSignature = signature
+	u.scrim.GetWidget().SetVisibility(widget.Visibility_Show)
+	design := u.design
+	contents := widget.NewContainer(
+		widget.ContainerOpts.BackgroundImage(design.Components.SurfaceRaised),
+		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
+	)
+
+	compactActions := u.viewportWidth < 560
+	bodyBottom := 106
+	actionDirection := widget.DirectionHorizontal
+	actionWidth := 154
+	if compactActions {
+		bodyBottom = 202
+		actionDirection = widget.DirectionVertical
+		actionWidth = min(280, max(190, u.viewportWidth-88))
+	}
+	body := widget.NewText(
+		widget.TextOpts.Text(
+			shell.tr(
+				"Choose the update channel for the integrated ARAM product.\n\n"+
+					"Stable is recommended for normal play. Nightly follows the latest "+
+					"successful main-branch build and may contain experimental changes.\n\n"+
+					"aram-core is already compiled into aram-emu; no separate core "+
+					"download is required. The optional aram-core tools archive only "+
+					"contains developer CLI utilities.\n\n"+
+					"You can change this later in Settings > Updates.",
+			),
+			design.Type.Body,
+			design.Palette.TextMuted,
+		),
+		widget.TextOpts.MaxWidth(float64(min(560, max(180, u.viewportWidth-88)))),
+		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+			HorizontalPosition: widget.AnchorLayoutPositionStart,
+			VerticalPosition:   widget.AnchorLayoutPositionStart,
+			Padding: &widget.Insets{
+				Left:   design.Space.XL,
+				Top:    design.Space.XL,
+				Right:  design.Space.XL,
+				Bottom: bodyBottom,
+			},
+		})),
+	)
+	contents.AddChild(body)
+
+	var welcomeWindow *widget.Window
+	closeWindow := func() {
+		if welcomeWindow != nil {
+			welcomeWindow.Close()
+		}
+		u.panelWindow = nil
+		u.panelSignature = ""
+		u.scrim.GetWidget().SetVisibility(widget.Visibility_Hide)
+	}
+	complete := func(channel updateChannel) {
+		shell.completeWelcome(channel)
+		if shell.panel == nil {
+			closeWindow()
+		}
+	}
+	u.welcomeStableButton = design.button(
+		shell.tr("Use Stable (Recommended)"),
+		design.Components.PrimaryButton,
+		design.Type.Strong,
+		actionWidth,
+		design.Components.PrimaryButton.MinHeight,
+		widget.TextPositionCenter,
+		func() { complete(updateChannelStable) },
+	)
+	u.welcomeNightlyButton = design.button(
+		shell.tr("Use Nightly"),
+		design.Components.SubtleButton,
+		design.Type.Strong,
+		actionWidth,
+		design.Components.SubtleButton.MinHeight,
+		widget.TextPositionCenter,
+		func() { complete(updateChannelNightly) },
+	)
+	u.welcomeLaterButton = design.button(
+		shell.tr("Decide later"),
+		design.Components.SubtleButton,
+		design.Type.Strong,
+		actionWidth,
+		design.Components.SubtleButton.MinHeight,
+		widget.TextPositionCenter,
+		func() {
+			shell.dismissWelcome()
+			closeWindow()
+		},
+	)
+	actions := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(actionDirection),
+			widget.RowLayoutOpts.Spacing(design.Space.S),
+		)),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+			HorizontalPosition: widget.AnchorLayoutPositionCenter,
+			VerticalPosition:   widget.AnchorLayoutPositionEnd,
+			Padding:            &widget.Insets{Bottom: design.Space.L},
+		})),
+	)
+	actions.AddChild(
+		u.welcomeStableButton,
+		u.welcomeNightlyButton,
+		u.welcomeLaterButton,
+	)
+	contents.AddChild(actions)
+
+	titleBar := widget.NewContainer(
+		widget.ContainerOpts.BackgroundImage(
+			euiimage.NewNineSliceColor(design.Palette.AccentSoft),
+		),
+		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
+	)
+	titleBar.AddChild(design.text(
+		shell.tr("Welcome to ARAM"),
+		design.Type.Heading,
+		design.Palette.Text,
+		widget.AnchorLayoutData{
+			HorizontalPosition: widget.AnchorLayoutPositionStart,
+			VerticalPosition:   widget.AnchorLayoutPositionCenter,
+			Padding:            &widget.Insets{Left: design.Space.XL},
+		},
+	))
+	welcomeWindow = widget.NewWindow(
+		widget.WindowOpts.Contents(contents),
+		widget.WindowOpts.TitleBar(titleBar, 46),
+		widget.WindowOpts.Modal(),
+		widget.WindowOpts.Location(centeredWindowRect(
+			u.viewportWidth,
+			u.viewportHeight,
+			650,
+			470,
+		)),
+	)
+	u.panelWindow = welcomeWindow
+	u.ui.AddWindow(welcomeWindow)
+}
+
 func (u *shellUI) syncRecentPanel(shell *Shell) {
 	recent := append([]string(nil), shell.settings.RecentFiles...)
 	signature := fmt.Sprintf(
@@ -577,7 +735,10 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 	contents.AddChild(design.text(
-		fmt.Sprintf("%d recent inputs — select one to inspect its full path.", len(recent)),
+		shell.trf(
+			"%d recent inputs — select one to inspect its full path.",
+			len(recent),
+		),
 		design.Type.Body,
 		design.Palette.TextMuted,
 		widget.AnchorLayoutData{
@@ -598,7 +759,12 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 	}
 	pathText := widget.NewText(
 		widget.TextOpts.Text(
-			recentPathDetails(selectedPath, detailWidth, 5),
+			recentPathDetails(
+				selectedPath,
+				detailWidth,
+				5,
+				shell.language(),
+			),
 			design.Type.Caption,
 			design.Palette.TextMuted,
 		),
@@ -631,7 +797,7 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 		u.scrim.GetWidget().SetVisibility(widget.Visibility_Hide)
 	}
 	openButton := design.button(
-		"Open",
+		shell.tr("Open"),
 		design.Components.PrimaryButton,
 		design.Type.Strong,
 		96,
@@ -655,7 +821,7 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 	contents.AddChild(openButton)
 
 	cancelButton := design.button(
-		"Cancel",
+		shell.tr("Cancel"),
 		design.Components.SubtleButton,
 		design.Type.Strong,
 		96,
@@ -663,7 +829,7 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 		widget.TextPositionCenter,
 		func() {
 			closeRecent()
-			shell.setStatus("Open recent canceled")
+			shell.setStatus(shell.tr("Open recent canceled"))
 		},
 	)
 	cancelButton.GetWidget().LayoutData = widget.AnchorLayoutData{
@@ -744,7 +910,12 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 		widget.ListOpts.EntrySelectedHandler(func(args *widget.ListEntrySelectedEventArgs) {
 			path, _ := args.Entry.(string)
 			selectedPath = path
-			pathText.Label = recentPathDetails(path, detailWidth, 5)
+			pathText.Label = recentPathDetails(
+				path,
+				detailWidth,
+				5,
+				shell.language(),
+			)
 			openButton.GetWidget().Disabled = path == ""
 		}),
 	)
@@ -756,7 +927,7 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 	titleBar.AddChild(design.text(
-		"Open Recent",
+		shell.tr("Open Recent"),
 		design.Type.Heading,
 		design.Palette.Text,
 		widget.AnchorLayoutData{
@@ -795,11 +966,19 @@ func recentEntryLabel(path string, width int) string {
 	return shorten(name, nameLimit) + "  —  " + shorten(parent, parentLimit)
 }
 
-func recentPathDetails(path string, width, limit int) string {
-	if strings.TrimSpace(path) == "" {
-		return "Select an input to view its full path."
+func recentPathDetails(path string, width, limit int, languages ...Language) string {
+	language := LanguageEnglish
+	if len(languages) > 0 {
+		language = languages[0]
 	}
-	lines := wrapPanelLines([]string{"Full path: " + path}, max(12, width), 1024)
+	if strings.TrimSpace(path) == "" {
+		return translate(language, "Select an input to view its full path.")
+	}
+	lines := wrapPanelLines(
+		[]string{translatef(language, "Full path: %s", path)},
+		max(12, width),
+		1024,
+	)
 	if len(lines) > limit {
 		lines = lines[:limit]
 		last := strings.TrimSpace(lines[limit-1])
@@ -865,7 +1044,7 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 	if len(panel.Lines) > 0 {
 		form.AddChild(widget.NewText(
 			widget.TextOpts.Text(
-				strings.Join(wrapPanelLines(panel.Lines, 76, 14), "\n"),
+				strings.Join(wrapPanelLines(shell.trLines(panel.Lines), 76, 14), "\n"),
 				design.Type.Body,
 				design.Palette.TextMuted,
 			),
@@ -887,7 +1066,7 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 			})),
 		)
 		fieldBlock.AddChild(design.text(
-			field.Label,
+			shell.tr(field.Label),
 			design.Type.Strong,
 			design.Palette.Text,
 			widget.RowLayoutData{Stretch: true},
@@ -943,7 +1122,7 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 	for _, action := range panel.Actions {
 		action := action
 		button := design.button(
-			action.Label,
+			shell.tr(action.Label),
 			design.Components.SubtleButton,
 			design.Type.Strong,
 			112,
@@ -961,7 +1140,7 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 
 	var toolWindow *widget.Window
 	closeButton := design.button(
-		"Close",
+		shell.tr("Close"),
 		design.Components.PrimaryButton,
 		design.Type.Strong,
 		96,
@@ -992,7 +1171,7 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 	titleBar.AddChild(design.text(
-		panel.Title,
+		shell.tr(panel.Title),
 		design.Type.Heading,
 		design.Palette.Text,
 		widget.AnchorLayoutData{
@@ -1019,13 +1198,14 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 
 func (u *shellUI) syncSettingsPanel(shell *Shell) {
 	switch u.settingsSection {
-	case "General", "Appearance", "Graphics", "Audio", "Controls", "Bindings":
+	case "General", "Appearance", "Graphics", "Audio", "Controls", "Bindings", "Updates":
 	default:
 		u.settingsSection = "General"
 	}
 	profile := shell.controllerProfile()
 	signature := fmt.Sprintf(
-		"settings|%dx%d|%s|%s|%t|%t|%d|%s|%s|%d|%g|%t|%d|%d|%s|%s|%s|%s|%s|%s|%t|%s|%s",
+		"settings|%s|%dx%d|%s|%s|%t|%t|%d|%s|%s|%d|%g|%t|%d|%d|%s|%s|%s|%s|%s|%s|%t|%s|%s|%s|%s",
+		shell.settings.Language,
 		u.viewportWidth,
 		u.viewportHeight,
 		u.settingsSection,
@@ -1049,6 +1229,8 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 		shell.settings.ShowVirtualKeypad,
 		u.bindingDevice,
 		bindingCaptureSignature(shell.bindingCapture),
+		shell.settings.UpdateChannel,
+		shell.updateProgressSignature(),
 	)
 	if signature == u.panelSignature && u.panelWindow != nil {
 		return
@@ -1087,15 +1269,15 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 		),
 	)
 	navigation.AddChild(design.text(
-		"SETTINGS",
+		shell.tr("SETTINGS"),
 		design.Type.Caption,
 		design.Palette.AccentHover,
 		widget.RowLayoutData{Stretch: true},
 	))
-	for _, section := range []string{"General", "Appearance", "Graphics", "Audio", "Controls", "Bindings"} {
+	for _, section := range []string{"General", "Appearance", "Graphics", "Audio", "Controls", "Bindings", "Updates"} {
 		sectionName := section
 		button := design.button(
-			sectionName,
+			shell.tr(sectionName),
 			design.Components.SubtleButton,
 			design.Type.Strong,
 			navWidth-design.Space.XL,
@@ -1152,13 +1334,13 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 	)
 	header.AddChild(
 		design.text(
-			u.settingsSection,
+			shell.tr(u.settingsSection),
 			design.Type.Display,
 			design.Palette.Text,
 			widget.RowLayoutData{Stretch: true},
 		),
 		design.text(
-			settingsSectionDescription(u.settingsSection),
+			shell.tr(settingsSectionDescription(u.settingsSection)),
 			design.Type.Body,
 			design.Palette.TextMuted,
 			widget.RowLayoutData{Stretch: true},
@@ -1192,7 +1374,7 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 	contents.AddChild(settingsContent)
 
 	contents.AddChild(design.text(
-		"Changes are saved immediately.",
+		shell.tr("Changes are saved immediately."),
 		design.Type.Caption,
 		design.Palette.TextDisabled,
 		widget.AnchorLayoutData{
@@ -1207,7 +1389,7 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 
 	var settingsWindow *widget.Window
 	doneButton := design.button(
-		"Done",
+		shell.tr("Done"),
 		design.Components.PrimaryButton,
 		design.Type.Strong,
 		92,
@@ -1238,7 +1420,7 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 	titleBar.AddChild(design.text(
-		"Configure ARAM",
+		shell.tr("Configure ARAM"),
 		design.Type.Heading,
 		design.Palette.Text,
 		widget.AnchorLayoutData{
@@ -1275,6 +1457,8 @@ func settingsSectionDescription(section string) string {
 		return "Configure normalized host input."
 	case "Bindings":
 		return "Select an action, then press the keyboard or gamepad button to assign."
+	case "Updates":
+		return "Download the latest public ARAM component archives from GitHub."
 	default:
 		return "Configure emulation and integration defaults."
 	}
@@ -1285,6 +1469,7 @@ type settingsRowModel struct {
 	description string
 	value       string
 	action      func()
+	disabled    bool
 }
 
 func (u *shellUI) settingsRows(shell *Shell) []*widget.Container {
@@ -1412,7 +1597,7 @@ func (u *shellUI) settingsRows(shell *Shell) []*widget.Container {
 			{
 				label:       "Connected gamepads",
 				description: "Detected devices and standard-layout support.",
-				value:       gamepadConnectionLabel(),
+				value:       gamepadConnectionLabel(shell.language()),
 			},
 			{
 				label:       "Controller database",
@@ -1500,8 +1685,64 @@ func (u *shellUI) settingsRows(shell *Shell) []*widget.Container {
 			value:       "Reset all",
 			action:      shell.resetControllerBindings,
 		})
+	case "Updates":
+		channel := normalizeUpdateChannel(shell.settings.UpdateChannel)
+		downloadRoot, downloadRootErr := defaultUpdateDownloadRoot()
+		downloadRootLabel := shorten(downloadRoot, 34)
+		if downloadRootErr != nil {
+			downloadRootLabel = "Unavailable"
+		}
+		rows = []settingsRowModel{
+			{
+				label:       "Update channel",
+				description: "Stable uses the latest official release; Nightly uses the latest main-branch build.",
+				value:       updateChannelLabel(channel),
+				action:      shell.cycleUpdateChannel,
+			},
+			{
+				label: "ARAM product",
+				description: shell.updateRowDescription(
+					updateComponentProduct,
+					"Integrated aram-emu build with aram-core and aram-frontend.",
+				),
+				value:    shell.updateActionLabel(updateComponentProduct),
+				action:   func() { shell.downloadUpdate(updateComponentProduct) },
+				disabled: !shell.updateActionAvailable(updateComponentProduct),
+			},
+			{
+				label: "aram-core developer tools",
+				description: shell.updateRowDescription(
+					updateComponentCore,
+					"Optional CLI debugger/inspectors; the emulator runtime is already built into ARAM product.",
+				),
+				value:    shell.updateActionLabel(updateComponentCore),
+				action:   func() { shell.downloadUpdate(updateComponentCore) },
+				disabled: !shell.updateActionAvailable(updateComponentCore),
+			},
+			{
+				label: "aram-frontend",
+				description: shell.updateRowDescription(
+					updateComponentFrontend,
+					"Standalone frontend archive without the integrated emulator backend.",
+				),
+				value:    shell.updateActionLabel(updateComponentFrontend),
+				action:   func() { shell.downloadUpdate(updateComponentFrontend) },
+				disabled: !shell.updateActionAvailable(updateComponentFrontend),
+			},
+			{
+				label:       "Download folder",
+				description: "Archives are verified and saved without replacing the running application.",
+				value:       downloadRootLabel,
+			},
+		}
 	default:
 		rows = []settingsRowModel{
+			{
+				label:       "Language",
+				description: "Choose the language used by menus, settings, and frontend messages.",
+				value:       languageLabel(shell.language(), shell.language()),
+				action:      shell.cycleLanguage,
+			},
 			{
 				label:       "Emulation speed",
 				description: "Default guest execution speed.",
@@ -1511,7 +1752,7 @@ func (u *shellUI) settingsRows(shell *Shell) []*widget.Container {
 			{
 				label:       "Save-state slot",
 				description: "Slot used by load and save state commands.",
-				value:       fmt.Sprintf("Slot %d", shell.settings.StateSlot),
+				value:       shell.trf("Slot %d", shell.settings.StateSlot),
 				action:      shell.cycleStateSlot,
 			},
 			{
@@ -1562,17 +1803,27 @@ func (u *shellUI) buildSettingsRow(model settingsRowModel) *widget.Container {
 			},
 		})),
 	)
-	copyBlock.AddChild(design.text(model.label, design.Type.Strong, design.Palette.Text, nil))
+	copyBlock.AddChild(design.text(
+		u.owner.tr(model.label),
+		design.Type.Strong,
+		design.Palette.Text,
+		nil,
+	))
 	if !u.compact {
 		copyBlock.AddChild(
-			design.text(model.description, design.Type.Caption, design.Palette.TextMuted, nil),
+			design.text(
+				u.owner.tr(model.description),
+				design.Type.Caption,
+				design.Palette.TextMuted,
+				nil,
+			),
 		)
 	}
 	row.AddChild(copyBlock)
 
 	if model.action == nil {
 		row.AddChild(design.text(
-			model.value,
+			u.owner.tr(model.value),
 			design.Type.Strong,
 			design.Palette.TextMuted,
 			widget.AnchorLayoutData{
@@ -1586,7 +1837,7 @@ func (u *shellUI) buildSettingsRow(model settingsRowModel) *widget.Container {
 
 	action := model.action
 	valueButton := design.button(
-		model.value,
+		u.owner.tr(model.value),
 		design.Components.SubtleButton,
 		design.Type.Strong,
 		actionWidth,
@@ -1597,6 +1848,7 @@ func (u *shellUI) buildSettingsRow(model settingsRowModel) *widget.Container {
 			u.panelSignature = ""
 		},
 	)
+	valueButton.GetWidget().Disabled = model.disabled
 	valueButton.GetWidget().LayoutData = widget.AnchorLayoutData{
 		HorizontalPosition: widget.AnchorLayoutPositionEnd,
 		VerticalPosition:   widget.AnchorLayoutPositionCenter,
@@ -1648,6 +1900,9 @@ func (u *shellUI) closePanel() {
 	u.panelSignature = ""
 	u.settingsScroll = nil
 	u.recentList = nil
+	u.welcomeStableButton = nil
+	u.welcomeNightlyButton = nil
+	u.welcomeLaterButton = nil
 	u.scrim.GetWidget().SetVisibility(widget.Visibility_Hide)
 	if window != nil {
 		window.Close()

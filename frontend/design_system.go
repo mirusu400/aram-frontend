@@ -2,6 +2,7 @@ package frontend
 
 import (
 	"bytes"
+	_ "embed"
 	"image"
 	"image/color"
 
@@ -12,6 +13,9 @@ import (
 	"golang.org/x/image/font/gofont/gobold"
 	"golang.org/x/image/font/gofont/goregular"
 )
+
+//go:embed assets/NotoSansKR-ARAM.ttf
+var notoSansKR []byte
 
 // ARAMPalette is the semantic color layer for the frontend. UI code should
 // depend on these roles instead of introducing component-local colors.
@@ -116,12 +120,16 @@ func newARAMDesignSystem(mode string) *ARAMDesignSystem {
 	if err != nil {
 		panic("load embedded ARAM bold font: " + err.Error())
 	}
+	koreanSource, err := text.NewGoTextFaceSource(bytes.NewReader(notoSansKR))
+	if err != nil {
+		panic("load embedded ARAM Korean font: " + err.Error())
+	}
 	typography := ARAMTypography{
-		Caption: goTextFace(regularSource, 11),
-		Body:    goTextFace(regularSource, 13),
-		Strong:  goTextFace(boldSource, 13),
-		Heading: goTextFace(boldSource, 16),
-		Display: goTextFace(boldSource, 22),
+		Caption: goTextFace(regularSource, koreanSource, 11, 400),
+		Body:    goTextFace(regularSource, koreanSource, 13, 400),
+		Strong:  goTextFace(boldSource, koreanSource, 13, 700),
+		Heading: goTextFace(boldSource, koreanSource, 16, 700),
+		Display: goTextFace(boldSource, koreanSource, 22, 700),
 	}
 
 	transparent := euiimage.NewNineSliceColor(color.NRGBA{})
@@ -254,8 +262,20 @@ func aramPalette(mode string) ARAMPalette {
 	}
 }
 
-func goTextFace(source *text.GoTextFaceSource, size float64) *text.Face {
-	var face text.Face = &text.GoTextFace{Source: source, Size: size}
+func goTextFace(
+	source *text.GoTextFaceSource,
+	koreanSource *text.GoTextFaceSource,
+	size float64,
+	weight float32,
+) *text.Face {
+	primary := &text.GoTextFace{Source: source, Size: size}
+	korean := &text.GoTextFace{Source: koreanSource, Size: size}
+	korean.SetVariation(text.MustParseTag("wght"), weight)
+	multi, err := text.NewMultiFace(primary, korean)
+	if err != nil {
+		panic("create ARAM font fallback: " + err.Error())
+	}
+	var face text.Face = multi
 	return &face
 }
 

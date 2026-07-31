@@ -166,6 +166,7 @@ func (s *Shell) drawTouchControls(screen *ebiten.Image) {
 
 func (s *Shell) drawTouchButton(screen *ebiten.Image, button touchButton, active bool) {
 	bounds := button.Bounds
+	label := s.tr(button.Label)
 	if s.design != nil {
 		surface := s.design.Components.TouchButton.Image.Idle
 		textColor := s.design.Palette.TextMuted
@@ -178,7 +179,7 @@ func (s *Shell) drawTouchButton(screen *ebiten.Image, button touchButton, active
 		})
 		drawCenteredText(
 			screen,
-			button.Label,
+			label,
 			s.design.Type.Strong,
 			textColor,
 			bounds,
@@ -195,7 +196,7 @@ func (s *Shell) drawTouchButton(screen *ebiten.Image, button touchButton, active
 		float64(bounds.Dy()),
 		palette.SurfaceRaised,
 	)
-	textX := bounds.Min.X + (bounds.Dx()-len(button.Label)*6)/2
+	textX := bounds.Min.X + (bounds.Dx()-len([]rune(label))*6)/2
 	textY := bounds.Min.Y + (bounds.Dy()-8)/2
-	ebitenutil.DebugPrintAt(screen, button.Label, textX, textY)
+	ebitenutil.DebugPrintAt(screen, label, textX, textY)
 }

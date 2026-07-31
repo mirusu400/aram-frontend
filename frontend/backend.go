@@ -8,7 +8,10 @@ import (
 	"time"
 )
 
-var ErrBackendUnavailable = errors.New("emulation backend is not attached")
+var ErrBackendUnavailable = errors.New(
+	"emulation backend is not attached; run the integrated product from " +
+		"aram-emu with `go run ./cmd/aram`",
+)
 
 type BackendState string
 
@@ -271,7 +274,8 @@ func (NullBackend) Supports(BackendCommand) bool { return false }
 func (NullBackend) Capability(BackendCommand) Capability {
 	return Capability{
 		Supported: false,
-		Reason:    "Connect an aram-core integration backend to use this command",
+		Reason: "Frontend preview only; run `go run ./cmd/aram` from " +
+			"aram-emu to use emulation commands",
 	}
 }
 func (NullBackend) Execute(context.Context, BackendCommand) error {

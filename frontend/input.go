@@ -328,10 +328,14 @@ func gamepadConnectionSignature() string {
 	return strings.Join(devices, "|")
 }
 
-func gamepadConnectionLabel() string {
+func gamepadConnectionLabel(languages ...Language) string {
+	language := LanguageEnglish
+	if len(languages) > 0 {
+		language = languages[0]
+	}
 	ids := ebiten.AppendGamepadIDs(nil)
 	if len(ids) == 0 {
-		return "None"
+		return translate(language, "None")
 	}
 	standard := 0
 	for _, id := range ids {
@@ -342,14 +346,23 @@ func gamepadConnectionLabel() string {
 	if len(ids) == 1 {
 		name := ebiten.GamepadName(ids[0])
 		if name == "" {
-			name = "Controller"
+			name = translate(language, "Controller")
 		}
 		if standard == 0 {
-			return shorten(name, 18) + " (unsupported)"
+			return translatef(
+				language,
+				"%s (unsupported)",
+				shorten(name, 18),
+			)
 		}
 		return shorten(name, 22)
 	}
-	return fmt.Sprintf("%d connected / %d standard", len(ids), standard)
+	return translatef(
+		language,
+		"%d connected / %d standard",
+		len(ids),
+		standard,
+	)
 }
 
 func customGamepadMappingsPath() (string, error) {
@@ -381,7 +394,7 @@ func loadCustomGamepadMappings() (bool, error) {
 func (s *Shell) gamepadActivityLabel() string {
 	profile := s.controllerProfile()
 	if !profile.GamepadEnabled {
-		return "Disabled"
+		return s.tr("Disabled")
 	}
 	var active []string
 	seen := make(map[string]bool)
@@ -392,7 +405,7 @@ func (s *Shell) gamepadActivityLabel() string {
 		for _, binding := range gamepadBindingsForProfile(profile) {
 			if ebiten.IsStandardGamepadButtonPressed(id, binding.Button) && !seen[binding.Control] {
 				seen[binding.Control] = true
-				active = append(active, controlDisplayName(binding.Control))
+				active = append(active, s.tr(controlDisplayName(binding.Control)))
 			}
 		}
 		if profile.GamepadAnalog {
@@ -406,13 +419,13 @@ func (s *Shell) gamepadActivityLabel() string {
 			for _, control := range []string{"up", "down", "left", "right"} {
 				if state[control] && !seen[control] {
 					seen[control] = true
-					active = append(active, controlDisplayName(control))
+					active = append(active, s.tr(controlDisplayName(control)))
 				}
 			}
 		}
 	}
 	if len(active) == 0 {
-		return "Idle"
+		return s.tr("Idle")
 	}
 	return strings.Join(active, " + ")
 }
@@ -467,7 +480,11 @@ func (s *Shell) queueInputTransitions(backend InputBackend, next map[string]bool
 			// current guest time instead of scheduling it in the future.
 			At: 0,
 		}); err != nil {
-			s.setStatus("Input " + control + ": " + err.Error())
+			s.setStatus(s.trf(
+				"Input %s: %s",
+				s.tr(controlDisplayName(control)),
+				err.Error(),
+			))
 			continue
 		}
 		if pressed {

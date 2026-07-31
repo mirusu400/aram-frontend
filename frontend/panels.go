@@ -2,7 +2,6 @@ package frontend
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -42,9 +41,11 @@ func (s *Shell) openToolPanel(kind ToolKind) {
 	backend, ok := s.backend.(ToolBackend)
 	if !ok {
 		s.panel.Lines = []string{
-			"This panel is ready, but the current backend does not expose",
-			"the checked " + string(kind) + " service.",
-			"",
+			"The current backend does not expose this panel.",
+			s.trf(
+				"The checked %s service is unavailable.",
+				s.tr(toolTitle(kind)),
+			),
 			"Guest memory is never read directly by the frontend.",
 			"Connect an integration backend that implements ToolBackend.",
 		}
@@ -67,7 +68,11 @@ func (s *Shell) consumeToolResult(result toolResult) {
 			"",
 			result.err.Error(),
 		}
-		s.setStatus(toolTitle(result.kind) + ": " + result.err.Error())
+		s.setStatus(s.trf(
+			"%s: %s",
+			s.tr(toolTitle(result.kind)),
+			result.err.Error(),
+		))
 		return
 	}
 	if result.snapshot.Title != "" {
@@ -81,7 +86,10 @@ func (s *Shell) consumeToolResult(result toolResult) {
 		s.panel.FieldValues[field.ID] = field.Value
 	}
 	s.panel.Busy = false
-	s.setStatus(toolTitle(result.kind) + " refreshed")
+	s.setStatus(s.trf(
+		"%s refreshed",
+		s.tr(toolTitle(result.kind)),
+	))
 }
 
 func (s *Shell) executeToolAction(action string, fields map[string]string) {
@@ -90,7 +98,10 @@ func (s *Shell) executeToolAction(action string, fields map[string]string) {
 	}
 	backend, ok := s.backend.(ToolActionBackend)
 	if !ok {
-		s.setStatus(toolTitle(s.panel.Tool) + ": backend actions are unavailable")
+		s.setStatus(s.trf(
+			"%s: backend actions are unavailable",
+			s.tr(toolTitle(s.panel.Tool)),
+		))
 		return
 	}
 	request := ToolRequest{
@@ -99,7 +110,11 @@ func (s *Shell) executeToolAction(action string, fields map[string]string) {
 		Fields: cloneStringMap(fields),
 	}
 	s.panel.Busy = true
-	s.setStatus(toolTitle(s.panel.Tool) + ": " + action + "...")
+	s.setStatus(s.trf(
+		"%s: %s...",
+		s.tr(toolTitle(s.panel.Tool)),
+		s.tr(action),
+	))
 	go func() {
 		snapshot, err := backend.ExecuteToolAction(context.Background(), request)
 		s.toolResults <- toolResult{kind: request.Kind, snapshot: snapshot, err: err}
@@ -112,6 +127,10 @@ func (s *Shell) openControllerPanel() {
 
 func (s *Shell) openAudioPanel() {
 	s.openSettingsSection("Audio")
+}
+
+func (s *Shell) openUpdatesPanel() {
+	s.openSettingsSection("Updates")
 }
 
 func (s *Shell) openSettingsPanel() {
@@ -172,19 +191,19 @@ func (s *Shell) applyAudioSettings() {
 	settings := s.currentAudioSettings()
 	if backend, ok := s.backend.(AudioBackend); ok {
 		if err := backend.ConfigureAudio(settings); err != nil {
-			s.setStatus("Audio settings: " + err.Error())
+			s.setStatus(s.tr("Audio settings: ") + err.Error())
 			return
 		}
 	}
 	if s.audioOutput != nil {
 		s.audioOutput.configure(settings)
 	}
-	s.setStatus(fmt.Sprintf(
-		"Audio: muted=%t volume=%d latency=%dms device=%s",
-		s.settings.Muted,
+	s.setStatus(s.trf(
+		"Audio: muted=%s volume=%d latency=%dms device=%s",
+		s.tr(onOff(s.settings.Muted)),
 		s.settings.Volume,
 		s.settings.AudioLatencyMS,
-		s.audioDeviceLabel(),
+		s.tr(s.audioDeviceLabel()),
 	))
 }
 
@@ -273,7 +292,10 @@ func (s *Shell) cycleKeyboardProfile() {
 
 func (s *Shell) toggleVirtualKeypad() {
 	s.settings.ShowVirtualKeypad = !s.settings.ShowVirtualKeypad
-	s.saveControllerSettings("Virtual keypad: " + onOff(s.settings.ShowVirtualKeypad))
+	s.saveControllerSettings(s.trf(
+		"Virtual keypad: %s",
+		s.tr(onOff(s.settings.ShowVirtualKeypad)),
+	))
 }
 
 func (s *Shell) toggleGamepadEnabled() {
@@ -323,20 +345,23 @@ func (s *Shell) resetControllerBindings() {
 func (s *Shell) reloadGamepadMappings() {
 	applied, err := loadCustomGamepadMappings()
 	if err != nil {
-		s.setStatus("Controller database: " + err.Error())
+		s.setStatus(s.tr("Controller database: ") + err.Error())
 		return
 	}
 	s.gamepadMappingsLoaded = applied
 	if !applied {
 		path, pathErr := customGamepadMappingsPath()
 		if pathErr != nil {
-			s.setStatus("Controller database: " + pathErr.Error())
+			s.setStatus(s.tr("Controller database: ") + pathErr.Error())
 			return
 		}
-		s.setStatus("Controller database: no mapping file at " + path)
+		s.setStatus(s.trf(
+			"Controller database: no mapping file at %s",
+			path,
+		))
 		return
 	}
-	s.setStatus("Custom controller database reloaded")
+	s.setStatus(s.tr("Custom controller database reloaded"))
 }
 
 func (s *Shell) togglePerTitleControls() {
@@ -347,7 +372,7 @@ func (s *Shell) togglePerTitleControls() {
 	}
 	key := s.titleControllerKey()
 	if key == "" {
-		s.setStatus("Controller profile: open an identified title first")
+		s.setStatus(s.tr("Controller profile: open an identified title first"))
 		return
 	}
 	s.settings.PerTitleControls = true
@@ -424,10 +449,10 @@ func (s *Shell) gamepadBindingLabel(control string) string {
 
 func (s *Shell) saveControllerSettings(status string) {
 	if err := s.settings.save(); err != nil {
-		s.setStatus("Controller settings: " + err.Error())
+		s.setStatus(s.tr("Controller settings: ") + err.Error())
 		return
 	}
-	s.setStatus(status)
+	s.setStatus(s.tr(status))
 }
 
 func gamepadLayoutLabel(layout string) string {
@@ -491,7 +516,38 @@ func (s *Shell) cycleThemeMode() {
 		s.settings.ThemeMode = "light"
 	}
 	_ = s.settings.save()
-	s.setStatus("Appearance: " + strings.Title(s.settings.ThemeMode))
+	s.setStatus(s.trf(
+		"Appearance: %s",
+		s.tr(settingValueLabel(s.settings.ThemeMode)),
+	))
+}
+
+func (s *Shell) cycleLanguage() {
+	previous := s.settings.Language
+	if normalizeLanguage(previous) == LanguageKorean {
+		s.settings.Language = string(LanguageEnglish)
+	} else {
+		s.settings.Language = string(LanguageKorean)
+	}
+	if err := s.settings.save(); err != nil {
+		s.settings.Language = previous
+		s.setStatus(s.tr("Language settings: ") + err.Error())
+		return
+	}
+	s.setStatus(s.trf(
+		"Language: %s",
+		languageLabel(s.language(), s.language()),
+	))
+	if s.panel != nil {
+		s.panel.Title = s.tr("Configure ARAM")
+	}
+	if localized, ok := s.picker.(languageAwarePicker); ok {
+		localized.SetLanguage(s.language())
+	}
+	if s.input == nil {
+		setPlatformWindowTitle(s.tr("ARAM - Archived Runtime for ARM Mobiles"))
+	}
+	s.interfaceUI = newShellUI(s, s.design)
 }
 
 func (s *Shell) panelLines() []string {
@@ -502,43 +558,79 @@ func (s *Shell) panelLines() []string {
 	case "logs":
 		start := max(0, len(s.logs)-28)
 		if start == len(s.logs) {
-			return []string{"No frontend log entries."}
+			return []string{s.tr("No frontend log entries.")}
 		}
 		return append([]string(nil), s.logs[start:]...)
 	case "properties":
 		if s.input == nil {
-			return []string{"No input is selected."}
+			return []string{s.tr("No input is selected.")}
 		}
 		return []string{
-			"Name: " + s.input.DisplayName,
-			"Format: " + emptyFallback(s.input.Format, "unknown"),
-			fmt.Sprintf("Size: %d bytes", s.input.Size),
-			"SHA-256: " + emptyFallback(s.input.SHA256, "not supplied"),
-			"Profile: " + emptyFallback(s.input.ProfileID, "unselected"),
-			"Path/handle: " + emptyFallback(s.selectedPath, "native document"),
-			"Backend: " + s.backendName(),
-			"Frontend state: " + string(s.state),
-			"Core state: " + string(s.backend.State()),
+			s.trf("Name: %s", s.input.DisplayName),
+			s.trf(
+				"Format: %s",
+				emptyFallback(s.input.Format, s.tr("unknown")),
+			),
+			s.trf("Size: %d bytes", s.input.Size),
+			s.trf(
+				"SHA-256: %s",
+				emptyFallback(s.input.SHA256, s.tr("not supplied")),
+			),
+			s.trf(
+				"Profile: %s",
+				emptyFallback(s.input.ProfileID, s.tr("unselected")),
+			),
+			s.trf(
+				"Path/handle: %s",
+				emptyFallback(s.selectedPath, s.tr("native document")),
+			),
+			s.trf("Backend: %s", s.backendName()),
+			s.trf(
+				"Frontend state: %s",
+				s.tr(stateValueLabel(string(s.state))),
+			),
+			s.trf(
+				"Core state: %s",
+				s.tr(stateValueLabel(string(s.backend.State()))),
+			),
 		}
 	case "compatibility":
 		if s.input == nil {
-			return []string{"No input is selected."}
+			return []string{s.tr("No input is selected.")}
 		}
 		lines := []string{
-			"Input: " + s.input.DisplayName,
-			"SHA-256: " + emptyFallback(s.input.SHA256, "not supplied"),
-			"Format: " + emptyFallback(s.input.Format, "unknown"),
-			"Profile: " + emptyFallback(s.input.ProfileID, "unselected"),
-			"Backend: " + s.backendName(),
-			"Frontend state: " + string(s.state),
-			"Core state: " + string(s.backend.State()),
+			s.trf("Input: %s", s.input.DisplayName),
+			s.trf(
+				"SHA-256: %s",
+				emptyFallback(s.input.SHA256, s.tr("not supplied")),
+			),
+			s.trf(
+				"Format: %s",
+				emptyFallback(s.input.Format, s.tr("unknown")),
+			),
+			s.trf(
+				"Profile: %s",
+				emptyFallback(s.input.ProfileID, s.tr("unselected")),
+			),
+			s.trf("Backend: %s", s.backendName()),
+			s.trf(
+				"Frontend state: %s",
+				s.tr(stateValueLabel(string(s.state))),
+			),
+			s.trf(
+				"Core state: %s",
+				s.tr(stateValueLabel(string(s.backend.State()))),
+			),
 			"",
-			"The report contains metadata only; no game or firmware bytes are copied.",
+			s.tr("The report contains metadata only; no game or firmware bytes are copied."),
 		}
 		if s.problem != nil {
 			lines = append(lines,
 				"",
-				"Last problem: "+string(s.problem.State),
+				s.trf(
+					"Last problem: %s",
+					s.tr(stateValueLabel(string(s.problem.State))),
+				),
 				s.problem.Reason,
 			)
 		}
@@ -553,6 +645,8 @@ func (s *Shell) panelFooter() string {
 		return ""
 	}
 	switch s.panel.Kind {
+	case "welcome":
+		return "Choose Stable or Nightly; aram-core runtime is already included."
 	case "compatibility":
 		return "S: save report  Esc: close"
 	case "tool":

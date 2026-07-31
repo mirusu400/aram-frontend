@@ -1,8 +1,6 @@
 package frontend
 
 import (
-	"fmt"
-
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
@@ -40,7 +38,10 @@ func (s *Shell) beginKeyboardBindingCapture(control string) {
 		BlockedKeys: blocked,
 	}
 	s.invalidateSettingsPanel()
-	s.setStatus(controlDisplayName(control) + ": press a keyboard key (Esc cancels)")
+	s.setStatus(s.trf(
+		"%s: press a keyboard key (Esc cancels)",
+		s.tr(controlDisplayName(control)),
+	))
 }
 
 func (s *Shell) beginGamepadBindingCapture(control string) {
@@ -62,7 +63,10 @@ func (s *Shell) beginGamepadBindingCapture(control string) {
 		BlockedButtons: blocked,
 	}
 	s.invalidateSettingsPanel()
-	s.setStatus(controlDisplayName(control) + ": press a gamepad button (Esc cancels)")
+	s.setStatus(s.trf(
+		"%s: press a gamepad button (Esc cancels)",
+		s.tr(controlDisplayName(control)),
+	))
 }
 
 // handleBindingCapture consumes input while a binding row is listening. It
@@ -101,7 +105,10 @@ func (s *Shell) handleBindingCapture() bool {
 				continue
 			}
 			if !isBindableKeyboardKey(key) {
-				s.setStatus(keyboardKeyLabel(key) + " is reserved; press another key")
+				s.setStatus(s.trf(
+					"%s is reserved; press another key",
+					s.tr(keyboardKeyLabel(key)),
+				))
 				continue
 			}
 			s.applyKeyboardBinding(capture.Control, key)
@@ -132,26 +139,26 @@ func (s *Shell) handleBindingCapture() bool {
 func (s *Shell) cancelBindingCapture(status string) {
 	s.bindingCapture = nil
 	s.invalidateSettingsPanel()
-	s.setStatus(status)
+	s.setStatus(s.tr(status))
 }
 
 func (s *Shell) applyKeyboardBinding(control string, key ebiten.Key) {
 	swapped := ""
 	s.updateControllerProfile(func(profile *ControllerProfile) {
 		swapped = assignKeyboardBinding(profile, control, key)
-	}, fmt.Sprintf(
+	}, s.trf(
 		"%s keyboard binding: %s",
-		controlDisplayName(control),
-		keyboardKeyLabel(key),
+		s.tr(controlDisplayName(control)),
+		s.tr(keyboardKeyLabel(key)),
 	))
 	s.bindingCapture = nil
 	s.invalidateSettingsPanel()
 	if swapped != "" {
-		s.setStatus(fmt.Sprintf(
+		s.setStatus(s.trf(
 			"%s mapped to %s; swapped with %s",
-			controlDisplayName(control),
-			keyboardKeyLabel(key),
-			controlDisplayName(swapped),
+			s.tr(controlDisplayName(control)),
+			s.tr(keyboardKeyLabel(key)),
+			s.tr(controlDisplayName(swapped)),
 		))
 	}
 }
@@ -160,19 +167,19 @@ func (s *Shell) applyGamepadBinding(control string, option gamepadButtonOption) 
 	swapped := ""
 	s.updateControllerProfile(func(profile *ControllerProfile) {
 		swapped = assignGamepadBinding(profile, control, option.ID)
-	}, fmt.Sprintf(
+	}, s.trf(
 		"%s gamepad binding: %s",
-		controlDisplayName(control),
-		option.Label,
+		s.tr(controlDisplayName(control)),
+		s.tr(option.Label),
 	))
 	s.bindingCapture = nil
 	s.invalidateSettingsPanel()
 	if swapped != "" {
-		s.setStatus(fmt.Sprintf(
+		s.setStatus(s.trf(
 			"%s mapped to %s; swapped with %s",
-			controlDisplayName(control),
-			option.Label,
-			controlDisplayName(swapped),
+			s.tr(controlDisplayName(control)),
+			s.tr(option.Label),
+			s.tr(controlDisplayName(swapped)),
 		))
 	}
 }

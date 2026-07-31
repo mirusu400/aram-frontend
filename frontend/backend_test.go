@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"image"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -18,6 +19,33 @@ func TestNullBackendPreservesSelectedName(t *testing.T) {
 	}
 	if info.DisplayName != "example.dat" {
 		t.Fatalf("DisplayName = %q", info.DisplayName)
+	}
+}
+
+func TestNullBackendExplainsHowToRunIntegratedProduct(t *testing.T) {
+	_, err := (NullBackend{}).Open(context.Background(), OpenRequest{
+		Path: `games/example.dat`,
+	})
+	if err == nil ||
+		!strings.Contains(err.Error(), `aram-emu`) ||
+		!strings.Contains(err.Error(), `go run ./cmd/aram`) {
+		t.Fatalf("NullBackend Open error = %v", err)
+	}
+	capability := (NullBackend{}).Capability(CommandStart)
+	if capability.Supported ||
+		!strings.Contains(capability.Reason, `go run ./cmd/aram`) {
+		t.Fatalf("NullBackend start capability = %+v", capability)
+	}
+}
+
+func TestStandaloneShellStatusExplainsHowToRunIntegratedProduct(t *testing.T) {
+	temporary := t.TempDir()
+	t.Setenv("APPDATA", temporary)
+	t.Setenv("XDG_CONFIG_HOME", temporary)
+	shell := NewShell(NullBackend{}, nil, "")
+	want := shell.tr("Frontend preview only - run `go run ./cmd/aram` from aram-emu")
+	if shell.status != want {
+		t.Fatalf("standalone shell status = %q", shell.status)
 	}
 }
 

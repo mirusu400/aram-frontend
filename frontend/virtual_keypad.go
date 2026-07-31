@@ -157,14 +157,19 @@ func (s *Shell) drawVirtualKeypad(screen *ebiten.Image) {
 	if s.design != nil {
 		drawCenteredText(
 			screen,
-			"VIRTUAL KEYS",
+			s.tr("VIRTUAL KEYS"),
 			s.design.Type.Caption,
 			palette.TextMuted,
 			titleBounds,
 			titleBounds.Min.Y,
 		)
 	} else {
-		ebitenutil.DebugPrintAt(screen, "VIRTUAL KEYS", panel.Min.X+12, panel.Min.Y+12)
+		ebitenutil.DebugPrintAt(
+			screen,
+			s.tr("VIRTUAL KEYS"),
+			panel.Min.X+12,
+			panel.Min.Y+12,
+		)
 	}
 
 	active := make(map[string]bool, len(s.controlState))

@@ -86,6 +86,8 @@ type Shell struct {
 	busyCommands              map[BackendCommand]bool
 	frameRunPending           bool
 	frameGeneration           uint64
+	updater                   updateDownloader
+	updateProgress            map[updateComponent]updateProgress
 	pickerResults             chan pickerResult
 	backendResults            chan backendResult
 	commandResults            chan commandResult
@@ -98,6 +100,7 @@ type Shell struct {
 	dropResults               chan dropResult
 	artifactResults           chan artifactResult
 	toolResults               chan toolResult
+	updateResults             chan updateResult
 }
 
 func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
@@ -107,13 +110,25 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 	if picker == nil {
 		picker = NewPlatformPicker()
 	}
+	settings := loadSettings()
+	language := normalizeLanguage(settings.Language)
+	if localized, ok := picker.(languageAwarePicker); ok {
+		localized.SetLanguage(language)
+	}
+	initialStatus := translate(language, "Ready - use File > Open File...")
+	if isPreviewBackend(backend) {
+		initialStatus = translate(
+			language,
+			"Frontend preview only - run `go run ./cmd/aram` from aram-emu",
+		)
+	}
 	shell := &Shell{
 		backend:                   backend,
 		picker:                    picker,
-		settings:                  loadSettings(),
+		settings:                  settings,
 		state:                     FrontendEmpty,
 		activeMenu:                -1,
-		status:                    "Ready - use File > Open File...",
+		status:                    initialStatus,
 		settingsSection:           "General",
 		layoutWidth:               logicalWidth,
 		layoutHeight:              logicalHeight,
@@ -121,6 +136,8 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		controlState:              make(map[string]bool),
 		touchControls:             make(map[ebiten.TouchID]string),
 		busyCommands:              make(map[BackendCommand]bool),
+		updater:                   newGitHubUpdater(),
+		updateProgress:            make(map[updateComponent]updateProgress),
 		pickerResults:             make(chan pickerResult, 2),
 		backendResults:            make(chan backendResult, 2),
 		commandResults:            make(chan commandResult, 8),
@@ -133,20 +150,25 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		dropResults:               make(chan dropResult, 2),
 		artifactResults:           make(chan artifactResult, 4),
 		toolResults:               make(chan toolResult, 2),
+		updateResults:             make(chan updateResult, 4),
+	}
+	setPlatformWindowTitle(shell.tr("ARAM - Archived Runtime for ARM Mobiles"))
+	if shell.shouldOpenWelcome() {
+		shell.openWelcome()
 	}
 	shell.menus = defaultMenus()
 	shell.design = newARAMDesignSystem(shell.settings.ThemeMode)
 	shell.interfaceUI = newShellUI(shell, shell.design)
 	if audio, ok := shell.backend.(AudioBackend); ok {
 		if err := audio.ConfigureAudio(shell.currentAudioSettings()); err != nil {
-			shell.appendLog("Audio settings: " + err.Error())
+			shell.appendLog(shell.tr("Audio settings: ") + err.Error())
 		}
 	}
 	if applied, err := loadCustomGamepadMappings(); err != nil {
-		shell.appendLog("Controller database: " + err.Error())
+		shell.appendLog(shell.tr("Controller database: ") + err.Error())
 	} else if applied {
 		shell.gamepadMappingsLoaded = true
-		shell.appendLog("Custom controller database loaded")
+		shell.appendLog(shell.tr("Custom controller database loaded"))
 	}
 	shell.appendLog(shell.status)
 	if initialPath != "" {
@@ -373,7 +395,7 @@ func effectiveMenuItemHeight() int {
 func (s *Shell) dispatchCommand(id string) {
 	command, found := s.findCommand(id)
 	if !found {
-		s.setStatus("Unknown command: " + id)
+		s.setStatus(s.trf("Unknown command: %s", id))
 		return
 	}
 	availability := command.Availability(s)
@@ -401,6 +423,17 @@ func (s *Shell) findCommand(id string) (Command, bool) {
 	return Command{}, false
 }
 
+func (s *Shell) backendCommandLabel(command BackendCommand) string {
+	for _, menu := range s.menus {
+		for _, item := range menu.Commands {
+			if item.Backend == command {
+				return item.DisplayLabel(s)
+			}
+		}
+	}
+	return s.tr(settingValueLabel(string(command)))
+}
+
 func (s *Shell) consumeResults() {
 	for {
 		select {
@@ -411,17 +444,17 @@ func (s *Shell) consumeResults() {
 		case <-s.externalSelectionCanceled:
 			s.dialogOpen = false
 			s.state = s.preDialogState
-			s.setStatus("Selection canceled")
+			s.setStatus(s.tr("Selection canceled"))
 		case active := <-s.hostLifecycle:
 			s.hostActive = active
 		case stage := <-s.openStageResults:
 			switch stage {
 			case OpenStageInspecting:
 				s.state = FrontendInspecting
-				s.setStatus("Inspecting selected input...")
+				s.setStatus(s.tr("Inspecting selected input..."))
 			case OpenStageLoading:
 				s.state = FrontendLoading
-				s.setStatus("Loading selected input...")
+				s.setStatus(s.tr("Loading selected input..."))
 			}
 		case result := <-s.pickerResults:
 			s.consumePickerResult(result)
@@ -431,11 +464,18 @@ func (s *Shell) consumeResults() {
 			delete(s.busyCommands, result.command)
 			if result.err != nil {
 				s.state = frontendStateForError(result.err)
-				s.setStatus(string(result.command) + ": " + result.err.Error())
+				s.setStatus(s.trf(
+					"%s: %s",
+					s.backendCommandLabel(result.command),
+					result.err.Error(),
+				))
 				continue
 			}
 			s.state = s.stableState()
-			s.setStatus(string(result.command) + ": complete")
+			s.setStatus(s.trf(
+				"%s: complete",
+				s.backendCommandLabel(result.command),
+			))
 		case result := <-s.frameRunResults:
 			if result.generation != s.frameGeneration {
 				continue
@@ -450,11 +490,11 @@ func (s *Shell) consumeResults() {
 					Reason:      result.err.Error(),
 					Recoverable: true,
 				}
-				s.setStatus("Run frame: " + result.err.Error())
+				s.setStatus(s.tr("Run frame: ") + result.err.Error())
 			}
 		case result := <-s.dropResults:
 			if result.err != nil {
-				s.setStatus("Drop: " + result.err.Error())
+				s.setStatus(s.tr("Drop: ") + result.err.Error())
 				continue
 			}
 			s.openRequest(OpenRequest{
@@ -464,12 +504,22 @@ func (s *Shell) consumeResults() {
 			})
 		case result := <-s.artifactResults:
 			if result.err != nil {
-				s.setStatus(result.kind + ": " + result.err.Error())
+				s.setStatus(s.trf(
+					"%s: %s",
+					s.tr(settingValueLabel(result.kind)),
+					result.err.Error(),
+				))
 				continue
 			}
-			s.setStatus(result.kind + " saved: " + result.path)
+			s.setStatus(s.trf(
+				"%s saved: %s",
+				s.tr(settingValueLabel(result.kind)),
+				result.path,
+			))
 		case result := <-s.toolResults:
 			s.consumeToolResult(result)
+		case result := <-s.updateResults:
+			s.consumeUpdateResult(result)
 		default:
 			return
 		}
@@ -482,13 +532,13 @@ func (s *Shell) consumePickerResult(result pickerResult) {
 		s.state = s.preDialogState
 		switch {
 		case errors.Is(result.err, ErrPickerCanceled):
-			s.setStatus("Selection canceled")
+			s.setStatus(s.tr("Selection canceled"))
 		case errors.Is(result.err, ErrPickerDeferred):
-			s.setStatus("Waiting for the native document picker...")
+			s.setStatus(s.tr("Waiting for the native document picker..."))
 		case errors.Is(result.err, ErrPickerUnavailable):
-			s.setStatus("Use the native mobile document picker")
+			s.setStatus(s.tr("Use the native mobile document picker"))
 		default:
-			s.setStatus("File picker: " + result.err.Error())
+			s.setStatus(s.tr("File picker: ") + result.err.Error())
 		}
 		return
 	}
@@ -537,11 +587,11 @@ func (s *Shell) consumeBackendResult(result backendResult) {
 	if s.state == FrontendEmpty {
 		s.state = FrontendReady
 	}
-	s.setStatus(fmt.Sprintf(
+	s.setStatus(s.trf(
 		"Loaded %s | %s | profile %s",
 		result.info.DisplayName,
-		emptyFallback(result.info.Format, "unknown"),
-		emptyFallback(result.info.ProfileID, "auto"),
+		emptyFallback(result.info.Format, s.tr("unknown")),
+		emptyFallback(result.info.ProfileID, s.tr("auto")),
 	))
 	setPlatformWindowTitle("ARAM - " + result.info.DisplayName)
 
@@ -559,7 +609,7 @@ func (s *Shell) chooseFile() {
 	s.preDialogState = s.state
 	s.state = FrontendSelecting
 	s.dialogOpen = true
-	s.setStatus("Waiting for file selection...")
+	s.setStatus(s.tr("Waiting for file selection..."))
 	go func() {
 		path, err := s.picker.OpenFile()
 		s.pickerResults <- pickerResult{operation: operationOpen, path: path, err: err}
@@ -573,7 +623,7 @@ func (s *Shell) chooseFirmwareDirectory() {
 	s.preDialogState = s.state
 	s.state = FrontendSelecting
 	s.dialogOpen = true
-	s.setStatus("Waiting for firmware directory selection...")
+	s.setStatus(s.tr("Waiting for firmware directory selection..."))
 	go func() {
 		path, err := s.picker.OpenFirmwareDirectory(s.settings.LastFirmwarePath)
 		s.pickerResults <- pickerResult{operation: operationFirmware, path: path, err: err}
@@ -589,14 +639,14 @@ func (s *Shell) chooseRecent() {
 			Kind:  "recent",
 			Title: "Open Recent",
 		}
-		s.setStatus("Select a recent input")
+		s.setStatus(s.tr("Select a recent input"))
 		return
 	}
 	s.preDialogState = s.state
 	s.state = FrontendSelecting
 	s.dialogOpen = true
 	recent := append([]string(nil), s.settings.RecentFiles...)
-	s.setStatus("Choose a recent input...")
+	s.setStatus(s.tr("Choose a recent input..."))
 	go func() {
 		path, err := s.picker.ChooseRecent(recent)
 		s.pickerResults <- pickerResult{operation: operationRecent, path: path, err: err}
@@ -606,7 +656,7 @@ func (s *Shell) chooseRecent() {
 func (s *Shell) openRecentPath(path string) {
 	path = strings.TrimSpace(path)
 	if path == "" {
-		s.setStatus("Open recent: no input selected")
+		s.setStatus(s.tr("Open recent: no input selected"))
 		return
 	}
 	s.panel = nil
@@ -615,19 +665,19 @@ func (s *Shell) openRecentPath(path string) {
 
 func (s *Shell) openRequest(request OpenRequest) {
 	if s.loading {
-		s.setStatus("An input is already loading")
+		s.setStatus(s.tr("An input is already loading"))
 		return
 	}
 	if s.input != nil {
 		if err := s.releaseCurrentInput(); err != nil {
-			s.setStatus("Close current title: " + err.Error())
+			s.setStatus(s.tr("Close current title: ") + err.Error())
 			return
 		}
 	}
 	s.loading = true
 	s.problem = nil
 	s.state = FrontendInspecting
-	s.setStatus("Inspecting " + displayName(request) + "...")
+	s.setStatus(s.trf("Inspecting %s...", displayName(request)))
 	if request.Firmware && request.Path != "" {
 		s.settings.LastFirmwarePath = request.Path
 		_ = s.settings.save()
@@ -655,11 +705,14 @@ func (s *Shell) openRequest(request OpenRequest) {
 
 func (s *Shell) executeBackend(command BackendCommand) {
 	if s.busyCommands[command] {
-		s.setStatus(string(command) + ": already in progress")
+		s.setStatus(s.trf(
+			"%s: already in progress",
+			s.backendCommandLabel(command),
+		))
 		return
 	}
 	s.busyCommands[command] = true
-	s.setStatus(string(command) + "...")
+	s.setStatus(s.trf("%s...", s.backendCommandLabel(command)))
 	request := CommandRequest{
 		Command: command,
 		Slot:    s.settings.StateSlot,
@@ -678,10 +731,10 @@ func (s *Shell) executeBackend(command BackendCommand) {
 
 func (s *Shell) closeInput() {
 	if err := s.releaseCurrentInput(); err != nil {
-		s.setStatus("Close: " + err.Error())
+		s.setStatus(s.tr("Close: ") + err.Error())
 		return
 	}
-	s.setStatus("Title closed")
+	s.setStatus(s.tr("Title closed"))
 }
 
 func (s *Shell) releaseCurrentInput() error {
@@ -704,7 +757,7 @@ func (s *Shell) releaseCurrentInput() error {
 	s.frame = VideoFrame{}
 	s.frameImage = nil
 	s.state = FrontendEmpty
-	setPlatformWindowTitle("ARAM - Archived Runtime for ARM Mobiles")
+	setPlatformWindowTitle(s.tr("ARAM - Archived Runtime for ARM Mobiles"))
 	return nil
 }
 
@@ -726,13 +779,13 @@ func (s *Shell) updateAudio() {
 	if s.audioOutput == nil {
 		output, err := newAudioOutput(s.currentAudioSettings())
 		if err != nil {
-			s.appendLog("Audio output: " + err.Error())
+			s.appendLog(s.tr("Audio output: ") + err.Error())
 			return
 		}
 		s.audioOutput = output
 	}
 	if err := s.audioOutput.enqueue(chunk); err != nil {
-		s.appendLog("Audio stream: " + err.Error())
+		s.appendLog(s.tr("Audio stream: ") + err.Error())
 	}
 	s.audioOutput.startIfReady(time.Now())
 }
@@ -844,34 +897,40 @@ func (s *Shell) handleDroppedFiles() {
 		return
 	}
 	s.state = FrontendInspecting
-	s.setStatus("Copying dropped input into the ARAM cache...")
+	s.setStatus(s.tr("Copying dropped input into the ARAM cache..."))
 	go copyFirstDroppedFile(files, s.dropResults)
 }
 
 func (s *Shell) toggleFullscreen() {
-	s.setStatus(togglePlatformFullscreen())
+	s.setStatus(s.tr(togglePlatformFullscreen()))
 }
 
 func (s *Shell) toggleIntegerScaling() {
 	s.settings.IntegerScaling = !s.settings.IntegerScaling
 	_ = s.settings.save()
-	s.setStatus(fmt.Sprintf("Integer scaling: %t", s.settings.IntegerScaling))
+	s.setStatus(s.trf(
+		"Integer scaling: %s",
+		s.tr(onOff(s.settings.IntegerScaling)),
+	))
 }
 
 func (s *Shell) toggleAspectRatio() {
 	s.settings.PreserveAspect = !s.settings.PreserveAspect
 	_ = s.settings.save()
-	s.setStatus(fmt.Sprintf("Preserve aspect ratio: %t", s.settings.PreserveAspect))
+	s.setStatus(s.trf(
+		"Preserve aspect ratio: %s",
+		s.tr(onOff(s.settings.PreserveAspect)),
+	))
 }
 
 func (s *Shell) fitWindow() {
-	s.setStatus(fitPlatformWindow())
+	s.setStatus(s.tr(fitPlatformWindow()))
 }
 
 func (s *Shell) cycleRotation() {
 	s.settings.Rotation = (s.settings.Rotation + 90) % 360
 	_ = s.settings.save()
-	s.setStatus(fmt.Sprintf("Rotation: %d degrees", s.settings.Rotation))
+	s.setStatus(s.trf("Rotation: %d°", s.settings.Rotation))
 }
 
 func (s *Shell) cycleScreenLayout() {
@@ -881,7 +940,10 @@ func (s *Shell) cycleScreenLayout() {
 		s.settings.ScreenLayout = "center"
 	}
 	_ = s.settings.save()
-	s.setStatus("Screen layout: " + s.settings.ScreenLayout)
+	s.setStatus(s.trf(
+		"Screen layout: %s",
+		s.tr(settingValueLabel(s.settings.ScreenLayout)),
+	))
 }
 
 func (s *Shell) cycleFilter() {
@@ -891,13 +953,16 @@ func (s *Shell) cycleFilter() {
 		s.settings.Filter = "nearest"
 	}
 	_ = s.settings.save()
-	s.setStatus("Filter: " + s.settings.Filter)
+	s.setStatus(s.trf(
+		"Filter: %s",
+		s.tr(settingValueLabel(s.settings.Filter)),
+	))
 }
 
 func (s *Shell) cycleStateSlot() {
 	s.settings.StateSlot = (s.settings.StateSlot + 1) % 10
 	_ = s.settings.save()
-	s.setStatus(fmt.Sprintf("State slot: %d", s.settings.StateSlot))
+	s.setStatus(s.trf("State slot: %d", s.settings.StateSlot))
 }
 
 func (s *Shell) cycleSpeed() {
@@ -906,7 +971,7 @@ func (s *Shell) cycleSpeed() {
 		if s.settings.Speed == speed {
 			s.settings.Speed = speeds[(index+1)%len(speeds)]
 			_ = s.settings.save()
-			s.setStatus(fmt.Sprintf("Emulation speed: %gx", s.settings.Speed))
+			s.setStatus(s.trf("Emulation speed: %gx", s.settings.Speed))
 			return
 		}
 	}
@@ -922,26 +987,29 @@ func (s *Shell) showAbout() {
 			"ARAM - Archived Runtime for ARM Mobiles",
 			"",
 			"Cross-platform frontend for Korean feature-phone emulation.",
-			"Frontend state: " + string(s.state),
-			"Backend: " + s.backendName(),
+			s.trf(
+				"Frontend state: %s",
+				s.tr(stateValueLabel(string(s.state))),
+			),
+			s.trf("Backend: %s", s.backendName()),
 		},
 	}
 }
 
 func (s *Shell) openDocumentation() {
 	if err := openPlatformURL("https://github.com/mirusu400/aram-emu/tree/main/docs"); err != nil {
-		s.setStatus("Documentation: " + err.Error())
+		s.setStatus(s.tr("Documentation: ") + err.Error())
 		return
 	}
-	s.setStatus("Opened ARAM documentation")
+	s.setStatus(s.tr("Opened ARAM documentation"))
 }
 
 func (s *Shell) openIssueTracker() {
 	if err := openPlatformURL("https://github.com/mirusu400/aram-emu/issues"); err != nil {
-		s.setStatus("Issue tracker: " + err.Error())
+		s.setStatus(s.tr("Issue tracker: ") + err.Error())
 		return
 	}
-	s.setStatus("Opened ARAM issue tracker")
+	s.setStatus(s.tr("Opened ARAM issue tracker"))
 }
 
 func (s *Shell) backendName() string {

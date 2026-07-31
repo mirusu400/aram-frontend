@@ -42,7 +42,7 @@ type compatibilityReport struct {
 func (s *Shell) saveScreenshot() {
 	frame := s.currentFrame()
 	if frame.Image == nil {
-		s.setStatus("Screenshot: no guest-native frame is available")
+		s.setStatus(s.tr("Screenshot: no guest-native frame is available"))
 		return
 	}
 	snapshot := cloneImage(frame.Image)
@@ -54,7 +54,7 @@ func (s *Shell) saveScreenshot() {
 
 func (s *Shell) saveCompatibilityReport() {
 	if s.input == nil {
-		s.setStatus("Compatibility report: no input is selected")
+		s.setStatus(s.tr("Compatibility report: no input is selected"))
 		return
 	}
 	report := compatibilityReport{

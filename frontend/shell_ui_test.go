@@ -2,12 +2,22 @@ package frontend
 
 import (
 	"fmt"
+	"image"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/ebitenui/ebitenui/widget"
 	"github.com/hajimehoshi/ebiten/v2"
 )
+
+type integratedWelcomeBackend struct {
+	NullBackend
+}
+
+func (integratedWelcomeBackend) BackendName() string {
+	return "aram-core"
+}
 
 func TestShellBuildsEbitenUIDesignSystem(t *testing.T) {
 	shell := NewShell(NullBackend{}, nil, "")
@@ -25,6 +35,108 @@ func TestShellBuildsEbitenUIDesignSystem(t *testing.T) {
 	}
 	if shell.design.Components.Surface == nil || shell.design.Components.PrimaryButton.Image == nil {
 		t.Fatal("component styles are incomplete")
+	}
+}
+
+func TestFirstIntegratedLaunchOpensWelcomeModal(t *testing.T) {
+	temporary := t.TempDir()
+	t.Setenv("APPDATA", temporary)
+	t.Setenv("XDG_CONFIG_HOME", temporary)
+	shell := NewShell(integratedWelcomeBackend{}, nil, "")
+	if shell.panel == nil || shell.panel.Kind != "welcome" {
+		t.Fatalf("first integrated launch panel = %#v", shell.panel)
+	}
+	view := shell.interfaceUI
+	view.sync(shell)
+	if view.panelWindow == nil || !view.panelWindow.Modal {
+		t.Fatal("Welcome panel was not rendered as a modal")
+	}
+	if view.welcomeStableButton == nil ||
+		view.welcomeNightlyButton == nil ||
+		view.welcomeLaterButton == nil {
+		t.Fatal("Welcome modal omitted a channel action")
+	}
+}
+
+func TestWelcomeChannelSelectionPersistsAndDoesNotDownloadCoreTools(t *testing.T) {
+	temporary := t.TempDir()
+	t.Setenv("APPDATA", temporary)
+	t.Setenv("XDG_CONFIG_HOME", temporary)
+	downloader := &fakeUpdateDownloader{
+		requests: make(chan updateDownload, 1),
+	}
+	shell := NewShell(integratedWelcomeBackend{}, nil, "")
+	shell.updater = downloader
+
+	shell.completeWelcome(updateChannelNightly)
+	if !shell.settings.WelcomeCompleted ||
+		shell.settings.UpdateChannel != string(updateChannelNightly) ||
+		shell.panel != nil {
+		t.Fatalf("completed Welcome state = settings:%#v panel:%#v", shell.settings, shell.panel)
+	}
+	select {
+	case request := <-downloader.requests:
+		t.Fatalf("Welcome unexpectedly downloaded a component: %#v", request)
+	default:
+	}
+	reloaded := loadSettings()
+	if !reloaded.WelcomeCompleted ||
+		reloaded.UpdateChannel != string(updateChannelNightly) {
+		t.Fatalf("reloaded Welcome settings = %#v", reloaded)
+	}
+}
+
+func TestWelcomeDecideLaterKeepsFirstRunIncomplete(t *testing.T) {
+	temporary := t.TempDir()
+	t.Setenv("APPDATA", temporary)
+	t.Setenv("XDG_CONFIG_HOME", temporary)
+	shell := NewShell(integratedWelcomeBackend{}, nil, "")
+	shell.dismissWelcome()
+	if shell.settings.WelcomeCompleted || shell.panel != nil {
+		t.Fatalf("deferred Welcome state = settings:%#v panel:%#v", shell.settings, shell.panel)
+	}
+}
+
+func TestWelcomeModalAndActionsStayInsideResponsiveViewport(t *testing.T) {
+	for _, size := range [][2]int{{390, 844}, {480, 480}, {720, 540}, {960, 720}} {
+		t.Run(fmt.Sprintf("%dx%d", size[0], size[1]), func(t *testing.T) {
+			temporary := t.TempDir()
+			t.Setenv("APPDATA", temporary)
+			t.Setenv("XDG_CONFIG_HOME", temporary)
+			shell := NewShell(integratedWelcomeBackend{}, nil, "")
+			shell.Layout(size[0], size[1])
+			view := shell.interfaceUI
+			view.sync(shell)
+			view.ui.Update()
+
+			windowRect := view.panelWindow.GetContainer().GetWidget().Rect
+			viewport := image.Rect(0, 0, size[0], size[1])
+			if !windowRect.In(viewport) {
+				t.Fatalf("Welcome modal %v outside viewport %v", windowRect, viewport)
+			}
+			buttons := []*widget.Button{
+				view.welcomeStableButton,
+				view.welcomeNightlyButton,
+				view.welcomeLaterButton,
+			}
+			for index, button := range buttons {
+				rect := button.GetWidget().Rect
+				if !rect.In(windowRect) {
+					t.Errorf("Welcome action %d at %v outside modal %v", index, rect, windowRect)
+				}
+				for previous := 0; previous < index; previous++ {
+					if rect.Overlaps(buttons[previous].GetWidget().Rect) {
+						t.Errorf(
+							"Welcome actions %d and %d overlap: %v / %v",
+							previous,
+							index,
+							buttons[previous].GetWidget().Rect,
+							rect,
+						)
+					}
+				}
+			}
+		})
 	}
 }
 
@@ -117,6 +229,30 @@ func TestAudioCommandOpensAudioSettings(t *testing.T) {
 			shell.settingsSection,
 			shell.interfaceUI.settingsSection,
 		)
+	}
+}
+
+func TestUpdatesSettingsSectionRendersAllPublicComponents(t *testing.T) {
+	shell := NewShell(NullBackend{}, nil, "")
+	shell.dispatchCommand("help.updates")
+	shell.interfaceUI.sync(shell)
+	shell.interfaceUI.ui.Update()
+	shell.Draw(ebiten.NewImage(logicalWidth, logicalHeight))
+
+	if shell.interfaceUI.settingsSection != "Updates" {
+		t.Fatalf("settings section = %q", shell.interfaceUI.settingsSection)
+	}
+	if shell.interfaceUI.panelWindow == nil {
+		t.Fatal("updates settings window was not created")
+	}
+	if _, ok := updateInfo(updateComponentProduct); !ok {
+		t.Fatal("aram-emu product update is missing")
+	}
+	if _, ok := updateInfo(updateComponentCore); !ok {
+		t.Fatal("aram-core update is missing")
+	}
+	if _, ok := updateInfo(updateComponentFrontend); !ok {
+		t.Fatal("aram-frontend update is missing")
 	}
 }
 

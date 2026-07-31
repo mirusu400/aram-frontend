@@ -146,19 +146,33 @@ func (s *Shell) drawEmptyViewport(screen *ebiten.Image, viewport image.Rectangle
 	if s.design != nil {
 		palette = s.design.Palette
 	}
-	title := "No guest frame"
-	details := []string{"Open a title from File, or drag a file here."}
+	title := s.tr("No guest frame")
+	details := []string{s.tr("Open a title from File, or drag a file here.")}
 	if s.loading {
-		title = "Preparing input"
-		details = []string{strings.ToUpper(string(s.state))}
-	} else if s.problem != nil {
-		title = "Unable to start this input"
+		title = s.tr("Preparing input")
 		details = []string{
-			"State: " + string(s.problem.State),
-			"Input: " + shorten(s.problem.Input, 40),
-			"Format: " + emptyFallback(s.problem.Format, "unknown"),
-			"Profile: " + emptyFallback(s.problem.Profile, "unselected"),
-			"Backend: " + emptyFallback(s.problem.Backend, "unknown"),
+			strings.ToUpper(s.tr(stateValueLabel(string(s.state)))),
+		}
+	} else if s.problem != nil {
+		title = s.tr("Unable to start this input")
+		details = []string{
+			s.trf(
+				"State: %s",
+				s.tr(stateValueLabel(string(s.problem.State))),
+			),
+			s.trf("Input: %s", shorten(s.problem.Input, 40)),
+			s.trf(
+				"Format: %s",
+				emptyFallback(s.problem.Format, s.tr("unknown")),
+			),
+			s.trf(
+				"Profile: %s",
+				emptyFallback(s.problem.Profile, s.tr("unselected")),
+			),
+			s.trf(
+				"Backend: %s",
+				emptyFallback(s.problem.Backend, s.tr("unknown")),
+			),
 			shorten(s.problem.Reason, 64),
 		}
 		ebitenutil.DrawRect(

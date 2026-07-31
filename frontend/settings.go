@@ -21,6 +21,7 @@ type ControllerProfile struct {
 
 type Settings struct {
 	RecentFiles       []string                     `json:"recent_files"`
+	Language          string                       `json:"language"`
 	ThemeMode         string                       `json:"theme_mode"`
 	IntegerScaling    bool                         `json:"integer_scaling"`
 	PreserveAspect    bool                         `json:"preserve_aspect"`
@@ -44,10 +45,13 @@ type Settings struct {
 	PerTitleControls  bool                         `json:"per_title_controls"`
 	TitleControllers  map[string]ControllerProfile `json:"title_controller_profiles,omitempty"`
 	ShowVirtualKeypad bool                         `json:"show_virtual_keypad"`
+	UpdateChannel     string                       `json:"update_channel"`
+	WelcomeCompleted  bool                         `json:"welcome_completed"`
 }
 
 func defaultSettings() Settings {
 	return Settings{
+		Language:         string(systemLanguage()),
 		ThemeMode:        "light",
 		IntegerScaling:   true,
 		PreserveAspect:   true,
@@ -63,6 +67,7 @@ func defaultSettings() Settings {
 		GamepadAnalog:    true,
 		GamepadDeadzone:  30,
 		TitleControllers: make(map[string]ControllerProfile),
+		UpdateChannel:    string(updateChannelStable),
 	}
 }
 
@@ -84,6 +89,7 @@ func loadSettings() Settings {
 }
 
 func (s *Settings) normalize() {
+	s.Language = string(normalizeLanguage(s.Language))
 	if s.ThemeMode != "light" && s.ThemeMode != "dark" {
 		s.ThemeMode = "light"
 	}
@@ -123,6 +129,7 @@ func (s *Settings) normalize() {
 	if s.GamepadDeadzone < 15 || s.GamepadDeadzone > 50 {
 		s.GamepadDeadzone = 30
 	}
+	s.UpdateChannel = string(normalizeUpdateChannel(s.UpdateChannel))
 	s.KeyboardBindings = normalizeKeyboardBindingIDs(s.KeyboardBindings)
 	s.GamepadBindings = normalizeGamepadBindingIDs(s.GamepadBindings)
 	if s.TitleControllers == nil {

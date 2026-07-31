@@ -28,7 +28,9 @@ Activity owns:
 - scoped storage and share intents.
 
 The native layer passes a document handle or copied cache file to the shared
-frontend. Desktop Zenity code is excluded by build tags.
+frontend. Its document picker must include `application/zip` so direct WIPI
+ZIP packages reach the same backend open request as desktop inputs. Desktop
+Zenity code is excluded by build tags.
 
 The generated binding exposes `mobile.SetHost`. The native Activity implements
 `RequestDocument`, then completes the asynchronous request with
