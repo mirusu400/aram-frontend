@@ -58,6 +58,8 @@ below the platform configuration directory. The bundle contains a JSON
 manifest, redacted frontend logs, build/runtime metadata, input identity
 metadata, and checked backend diagnostic files. It never copies the selected
 game or firmware bytes, guest memory, framebuffer pixels, save data, or media.
+`Tools > Open Debug Bundle Folder` creates that directory when necessary and
+opens it in Explorer, Finder, or the desktop file manager.
 
 Desktop resizing uses the available window as the internal canvas: the guest
 viewport expands while menus, text, centered dialogs, and scrollable settings

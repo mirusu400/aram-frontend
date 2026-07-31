@@ -58,12 +58,15 @@ entire 960x720 interface.
 - Compatibility Report
 - Logs
 - Export Debug Bundle (`Ctrl+Shift+D`)
+- Open Debug Bundle Folder
 
 The menu model is shared. Mobile may present the same commands as a drawer or
 overlay rather than a desktop top bar, but the feature IDs remain identical.
 `Open Recent` uses an in-application list with a visible vertical scrollbar.
 Entries lead with the filename instead of a shared directory prefix, and the
 selected entry shows its wrapped full path before it is opened.
+`Open Debug Bundle Folder` creates the shared debug artifact directory when it
+does not exist and opens it with Explorer, Finder, or `xdg-open`.
 Checked backends can expose `ToolField` and `ToolAction` descriptors in a
 snapshot. The frontend renders those fields and actions and sends a
 `ToolRequest` through `ToolActionBackend`; guest memory is never accessed

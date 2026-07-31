@@ -1,6 +1,7 @@
 package frontend
 
 import (
+	"errors"
 	"image"
 	"image/color"
 	"image/png"
@@ -8,9 +9,62 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"testing/fstest"
 )
+
+func TestOpenDebugBundleFolderCreatesAndOpensArtifactDirectory(t *testing.T) {
+	config := t.TempDir()
+	t.Setenv("APPDATA", config)
+	t.Setenv("XDG_CONFIG_HOME", config)
+	t.Setenv("HOME", config)
+
+	original := openArtifactFolder
+	t.Cleanup(func() { openArtifactFolder = original })
+	var opened string
+	openArtifactFolder = func(path string) error {
+		opened = path
+		return nil
+	}
+	shell := &Shell{
+		backend:  NullBackend{},
+		settings: defaultSettings(),
+	}
+	shell.openDebugBundleFolder()
+
+	expected := filepath.Join(config, "ARAM", "debug")
+	if filepath.Clean(opened) != filepath.Clean(expected) {
+		t.Fatalf("opened folder = %q, want %q", opened, expected)
+	}
+	if info, err := os.Stat(expected); err != nil || !info.IsDir() {
+		t.Fatalf("debug folder was not created: info=%v err=%v", info, err)
+	}
+	if !strings.Contains(shell.status, expected) {
+		t.Fatalf("open-folder status = %q", shell.status)
+	}
+}
+
+func TestOpenDebugBundleFolderReportsPlatformFailure(t *testing.T) {
+	config := t.TempDir()
+	t.Setenv("APPDATA", config)
+	t.Setenv("XDG_CONFIG_HOME", config)
+	t.Setenv("HOME", config)
+
+	original := openArtifactFolder
+	t.Cleanup(func() { openArtifactFolder = original })
+	openArtifactFolder = func(string) error {
+		return errors.New("synthetic open failure")
+	}
+	shell := &Shell{
+		backend:  NullBackend{},
+		settings: defaultSettings(),
+	}
+	shell.openDebugBundleFolder()
+	if !strings.Contains(shell.status, "synthetic open failure") {
+		t.Fatalf("open-folder failure status = %q", shell.status)
+	}
+}
 
 func TestCopyFirstDroppedFileUsesPrivateCacheCopy(t *testing.T) {
 	cache := t.TempDir()

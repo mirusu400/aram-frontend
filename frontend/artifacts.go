@@ -28,6 +28,8 @@ type dropResult struct {
 	err         error
 }
 
+var openArtifactFolder = openPlatformFolder
+
 type compatibilityReport struct {
 	CreatedAt     time.Time        `json:"created_at"`
 	Input         *InputInfo       `json:"input,omitempty"`
@@ -88,6 +90,22 @@ func (s *Shell) saveLog() {
 		path, err := writeTextArtifact("logs", "frontend", ".log", data)
 		s.artifactResults <- artifactResult{kind: "Log", path: path, err: err}
 	}()
+}
+
+func (s *Shell) openDebugBundleFolder() {
+	path, err := artifactDirectory("debug")
+	if err == nil {
+		err = openArtifactFolder(path)
+	}
+	if err != nil {
+		message := s.tr("Debug bundle folder: ") + err.Error()
+		s.appendLog(message)
+		s.setStatus(message)
+		return
+	}
+	message := s.trf("Debug bundle folder opened: %s", path)
+	s.appendLog(message)
+	s.setStatus(message)
 }
 
 func cloneImage(source image.Image) *image.RGBA {
