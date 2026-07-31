@@ -549,3 +549,21 @@ func TestInteractiveToolFormRendersAtCompactSize(t *testing.T) {
 		t.Fatal("interactive tool window was not created")
 	}
 }
+
+func TestIssueReportFormRendersAtCompactSize(t *testing.T) {
+	shell := NewShell(NullBackend{}, nil, "")
+	shell.Layout(390, 844)
+	shell.openIssueTracker()
+	shell.interfaceUI.sync(shell)
+	shell.interfaceUI.ui.Update()
+	shell.Draw(ebiten.NewImage(390, 844))
+
+	if shell.interfaceUI.panelWindow == nil {
+		t.Fatal("compact issue report window was not created")
+	}
+	if shell.panel == nil ||
+		shell.panel.Kind != "issue-report" ||
+		len(shell.panel.Fields) != 4 {
+		t.Fatalf("compact issue report panel = %#v", shell.panel)
+	}
+}

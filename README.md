@@ -62,6 +62,11 @@ backend diagnostic files. It never copies the selected game or firmware bytes,
 guest memory, save data, or other proprietary media.
 `Tools > Open Debug Bundle Folder` creates that directory when necessary and
 opens it in Explorer, Finder, or the desktop file manager.
+`Help > Report Issue` collects the situation, game title, carrier, and expected
+ARAM repository in-app. It creates the same redacted debug ZIP with the current
+screenshot, opens its folder, and opens a prefilled GitHub issue draft in the
+signed-in browser. GitHub has no public issue-attachment API, so the user
+reviews the draft and drags the prepared ZIP into it before submitting.
 
 Desktop resizing uses the available window as the internal canvas: the guest
 viewport expands while menus, text, centered dialogs, and scrollable settings

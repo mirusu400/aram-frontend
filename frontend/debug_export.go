@@ -134,19 +134,7 @@ func (s *Shell) saveDebugBundle() {
 	snapshot := s.captureDebugBundleSnapshot(time.Now().UTC())
 	backend := s.backend
 	go func() {
-		var (
-			artifacts  []DebugArtifact
-			collectErr error
-		)
-		if exporter, ok := backend.(DebugExportBackend); ok {
-			ctx, cancel := context.WithTimeout(
-				context.Background(),
-				debugCollectionTimeout,
-			)
-			artifacts, collectErr = exporter.DebugArtifacts(ctx)
-			cancel()
-		}
-		path, warning, err := writeDebugBundle(snapshot, artifacts, collectErr)
+		path, warning, err := collectDebugBundle(snapshot, backend)
 		s.artifactResults <- artifactResult{
 			kind:    "Debug bundle",
 			path:    path,
@@ -154,6 +142,25 @@ func (s *Shell) saveDebugBundle() {
 			err:     err,
 		}
 	}()
+}
+
+func collectDebugBundle(
+	snapshot debugBundleSnapshot,
+	backend Backend,
+) (string, string, error) {
+	var (
+		artifacts  []DebugArtifact
+		collectErr error
+	)
+	if exporter, ok := backend.(DebugExportBackend); ok {
+		ctx, cancel := context.WithTimeout(
+			context.Background(),
+			debugCollectionTimeout,
+		)
+		artifacts, collectErr = exporter.DebugArtifacts(ctx)
+		cancel()
+	}
+	return writeDebugBundle(snapshot, artifacts, collectErr)
 }
 
 func (s *Shell) captureDebugBundleSnapshot(createdAt time.Time) debugBundleSnapshot {

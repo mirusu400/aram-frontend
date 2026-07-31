@@ -100,6 +100,7 @@ type Shell struct {
 	hostLifecycle             chan bool
 	dropResults               chan dropResult
 	artifactResults           chan artifactResult
+	issueReportResults        chan issueReportResult
 	toolResults               chan toolResult
 	updateResults             chan updateResult
 }
@@ -150,6 +151,7 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		hostLifecycle:             make(chan bool, 2),
 		dropResults:               make(chan dropResult, 2),
 		artifactResults:           make(chan artifactResult, 4),
+		issueReportResults:        make(chan issueReportResult, 2),
 		toolResults:               make(chan toolResult, 2),
 		updateResults:             make(chan updateResult, 4),
 	}
@@ -528,6 +530,8 @@ func (s *Shell) consumeResults() {
 				s.tr(settingValueLabel(result.kind)),
 				result.path,
 			))
+		case result := <-s.issueReportResults:
+			s.consumeIssueReportResult(result)
 		case result := <-s.toolResults:
 			s.consumeToolResult(result)
 		case result := <-s.updateResults:
@@ -1014,14 +1018,6 @@ func (s *Shell) openDocumentation() {
 		return
 	}
 	s.setStatus(s.tr("Opened ARAM documentation"))
-}
-
-func (s *Shell) openIssueTracker() {
-	if err := openPlatformURL("https://github.com/mirusu400/aram-emu/issues"); err != nil {
-		s.setStatus(s.tr("Issue tracker: ") + err.Error())
-		return
-	}
-	s.setStatus(s.tr("Opened ARAM issue tracker"))
 }
 
 func (s *Shell) backendName() string {

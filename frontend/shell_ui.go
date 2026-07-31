@@ -446,7 +446,8 @@ func (u *shellUI) syncPanel(shell *Shell) {
 		u.syncRecentPanel(shell)
 		return
 	}
-	if shell.panel.Kind == "tool" &&
+	if (shell.panel.Kind == "tool" ||
+		shell.panel.Kind == "issue-report") &&
 		(len(shell.panel.Fields) > 0 || len(shell.panel.Actions) > 0) {
 		u.syncInteractiveToolPanel(shell)
 		return
@@ -1117,7 +1118,7 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 				Left: design.Space.S, Right: design.Space.S,
 			}),
 			widget.TextInputOpts.Face(design.Type.Body),
-			widget.TextInputOpts.Placeholder(field.Placeholder),
+			widget.TextInputOpts.Placeholder(shell.tr(field.Placeholder)),
 			widget.TextInputOpts.ChangedHandler(func(args *widget.TextInputChangedEventArgs) {
 				if panel.FieldValues == nil {
 					panel.FieldValues = make(map[string]string)
@@ -1156,7 +1157,11 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 			design.Components.SubtleButton.MinHeight,
 			widget.TextPositionCenter,
 			func() {
-				shell.executeToolAction(action.ID, panel.FieldValues)
+				if panel.Kind == "issue-report" {
+					shell.executeIssueReportAction(action.ID, panel.FieldValues)
+				} else {
+					shell.executeToolAction(action.ID, panel.FieldValues)
+				}
 				u.panelSignature = ""
 			},
 		)

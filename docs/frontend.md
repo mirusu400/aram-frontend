@@ -172,3 +172,11 @@ the frame visible when export was requested. Backend collection failures
 become manifest warnings instead of discarding the frontend evidence.
 Attachment names and sizes are validated before writing. The bundle excludes
 input bytes, guest memory, save data, and other proprietary media.
+
+`Help > Report Issue` opens an in-application report form for the situation,
+game title, carrier, and expected `aram-frontend`, `aram-emu`, or `aram-core`
+repository. Preparing the report captures the same redacted debug bundle and
+current screenshot, then opens both the artifact folder and a prefilled GitHub
+issue draft for the selected repository. Because GitHub does not expose a
+public API for issue attachment uploads, the final signed-in browser step asks
+the user to review the report, drag in the prepared ZIP, and submit it.
