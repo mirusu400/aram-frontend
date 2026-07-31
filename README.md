@@ -84,6 +84,9 @@ phone keypad can be shown beside the guest display.
 `Help > Check for Updates...` (or `Emulation > Configure ARAM > Updates`)
 downloads public archives for the integrated `aram-emu` product, the
 optional `aram-core` developer tools, and the standalone `aram-frontend`.
+The Updates category and `Help > About ARAM` show the version of the running
+build: a release tag for Stable, the source revision for Nightly, or a
+development revision for local builds.
 In the integrated host, the ARAM product action installs the verified archive,
 restarts automatically, and reopens the currently loaded input. Core tools and
 the standalone frontend remain ordinary archive downloads.

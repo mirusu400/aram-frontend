@@ -46,6 +46,18 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
+      - name: Resolve build version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "release" ]]; then
+            build_version="${GITHUB_REF_NAME}"
+          elif [[ "${GITHUB_EVENT_NAME}" == "push" &&
+                  "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            build_version="Nightly-${GITHUB_SHA::7}"
+          else
+            build_version="Development-${GITHUB_SHA::7}"
+          fi
+          echo "ARAM_BUILD_VERSION=${build_version}" >> "${GITHUB_ENV}"
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
@@ -66,7 +78,8 @@ jobs:
         shell: bash
         run: |
           mkdir -p build/package dist
-          go build -trimpath -ldflags="-s -w" \
+          go build -trimpath \
+            -ldflags="-s -w -X=github.com/mirusu400/aram-frontend/frontend.BuildVersion=${ARAM_BUILD_VERSION}" \
             -o "build/package/${{ matrix.executable }}" \
             ./cmd/aram-frontend
           cp README.md build/package/
@@ -97,6 +110,18 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
+      - name: Resolve build version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "release" ]]; then
+            build_version="${GITHUB_REF_NAME}"
+          elif [[ "${GITHUB_EVENT_NAME}" == "push" &&
+                  "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            build_version="Nightly-${GITHUB_SHA::7}"
+          else
+            build_version="Development-${GITHUB_SHA::7}"
+          fi
+          echo "ARAM_BUILD_VERSION=${build_version}" >> "${GITHUB_ENV}"
       - name: Install Ebitengine mobile binder
         run: go install github.com/hajimehoshi/ebiten/v2/cmd/ebitenmobile@v2.9.9
       - name: Build Android AAR
@@ -104,6 +129,7 @@ jobs:
           mkdir -p build
           ebitenmobile bind \
             -target android \
+            -ldflags="-s -w -X=github.com/mirusu400/aram-frontend/frontend.BuildVersion=${ARAM_BUILD_VERSION}" \
             -javapkg io.github.mirusu400.aram \
             -o build/aram.aar \
             ./mobile
@@ -122,6 +148,18 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
+      - name: Resolve build version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "release" ]]; then
+            build_version="${GITHUB_REF_NAME}"
+          elif [[ "${GITHUB_EVENT_NAME}" == "push" &&
+                  "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            build_version="Nightly-${GITHUB_SHA::7}"
+          else
+            build_version="Development-${GITHUB_SHA::7}"
+          fi
+          echo "ARAM_BUILD_VERSION=${build_version}" >> "${GITHUB_ENV}"
       - name: Install Ebitengine mobile binder
         run: go install github.com/hajimehoshi/ebiten/v2/cmd/ebitenmobile@v2.9.9
       - name: Build iOS XCFramework
@@ -129,6 +167,7 @@ jobs:
           mkdir -p build
           ebitenmobile bind \
             -target ios \
+            -ldflags="-s -w -X=github.com/mirusu400/aram-frontend/frontend.BuildVersion=${ARAM_BUILD_VERSION}" \
             -o build/ARAM.xcframework \
             ./mobile
       - uses: actions/upload-artifact@v7

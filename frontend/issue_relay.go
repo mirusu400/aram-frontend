@@ -254,15 +254,7 @@ func validIssueSHA256(value string) bool {
 }
 
 func currentIssueReportVersion() string {
-	build := currentDebugBuildReport()
-	if version := strings.TrimSpace(build.Main.Version); version != "" &&
-		version != "(devel)" {
-		return shorten(version, 100)
-	}
-	if revision := strings.TrimSpace(build.Revision); revision != "" {
-		return "commit-" + shorten(revision, 12)
-	}
-	return "development"
+	return currentApplicationVersion()
 }
 
 func readIssueScreenshot(bundlePath string) ([]byte, error) {

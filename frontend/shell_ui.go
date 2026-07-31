@@ -1841,55 +1841,7 @@ func (u *shellUI) settingsRows(shell *Shell) []*widget.Container {
 			action:      shell.resetControllerBindings,
 		})
 	case "Updates":
-		channel := normalizeUpdateChannel(shell.settings.UpdateChannel)
-		downloadRoot, downloadRootErr := defaultUpdateDownloadRoot()
-		downloadRootLabel := shorten(downloadRoot, 34)
-		if downloadRootErr != nil {
-			downloadRootLabel = "Unavailable"
-		}
-		rows = []settingsRowModel{
-			{
-				label:       "Update channel",
-				description: "Stable uses the latest official release; Nightly uses the latest main-branch build.",
-				value:       updateChannelLabel(channel),
-				action:      shell.cycleUpdateChannel,
-			},
-			{
-				label: "ARAM product",
-				description: shell.updateRowDescription(
-					updateComponentProduct,
-					"Integrated app, rebuilt from successful aram-core and aram-frontend Nightlies.",
-				),
-				value:    shell.updateActionLabel(updateComponentProduct),
-				action:   func() { shell.downloadUpdate(updateComponentProduct) },
-				disabled: !shell.updateActionAvailable(updateComponentProduct),
-			},
-			{
-				label: "aram-core developer tools",
-				description: shell.updateRowDescription(
-					updateComponentCore,
-					"Optional CLI debugger/inspectors; the emulator runtime is already built into ARAM product.",
-				),
-				value:    shell.updateActionLabel(updateComponentCore),
-				action:   func() { shell.downloadUpdate(updateComponentCore) },
-				disabled: !shell.updateActionAvailable(updateComponentCore),
-			},
-			{
-				label: "aram-frontend",
-				description: shell.updateRowDescription(
-					updateComponentFrontend,
-					"Optional standalone UI archive; it does not update the integrated ARAM app.",
-				),
-				value:    shell.updateActionLabel(updateComponentFrontend),
-				action:   func() { shell.downloadUpdate(updateComponentFrontend) },
-				disabled: !shell.updateActionAvailable(updateComponentFrontend),
-			},
-			{
-				label:       "Download folder",
-				description: "Archives are verified and saved without replacing the running application.",
-				value:       downloadRootLabel,
-			},
-		}
+		rows = updateSettingsRowModels(shell)
 	default:
 		rows = []settingsRowModel{
 			{
@@ -1923,6 +1875,63 @@ func (u *shellUI) settingsRows(shell *Shell) []*widget.Container {
 		result = append(result, u.buildSettingsRow(row))
 	}
 	return result
+}
+
+func updateSettingsRowModels(shell *Shell) []settingsRowModel {
+	channel := normalizeUpdateChannel(shell.settings.UpdateChannel)
+	downloadRoot, downloadRootErr := defaultUpdateDownloadRoot()
+	downloadRootLabel := shorten(downloadRoot, 34)
+	if downloadRootErr != nil {
+		downloadRootLabel = "Unavailable"
+	}
+	return []settingsRowModel{
+		{
+			label:       "Current version",
+			description: "Version of the running ARAM application.",
+			value:       currentApplicationVersion(),
+		},
+		{
+			label:       "Update channel",
+			description: "Stable uses the latest official release; Nightly uses the latest main-branch build.",
+			value:       updateChannelLabel(channel),
+			action:      shell.cycleUpdateChannel,
+		},
+		{
+			label: "ARAM product",
+			description: shell.updateRowDescription(
+				updateComponentProduct,
+				"Integrated app, rebuilt from successful aram-core and aram-frontend Nightlies.",
+			),
+			value:    shell.updateActionLabel(updateComponentProduct),
+			action:   func() { shell.downloadUpdate(updateComponentProduct) },
+			disabled: !shell.updateActionAvailable(updateComponentProduct),
+		},
+		{
+			label: "aram-core developer tools",
+			description: shell.updateRowDescription(
+				updateComponentCore,
+				"Optional CLI debugger/inspectors; the emulator runtime is already built into ARAM product.",
+			),
+			value:    shell.updateActionLabel(updateComponentCore),
+			action:   func() { shell.downloadUpdate(updateComponentCore) },
+			disabled: !shell.updateActionAvailable(updateComponentCore),
+		},
+		{
+			label: "aram-frontend",
+			description: shell.updateRowDescription(
+				updateComponentFrontend,
+				"Optional standalone UI archive; it does not update the integrated ARAM app.",
+			),
+			value:    shell.updateActionLabel(updateComponentFrontend),
+			action:   func() { shell.downloadUpdate(updateComponentFrontend) },
+			disabled: !shell.updateActionAvailable(updateComponentFrontend),
+		},
+		{
+			label:       "Download folder",
+			description: "Archives are verified and saved without replacing the running application.",
+			value:       downloadRootLabel,
+		},
+	}
 }
 
 func (u *shellUI) buildSettingsRow(model settingsRowModel) *widget.Container {

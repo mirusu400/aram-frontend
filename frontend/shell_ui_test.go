@@ -285,8 +285,18 @@ func TestEbitenUIDropdownPreservesStableCommandIDs(t *testing.T) {
 }
 
 func TestEbitenUIModalTracksPanelLifecycle(t *testing.T) {
+	previousVersion := BuildVersion
+	BuildVersion = "Nightly-7654321"
+	t.Cleanup(func() { BuildVersion = previousVersion })
+
 	shell := NewShell(NullBackend{}, nil, "")
 	shell.showAbout()
+	if !strings.Contains(
+		strings.Join(shell.panel.Lines, "\n"),
+		"Nightly 7654321",
+	) {
+		t.Fatalf("about lines omit current version: %#v", shell.panel.Lines)
+	}
 	shell.interfaceUI.sync(shell)
 	if shell.interfaceUI.panelWindow == nil || !shell.interfaceUI.panelWindow.Modal {
 		t.Fatal("about panel did not open as an EbitenUI modal")
@@ -358,6 +368,10 @@ func TestAudioCommandOpensAudioSettings(t *testing.T) {
 }
 
 func TestUpdatesSettingsSectionRendersAllPublicComponents(t *testing.T) {
+	previousVersion := BuildVersion
+	BuildVersion = "v1.2.3"
+	t.Cleanup(func() { BuildVersion = previousVersion })
+
 	shell := NewShell(NullBackend{}, nil, "")
 	shell.dispatchCommand("help.updates")
 	shell.interfaceUI.sync(shell)
@@ -369,6 +383,13 @@ func TestUpdatesSettingsSectionRendersAllPublicComponents(t *testing.T) {
 	}
 	if shell.interfaceUI.panelWindow == nil {
 		t.Fatal("updates settings window was not created")
+	}
+	rows := updateSettingsRowModels(shell)
+	if len(rows) == 0 ||
+		rows[0].label != "Current version" ||
+		rows[0].value != "v1.2.3" ||
+		rows[0].action != nil {
+		t.Fatalf("current version row = %#v", rows)
 	}
 	if _, ok := updateInfo(updateComponentProduct); !ok {
 		t.Fatal("aram-emu product update is missing")

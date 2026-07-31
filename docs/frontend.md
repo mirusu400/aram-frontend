@@ -101,6 +101,9 @@ phone-number controls to mouse or touch input.
 ## Updates
 
 `Help > Check for Updates...` opens the `Updates` category in `Configure ARAM`.
+Its read-only Current version row and `Help > About ARAM` identify the running
+build. Stable archives show their release tag, Nightly archives show their
+source revision, and local builds fall back to Go VCS build metadata.
 It exposes downloads for:
 
 - the integrated `aram-emu` product;

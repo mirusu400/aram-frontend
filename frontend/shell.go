@@ -1009,6 +1009,7 @@ func (s *Shell) showAbout() {
 			"ARAM - Archived Runtime for ARM Mobiles",
 			"",
 			"Cross-platform frontend for Korean feature-phone emulation.",
+			s.trf("Version: %s", currentApplicationVersion()),
 			s.trf(
 				"Frontend state: %s",
 				s.tr(stateValueLabel(string(s.state))),
