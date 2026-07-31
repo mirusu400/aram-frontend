@@ -19,6 +19,14 @@ func (integratedWelcomeBackend) BackendName() string {
 	return "aram-core"
 }
 
+func isolateSettings(t *testing.T) {
+	t.Helper()
+	temporary := t.TempDir()
+	t.Setenv("APPDATA", temporary)
+	t.Setenv("XDG_CONFIG_HOME", temporary)
+	t.Setenv("HOME", temporary)
+}
+
 func TestShellBuildsEbitenUIDesignSystem(t *testing.T) {
 	shell := NewShell(NullBackend{}, nil, "")
 	if shell.design == nil {
@@ -39,9 +47,7 @@ func TestShellBuildsEbitenUIDesignSystem(t *testing.T) {
 }
 
 func TestFirstIntegratedLaunchOpensWelcomeModal(t *testing.T) {
-	temporary := t.TempDir()
-	t.Setenv("APPDATA", temporary)
-	t.Setenv("XDG_CONFIG_HOME", temporary)
+	isolateSettings(t)
 	shell := NewShell(integratedWelcomeBackend{}, nil, "")
 	if shell.panel == nil || shell.panel.Kind != "welcome" {
 		t.Fatalf("first integrated launch panel = %#v", shell.panel)
@@ -59,9 +65,7 @@ func TestFirstIntegratedLaunchOpensWelcomeModal(t *testing.T) {
 }
 
 func TestWelcomeChannelSelectionPersistsAndDoesNotDownloadCoreTools(t *testing.T) {
-	temporary := t.TempDir()
-	t.Setenv("APPDATA", temporary)
-	t.Setenv("XDG_CONFIG_HOME", temporary)
+	isolateSettings(t)
 	downloader := &fakeUpdateDownloader{
 		requests: make(chan updateDownload, 1),
 	}
@@ -87,9 +91,7 @@ func TestWelcomeChannelSelectionPersistsAndDoesNotDownloadCoreTools(t *testing.T
 }
 
 func TestWelcomeDecideLaterKeepsFirstRunIncomplete(t *testing.T) {
-	temporary := t.TempDir()
-	t.Setenv("APPDATA", temporary)
-	t.Setenv("XDG_CONFIG_HOME", temporary)
+	isolateSettings(t)
 	shell := NewShell(integratedWelcomeBackend{}, nil, "")
 	shell.dismissWelcome()
 	if shell.settings.WelcomeCompleted || shell.panel != nil {
@@ -100,9 +102,7 @@ func TestWelcomeDecideLaterKeepsFirstRunIncomplete(t *testing.T) {
 func TestWelcomeModalAndActionsStayInsideResponsiveViewport(t *testing.T) {
 	for _, size := range [][2]int{{390, 844}, {480, 480}, {720, 540}, {960, 720}} {
 		t.Run(fmt.Sprintf("%dx%d", size[0], size[1]), func(t *testing.T) {
-			temporary := t.TempDir()
-			t.Setenv("APPDATA", temporary)
-			t.Setenv("XDG_CONFIG_HOME", temporary)
+			isolateSettings(t)
 			shell := NewShell(integratedWelcomeBackend{}, nil, "")
 			shell.Layout(size[0], size[1])
 			view := shell.interfaceUI
