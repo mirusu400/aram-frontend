@@ -35,6 +35,7 @@ func RunWithOptions(
 	openOnStart bool,
 ) error {
 	ebiten.SetWindowTitle("ARAM - Archived Runtime for ARM Mobiles")
+	ebiten.SetWindowIcon(appIcons())
 	ebiten.SetWindowSize(logicalWidth, logicalHeight)
 	ebiten.SetWindowSizeLimits(720, 540, -1, -1)
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
