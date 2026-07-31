@@ -1,6 +1,8 @@
 package frontend
 
 import (
+	"context"
+	"errors"
 	"image"
 	"image/color"
 	"net/url"
@@ -10,6 +12,46 @@ import (
 	"testing"
 	"time"
 )
+
+type fakeIssueRelay struct {
+	report     issueRelayReport
+	submitErr  error
+	submission issueRelaySubmission
+	comment    string
+	commentKey string
+	commentURL string
+	commentErr error
+}
+
+func (relay *fakeIssueRelay) Submit(
+	_ context.Context,
+	submission issueRelaySubmission,
+) (issueRelayReport, error) {
+	relay.submission = submission
+	return relay.report, relay.submitErr
+}
+
+func (relay *fakeIssueRelay) AddComment(
+	_ context.Context,
+	_ issueRelayReport,
+	comment string,
+	idempotencyKey string,
+) (string, error) {
+	relay.comment = comment
+	relay.commentKey = idempotencyKey
+	return relay.commentURL, relay.commentErr
+}
+
+func successfulFakeIssueRelay() *fakeIssueRelay {
+	return &fakeIssueRelay{
+		report: issueRelayReport{
+			ReportID:   "11111111-1111-4111-8111-111111111111",
+			IssueURL:   "https://github.com/mirusu400/aram-frontend/issues/42",
+			Capability: "aram_rpt_" + strings.Repeat("A", 43),
+		},
+		commentURL: "https://github.com/mirusu400/aram-frontend/issues/42#issuecomment-7",
+	}
+}
 
 func TestOpenIssueTrackerShowsReportFormWithCurrentTitle(t *testing.T) {
 	shell := &Shell{
@@ -98,7 +140,7 @@ func TestIssueReportDraftRejectsMissingSituationAndUnknownRepository(t *testing.
 	}
 }
 
-func TestPrepareIssueReportCreatesBundleAndOpensDraft(t *testing.T) {
+func TestPrepareIssueReportUploadsBundleAndOpensCreatedIssue(t *testing.T) {
 	config := t.TempDir()
 	t.Setenv("APPDATA", config)
 	t.Setenv("XDG_CONFIG_HOME", config)
@@ -124,6 +166,8 @@ func TestPrepareIssueReportCreatesBundleAndOpensDraft(t *testing.T) {
 	frame := image.NewRGBA(image.Rect(0, 0, 2, 2))
 	frame.Set(0, 0, color.RGBA{R: 0xee, G: 0x11, B: 0x22, A: 0xff})
 	shell := NewShell(NullBackend{}, nil, "")
+	relay := successfulFakeIssueRelay()
+	shell.issueRelay = relay
 	shell.frame = VideoFrame{Image: frame, Sequence: 1}
 	shell.input = &InputInfo{
 		DisplayName: "synthetic.dat",
@@ -144,7 +188,7 @@ func TestPrepareIssueReportCreatesBundleAndOpensDraft(t *testing.T) {
 		t.Fatal("issue report did not complete")
 	}
 
-	if openedURL == "" || openedFolder == "" {
+	if openedURL != relay.report.IssueURL || openedFolder != "" {
 		t.Fatalf("opened URL=%q folder=%q", openedURL, openedFolder)
 	}
 	if shell.panel == nil || shell.panel.Busy {
@@ -158,7 +202,139 @@ func TestPrepareIssueReportCreatesBundleAndOpensDraft(t *testing.T) {
 	if _, ok := entries["screenshot.png"]; !ok {
 		t.Fatal("prepared report bundle has no screenshot")
 	}
+	if relay.submission.BundlePath != bundlePath ||
+		relay.submission.Draft.Repository != "aram-frontend" ||
+		!validIssueUUID(relay.submission.IdempotencyKey) {
+		t.Fatalf("relay submission = %#v", relay.submission)
+	}
+	if shell.panel.FieldValues[issueReportCapabilityField] !=
+		relay.report.Capability {
+		t.Fatalf("completed issue panel = %#v", shell.panel.FieldValues)
+	}
+	shell.executeIssueReportAction(
+		issueReportFolderAction,
+		shell.panel.FieldValues,
+	)
 	if filepath.Clean(openedFolder) != filepath.Clean(filepath.Dir(bundlePath)) {
 		t.Fatalf("opened folder = %q, bundle = %q", openedFolder, bundlePath)
+	}
+}
+
+func TestIssueReportFallsBackToManualDraftWhenRelayFails(t *testing.T) {
+	config := t.TempDir()
+	t.Setenv("APPDATA", config)
+	t.Setenv("XDG_CONFIG_HOME", config)
+	t.Setenv("HOME", config)
+
+	originalURL := openExternalURL
+	originalFolder := openArtifactFolder
+	t.Cleanup(func() {
+		openExternalURL = originalURL
+		openArtifactFolder = originalFolder
+	})
+	var openedURL string
+	var openedFolder string
+	openExternalURL = func(value string) error {
+		openedURL = value
+		return nil
+	}
+	openArtifactFolder = func(value string) error {
+		openedFolder = value
+		return nil
+	}
+
+	frame := image.NewRGBA(image.Rect(0, 0, 1, 1))
+	shell := NewShell(NullBackend{}, nil, "")
+	shell.issueRelay = &fakeIssueRelay{
+		submitErr: errors.New("relay unavailable"),
+	}
+	shell.frame = VideoFrame{Image: frame, Sequence: 1}
+	shell.openIssueTracker()
+	shell.executeIssueReportAction(issueReportPrepareAction, map[string]string{
+		"situation":  "The screen is incorrect.",
+		"game_title": "Synthetic",
+		"repository": "frontend",
+	})
+
+	select {
+	case result := <-shell.issueReportResults:
+		shell.consumeIssueReportResult(result)
+	case <-time.After(2 * time.Second):
+		t.Fatal("issue report did not complete")
+	}
+
+	parsed, err := url.Parse(openedURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsed.Host != "github.com" ||
+		parsed.Path != "/mirusu400/aram-frontend/issues/new" ||
+		openedFolder == "" {
+		t.Fatalf("fallback URL=%q folder=%q", openedURL, openedFolder)
+	}
+	if shell.panel.FieldValues[issueReportDraftURLField] == "" ||
+		!validIssueUUID(
+			shell.panel.FieldValues[issueReportIdempotencyField],
+		) {
+		t.Fatalf("fallback fields = %#v", shell.panel.FieldValues)
+	}
+	if len(shell.panel.Actions) != 3 ||
+		shell.panel.Actions[0].ID != issueReportPrepareAction {
+		t.Fatalf("fallback actions = %#v", shell.panel.Actions)
+	}
+}
+
+func TestCreatedIssueAcceptsFollowUpComment(t *testing.T) {
+	config := t.TempDir()
+	t.Setenv("APPDATA", config)
+	t.Setenv("XDG_CONFIG_HOME", config)
+	t.Setenv("HOME", config)
+
+	originalURL := openExternalURL
+	originalFolder := openArtifactFolder
+	t.Cleanup(func() {
+		openExternalURL = originalURL
+		openArtifactFolder = originalFolder
+	})
+	openExternalURL = func(string) error { return nil }
+	openArtifactFolder = func(string) error { return nil }
+
+	frame := image.NewRGBA(image.Rect(0, 0, 1, 1))
+	shell := NewShell(NullBackend{}, nil, "")
+	relay := successfulFakeIssueRelay()
+	shell.issueRelay = relay
+	shell.frame = VideoFrame{Image: frame, Sequence: 1}
+	shell.openIssueTracker()
+	shell.executeIssueReportAction(issueReportPrepareAction, map[string]string{
+		"situation":  "The screen is incorrect.",
+		"repository": "frontend",
+	})
+	select {
+	case result := <-shell.issueReportResults:
+		shell.consumeIssueReportResult(result)
+	case <-time.After(2 * time.Second):
+		t.Fatal("issue report did not complete")
+	}
+
+	shell.panel.FieldValues[issueReportCommentField] = "It also fails after reset."
+	shell.executeIssueReportAction(
+		issueReportCommentAction,
+		shell.panel.FieldValues,
+	)
+	select {
+	case result := <-shell.issueCommentResults:
+		shell.consumeIssueCommentResult(result)
+	case <-time.After(2 * time.Second):
+		t.Fatal("issue comment did not complete")
+	}
+
+	if relay.comment != "It also fails after reset." ||
+		!validIssueUUID(relay.commentKey) {
+		t.Fatalf("comment=%q key=%q", relay.comment, relay.commentKey)
+	}
+	if shell.panel.Busy ||
+		shell.panel.FieldValues[issueReportCommentField] != "" ||
+		shell.panel.FieldValues[issueCommentIdempotencyField] != "" {
+		t.Fatalf("completed comment panel = %#v", shell.panel)
 	}
 }

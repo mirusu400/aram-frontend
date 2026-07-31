@@ -181,8 +181,17 @@ input bytes, guest memory, save data, and other proprietary media.
 
 `Help > Report Issue` opens an in-application report form for the situation,
 game title, carrier, and expected `aram-frontend`, `aram-emu`, or `aram-core`
-repository. Preparing the report captures the same redacted debug bundle and
-current screenshot, then opens both the artifact folder and a prefilled GitHub
-issue draft for the selected repository. Because GitHub does not expose a
-public API for issue attachment uploads, the final signed-in browser step asks
-the user to review the report, drag in the prepared ZIP, and submit it.
+repository. `Submit Report` explicitly warns that it creates a public GitHub
+issue, captures the same redacted debug bundle and current screenshot when
+available, and streams them to
+`https://aram-report-relay.mirusu400.workers.dev`. The relay creates the
+selected repository issue and returns a report-scoped capability; the frontend
+keeps that capability only in the current panel so the user can add follow-up
+comments without exposing a GitHub credential.
+
+The finished issue opens in the browser. Its Worker-served attachment links
+expire after 30 days. If upload or relay authentication fails, the bundle
+remains local and the frontend opens its folder plus a prefilled GitHub draft
+for manual attachment and submission. Idempotency keys are reused when that
+automatic upload is retried, preventing an uncertain network response from
+creating duplicate issues.

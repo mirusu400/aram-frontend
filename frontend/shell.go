@@ -88,6 +88,7 @@ type Shell struct {
 	frameGeneration           uint64
 	welcomeInstalling         bool
 	updater                   updateDownloader
+	issueRelay                issueRelayService
 	updateProgress            map[updateComponent]updateProgress
 	pickerResults             chan pickerResult
 	backendResults            chan backendResult
@@ -101,6 +102,7 @@ type Shell struct {
 	dropResults               chan dropResult
 	artifactResults           chan artifactResult
 	issueReportResults        chan issueReportResult
+	issueCommentResults       chan issueCommentResult
 	toolResults               chan toolResult
 	updateResults             chan updateResult
 }
@@ -139,6 +141,7 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		touchControls:             make(map[ebiten.TouchID]string),
 		busyCommands:              make(map[BackendCommand]bool),
 		updater:                   newGitHubUpdater(),
+		issueRelay:                newIssueRelayClient(),
 		updateProgress:            make(map[updateComponent]updateProgress),
 		pickerResults:             make(chan pickerResult, 2),
 		backendResults:            make(chan backendResult, 2),
@@ -152,6 +155,7 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		dropResults:               make(chan dropResult, 2),
 		artifactResults:           make(chan artifactResult, 4),
 		issueReportResults:        make(chan issueReportResult, 2),
+		issueCommentResults:       make(chan issueCommentResult, 2),
 		toolResults:               make(chan toolResult, 2),
 		updateResults:             make(chan updateResult, 4),
 	}
@@ -532,6 +536,8 @@ func (s *Shell) consumeResults() {
 			))
 		case result := <-s.issueReportResults:
 			s.consumeIssueReportResult(result)
+		case result := <-s.issueCommentResults:
+			s.consumeIssueCommentResult(result)
 		case result := <-s.toolResults:
 			s.consumeToolResult(result)
 		case result := <-s.updateResults:

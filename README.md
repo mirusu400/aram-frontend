@@ -63,10 +63,15 @@ guest memory, save data, or other proprietary media.
 `Tools > Open Debug Bundle Folder` creates that directory when necessary and
 opens it in Explorer, Finder, or the desktop file manager.
 `Help > Report Issue` collects the situation, game title, carrier, and expected
-ARAM repository in-app. It creates the same redacted debug ZIP with the current
-screenshot, opens its folder, and opens a prefilled GitHub issue draft in the
-signed-in browser. GitHub has no public issue-attachment API, so the user
-reviews the draft and drags the prepared ZIP into it before submitting.
+ARAM repository in-app. Submitting creates the same redacted debug ZIP,
+uploads it and the current screenshot when available through the ARAM Report
+Relay, creates the GitHub issue automatically, and opens the finished issue in
+the browser.
+The completed panel can add capability-authorized follow-up comments without a
+GitHub login. If the relay is unavailable, ARAM preserves the bundle, opens its
+folder, and falls back to a prefilled GitHub draft for manual submission.
+Uploaded attachments are publicly linked from the issue and expire after 30
+days; the selected game and firmware bytes are never included.
 
 Desktop resizing uses the available window as the internal canvas: the guest
 viewport expands while menus, text, centered dialogs, and scrollable settings
