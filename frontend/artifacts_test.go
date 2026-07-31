@@ -33,7 +33,11 @@ func TestOpenDebugBundleFolderCreatesAndOpensArtifactDirectory(t *testing.T) {
 	}
 	shell.openDebugBundleFolder()
 
-	expected := filepath.Join(config, "ARAM", "debug")
+	configRoot, err := os.UserConfigDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := filepath.Join(configRoot, "ARAM", "debug")
 	if filepath.Clean(opened) != filepath.Clean(expected) {
 		t.Fatalf("opened folder = %q, want %q", opened, expected)
 	}
