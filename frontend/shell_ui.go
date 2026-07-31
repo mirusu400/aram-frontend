@@ -34,6 +34,7 @@ type shellUI struct {
 	panelSignature       string
 	panelDropdowns       map[string]*widget.ListComboButton
 	panelCheckboxes      map[string]*widget.Checkbox
+	panelTextInputs      map[string]*imeTextInput
 	settingsSection      string
 	bindingDevice        bindingDevice
 	scrim                *widget.Container
@@ -1220,6 +1221,7 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 	u.panelSignature = signature
 	u.panelDropdowns = make(map[string]*widget.ListComboButton)
 	u.panelCheckboxes = make(map[string]*widget.Checkbox)
+	u.panelTextInputs = make(map[string]*imeTextInput)
 	u.scrim.GetWidget().SetVisibility(widget.Visibility_Show)
 	design := u.design
 	contents := widget.NewContainer(
@@ -1295,35 +1297,20 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 			form.AddChild(fieldBlock)
 			continue
 		}
-		input := widget.NewTextInput(
-			widget.TextInputOpts.WidgetOpts(
-				widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
-				widget.WidgetOpts.MinSize(0, 34),
-			),
-			widget.TextInputOpts.Image(&widget.TextInputImage{
-				Idle:     design.Components.ControlGroup,
-				Disabled: design.Components.ControlGroup,
-			}),
-			widget.TextInputOpts.Color(&widget.TextInputColor{
-				Idle:          design.Palette.Text,
-				Disabled:      design.Palette.TextDisabled,
-				Caret:         design.Palette.Accent,
-				DisabledCaret: design.Palette.TextDisabled,
-			}),
-			widget.TextInputOpts.Padding(&widget.Insets{
-				Left: design.Space.S, Right: design.Space.S,
-			}),
-			widget.TextInputOpts.Face(design.Type.Body),
-			widget.TextInputOpts.Placeholder(shell.tr(field.Placeholder)),
-			widget.TextInputOpts.ChangedHandler(func(args *widget.TextInputChangedEventArgs) {
+		input := newIMETextInput(design, imeTextInputConfig{
+			Placeholder: shell.tr(field.Placeholder),
+			Text:        panel.FieldValues[field.ID],
+			Disabled:    panel.Busy,
+			MinHeight:   34,
+			LayoutData:  widget.RowLayoutData{Stretch: true},
+			Changed: func(value string) {
 				if panel.FieldValues == nil {
 					panel.FieldValues = make(map[string]string)
 				}
-				panel.FieldValues[field.ID] = args.InputText
-			}),
-		)
-		input.SetText(panel.FieldValues[field.ID])
-		input.GetWidget().Disabled = panel.Busy
+				panel.FieldValues[field.ID] = value
+			},
+		})
+		u.panelTextInputs[field.ID] = input
 		fieldBlock.AddChild(input)
 		form.AddChild(fieldBlock)
 	}
@@ -2137,6 +2124,12 @@ func (u *shellUI) closePanel() {
 	u.panelSignature = ""
 	u.panelDropdowns = nil
 	u.panelCheckboxes = nil
+	// Release the text input session so the IME is detached again once the
+	// form is gone.
+	for _, input := range u.panelTextInputs {
+		input.Focus(false)
+	}
+	u.panelTextInputs = nil
 	u.settingsScroll = nil
 	u.recentList = nil
 	u.welcomeStableButton = nil
