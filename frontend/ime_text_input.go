@@ -42,7 +42,6 @@ type imeTextInput struct {
 	caretOffset  int
 	blink        int
 	lastText     string
-	chars        []rune
 
 	tabOrder int
 	focusMap map[widget.FocusDirection]widget.Focuser
@@ -130,16 +129,10 @@ func (t *imeTextInput) Focus(focused bool) {
 	}
 	t.focused = focused
 	t.blink = 0
-	switch {
-	case focused && platformIMEUsesEbitenTextInput:
+	if focused {
 		t.field.Focus()
-	case focused:
-		focusPlatformIME(t.caretBounds())
-	case platformIMEUsesEbitenTextInput:
+	} else {
 		t.field.Blur()
-		t.dragging = false
-	default:
-		blurPlatformIME()
 		t.dragging = false
 	}
 	t.widget.FireFocusEvent(t, focused, image.Point{-1, -1})
@@ -183,7 +176,7 @@ func (t *imeTextInput) SetText(value string) {
 
 func (t *imeTextInput) Update(updObj *widget.UpdateObject) {
 	t.widget.Update(updObj)
-	if platformIMEUsesEbitenTextInput && t.focused && !t.field.IsFocused() {
+	if t.focused && !t.field.IsFocused() {
 		// Another field took the single global text input session.
 		t.focused = false
 		t.dragging = false
@@ -246,9 +239,6 @@ func (t *imeTextInput) updateComposition() bool {
 		currentEnd != end {
 		t.field.SetSelection(start, end)
 	}
-	if !platformIMEUsesEbitenTextInput {
-		return t.updateSystemComposition()
-	}
 	handled, err := t.field.HandleInputWithBounds(t.caretBounds())
 	if err != nil {
 		return false
@@ -259,19 +249,6 @@ func (t *imeTextInput) updateComposition() bool {
 		t.blink = 0
 	}
 	return handled || t.field.UncommittedTextLengthInBytes() > 0
-}
-
-// updateSystemComposition is the path for platforms where the system IME owns
-// composition. Only committed characters arrive, through the regular character
-// queue.
-func (t *imeTextInput) updateSystemComposition() bool {
-	movePlatformIMECaret(t.caretBounds())
-	t.chars = ebiten.AppendInputChars(t.chars[:0])
-	if len(t.chars) == 0 || ebiten.IsKeyPressed(ebiten.KeyControl) {
-		return false
-	}
-	t.replaceSelection(string(t.chars))
-	return true
 }
 
 func (t *imeTextInput) updateCommands() {
