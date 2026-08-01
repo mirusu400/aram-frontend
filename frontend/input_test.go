@@ -9,11 +9,13 @@ import (
 )
 
 type inputRecorder struct {
-	events []InputEvent
-	err    error
+	attempts []InputEvent
+	events   []InputEvent
+	err      error
 }
 
 func (recorder *inputRecorder) QueueInput(event InputEvent) error {
+	recorder.attempts = append(recorder.attempts, event)
 	if recorder.err != nil {
 		return recorder.err
 	}
@@ -69,6 +71,82 @@ func TestFailedInputTransitionIsRetried(t *testing.T) {
 	if len(recorder.events) != 1 || !recorder.events[0].Pressed ||
 		recorder.events[0].Control != "up" {
 		t.Fatalf("retried input events = %#v", recorder.events)
+	}
+}
+
+func TestDirectionalInputReleasesPreviousDirectionBeforePressingNext(t *testing.T) {
+	recorder := &inputRecorder{}
+	shell := &Shell{controlState: make(map[string]bool)}
+
+	shell.queueInputTransitions(recorder, map[string]bool{"left": true})
+	shell.queueInputTransitions(recorder, map[string]bool{
+		"left": true,
+		"down": true,
+	})
+
+	want := []InputEvent{
+		{Control: "left", Pressed: true},
+		{Control: "left", Pressed: false},
+		{Control: "down", Pressed: true},
+	}
+	if len(recorder.events) != len(want) {
+		t.Fatalf("directional input events = %#v, want %#v", recorder.events, want)
+	}
+	for index := range want {
+		if recorder.events[index] != want[index] {
+			t.Fatalf("directional input event %d = %#v, want %#v", index, recorder.events[index], want[index])
+		}
+	}
+	if shell.controlState["left"] || !shell.controlState["down"] {
+		t.Fatalf("delivered directional state = %#v, want only down", shell.controlState)
+	}
+
+	shell.queueInputTransitions(recorder, map[string]bool{
+		"left": true,
+		"down": true,
+	})
+	if len(recorder.events) != len(want) {
+		t.Fatalf("held directions emitted another transition: %#v", recorder.events)
+	}
+}
+
+func TestDirectionalInputWaitsForFailedRelease(t *testing.T) {
+	recorder := &inputRecorder{}
+	shell := &Shell{controlState: make(map[string]bool)}
+	shell.queueInputTransitions(recorder, map[string]bool{"left": true})
+
+	recorder.err = errors.New("queue busy")
+	shell.queueInputTransitions(recorder, map[string]bool{
+		"left": true,
+		"down": true,
+	})
+	if len(recorder.attempts) != 2 || recorder.attempts[1] != (InputEvent{
+		Control: "left",
+		Pressed: false,
+	}) {
+		t.Fatalf("failed direction switch attempts = %#v, want only left release", recorder.attempts)
+	}
+	if !shell.controlState["left"] || shell.controlState["down"] {
+		t.Fatalf("state after failed release = %#v, want only left", shell.controlState)
+	}
+
+	recorder.err = nil
+	shell.queueInputTransitions(recorder, map[string]bool{
+		"left": true,
+		"down": true,
+	})
+	want := []InputEvent{
+		{Control: "left", Pressed: true},
+		{Control: "left", Pressed: false},
+		{Control: "down", Pressed: true},
+	}
+	if len(recorder.events) != len(want) {
+		t.Fatalf("retried direction switch events = %#v, want %#v", recorder.events, want)
+	}
+	for index := range want {
+		if recorder.events[index] != want[index] {
+			t.Fatalf("retried direction event %d = %#v, want %#v", index, recorder.events[index], want[index])
+		}
 	}
 }
 

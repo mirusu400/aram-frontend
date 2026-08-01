@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -53,6 +54,8 @@ var controllerControlOrder = []string{
 	"up", "down", "left", "right",
 	"ok", "back", "soft-left", "soft-right", "menu", "star", "hash",
 }
+
+var directionControlOrder = []string{"up", "down", "left", "right"}
 
 var keyboardControlOrder = append(
 	append([]string(nil), controllerControlOrder...),
@@ -460,6 +463,11 @@ func (s *Shell) handleMappedInput() {
 }
 
 func (s *Shell) queueInputTransitions(backend InputBackend, next map[string]bool) {
+	next = s.atomicDirectionalState(next)
+	if s.controlState == nil {
+		s.controlState = make(map[string]bool)
+	}
+
 	allControls := make(map[string]bool, len(next)+len(s.controlState))
 	for control := range next {
 		allControls[control] = true
@@ -467,32 +475,92 @@ func (s *Shell) queueInputTransitions(backend InputBackend, next map[string]bool
 	for control := range s.controlState {
 		allControls[control] = true
 	}
+	controls := make([]string, 0, len(allControls))
 	for control := range allControls {
-		pressed := next[control]
-		if s.controlState[control] == pressed {
-			continue
-		}
-		if err := backend.QueueInput(InputEvent{
-			Control: control,
-			Pressed: pressed,
-			// Host input is sampled independently from the emulated clock. A
-			// zero timestamp asks the backend to anchor the transition at its
-			// current guest time instead of scheduling it in the future.
-			At: 0,
-		}); err != nil {
-			s.setStatus(s.trf(
-				"Input %s: %s",
-				s.tr(controlDisplayName(control)),
-				err.Error(),
-			))
-			continue
-		}
-		if pressed {
-			s.controlState[control] = true
-		} else {
-			delete(s.controlState, control)
+		controls = append(controls, control)
+	}
+	sort.Strings(controls)
+
+	// Deliver releases first so changing direction can never leave the old
+	// and new direction pressed together in the backend, even momentarily.
+	for _, pressed := range []bool{false, true} {
+		for _, control := range controls {
+			if next[control] != pressed || s.controlState[control] == pressed {
+				continue
+			}
+			if pressed && isDirectionControl(control) && s.hasPressedDirection() {
+				// A failed release is retried on the next update. Do not press its
+				// replacement until the backend has accepted that release.
+				continue
+			}
+			if err := backend.QueueInput(InputEvent{
+				Control: control,
+				Pressed: pressed,
+				// Host input is sampled independently from the emulated clock. A
+				// zero timestamp asks the backend to anchor the transition at its
+				// current guest time instead of scheduling it in the future.
+				At: 0,
+			}); err != nil {
+				s.setStatus(s.trf(
+					"Input %s: %s",
+					s.tr(controlDisplayName(control)),
+					err.Error(),
+				))
+				continue
+			}
+			if pressed {
+				s.controlState[control] = true
+			} else {
+				delete(s.controlState, control)
+			}
 		}
 	}
+}
+
+func (s *Shell) atomicDirectionalState(next map[string]bool) map[string]bool {
+	result := make(map[string]bool, len(next))
+	for control, pressed := range next {
+		if !isDirectionControl(control) {
+			result[control] = pressed
+		}
+	}
+
+	held := make(map[string]bool, len(s.directionPressOrder))
+	order := make([]string, 0, len(directionControlOrder))
+	for _, control := range s.directionPressOrder {
+		if next[control] {
+			order = append(order, control)
+			held[control] = true
+		}
+	}
+	for _, control := range directionControlOrder {
+		if next[control] && !held[control] {
+			order = append(order, control)
+		}
+	}
+	s.directionPressOrder = order
+	if len(order) != 0 {
+		result[order[len(order)-1]] = true
+	}
+	return result
+}
+
+func isDirectionControl(control string) bool {
+	for _, direction := range directionControlOrder {
+		if control == direction {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Shell) hasPressedDirection() bool {
+	for _, control := range directionControlOrder {
+		if s.controlState[control] {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Shell) collectTouchState(state map[string]bool) {

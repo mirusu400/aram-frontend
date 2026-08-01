@@ -80,6 +80,7 @@ type Shell struct {
 	frameImage                *ebiten.Image
 	audioOutput               *audioOutput
 	controlState              map[string]bool
+	directionPressOrder       []string
 	bindingCapture            *bindingCapture
 	gamepadMappingsLoaded     bool
 	touchControls             map[ebiten.TouchID]string
