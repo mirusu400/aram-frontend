@@ -1912,8 +1912,8 @@ func (u *shellUI) settingsRows(shell *Shell) []*widget.Container {
 			},
 			{
 				label:       "Emulation speed",
-				description: "Default guest execution speed.",
-				value:       fmt.Sprintf("%gx", shell.settings.Speed),
+				description: "Guest execution speed relative to the original handset.",
+				value:       shell.speedSettingValue(),
 				action:      shell.cycleSpeed,
 			},
 			{

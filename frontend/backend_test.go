@@ -387,6 +387,11 @@ func TestShellContinuouslySchedulesOneRunningFrameAtATime(t *testing.T) {
 	}
 	shell := NewShell(backend, nil, "")
 	shell.input = &InputInfo{DisplayName: "synthetic.dat"}
+	// Pacing is driven from the clock, so the test advances it by a whole
+	// quantum whenever it expects another frame to be issued.
+	clock := time.Now()
+	shell.nowFunc = func() time.Time { return clock }
+	advance := func() { clock = clock.Add(shell.frameQuantum()) }
 
 	shell.scheduleRunningFrame()
 	waitSignal(t, backend.started, "first frame")
@@ -400,6 +405,7 @@ func TestShellContinuouslySchedulesOneRunningFrameAtATime(t *testing.T) {
 
 	backend.release <- struct{}{}
 	waitFrameCompletion(t, shell)
+	advance()
 	shell.scheduleRunningFrame()
 	waitSignal(t, backend.started, "second frame")
 	backend.mu.Lock()
@@ -414,6 +420,7 @@ func TestShellContinuouslySchedulesOneRunningFrameAtATime(t *testing.T) {
 	backend.mu.Lock()
 	backend.state = StatePaused
 	backend.mu.Unlock()
+	advance()
 	shell.scheduleRunningFrame()
 	backend.mu.Lock()
 	calls = backend.calls

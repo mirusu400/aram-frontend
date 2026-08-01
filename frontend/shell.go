@@ -86,6 +86,12 @@ type Shell struct {
 	busyCommands              map[BackendCommand]bool
 	frameRunPending           bool
 	frameGeneration           uint64
+	frameAccumulator          time.Duration
+	lastFramePacingAt         time.Time
+	pacingQuantaIssued        int
+	pacingSampleStartedAt     time.Time
+	measuredSpeed             float64
+	nowFunc                   func() time.Time
 	welcomeInstalling         bool
 	updater                   updateDownloader
 	issueRelay                issueRelayService
@@ -884,33 +890,6 @@ func (s *Shell) updateVideo() {
 	}
 	s.frame = frame
 	s.frameImage = ebiten.NewImageFromImage(frame.Image)
-}
-
-func (s *Shell) scheduleRunningFrame() {
-	if !s.hostActive ||
-		s.hostPaused ||
-		s.loading ||
-		s.dialogOpen ||
-		s.problem != nil ||
-		s.input == nil ||
-		s.frameRunPending ||
-		len(s.busyCommands) != 0 ||
-		s.backend.State() != StateRunning {
-		return
-	}
-	backend, ok := s.backend.(FrameBackend)
-	if !ok {
-		return
-	}
-	generation := s.frameGeneration
-	s.frameRunPending = true
-	go func() {
-		err := backend.RunFrame(context.Background())
-		s.frameRunResults <- frameRunResult{
-			generation: generation,
-			err:        err,
-		}
-	}()
 }
 
 func (s *Shell) handleDroppedFiles() {
