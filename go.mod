@@ -28,9 +28,9 @@ require (
 	golang.org/x/text v0.29.0 // indirect
 )
 
-// Ebitengine's exp/textinput indexes the GCS_COMPATTR and GCS_COMPCLAUSE
-// buffers without checking their length. Hangul IMEs report both as empty, so
-// composing the first syllable panics inside the window procedure. The fork
-// only adds the missing length guards; drop this replace once the fix lands
-// upstream. Branch: mirusu400/ebiten aram-ime-fix.
-replace github.com/hajimehoshi/ebiten/v2 => github.com/mirusu400/ebiten/v2 v2.9.10-0.20260731124307-b6f31d44c846
+// Ebitengine's exp/textinput mishandles several Windows Hangul IME edge cases:
+// empty composition metadata can panic, the end-of-composition message does
+// not clear preedit text, and a character arriving between sessions is lost.
+// Drop this replace once an upstream release contains all fixes. Branch:
+// mirusu400/ebiten aram-ime-fix.
+replace github.com/hajimehoshi/ebiten/v2 => github.com/mirusu400/ebiten/v2 v2.9.10-0.20260801111254-3858a8d6e077

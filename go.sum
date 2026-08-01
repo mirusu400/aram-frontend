@@ -29,8 +29,8 @@ github.com/josephspurrier/goversioninfo v1.4.1 h1:5LvrkP+n0tg91J9yTkoVnt/QgNnrI1
 github.com/josephspurrier/goversioninfo v1.4.1/go.mod h1:JWzv5rKQr+MmW+LvM412ToT/IkYDZjaclF2pKDss8IY=
 github.com/matryer/is v1.4.1 h1:55ehd8zaGABKLXQUe2awZ99BD/PTc2ls+KV/dXphgEQ=
 github.com/matryer/is v1.4.1/go.mod h1:8I/i5uYgLzgsgEloJE1U6xx5HkBQpAZvepWuujKwMRU=
-github.com/mirusu400/ebiten/v2 v2.9.10-0.20260731124307-b6f31d44c846 h1:LpNqSwCTPmmG7hxMXpBsHp6dzBxgrhdvJbgNm1DN5lM=
-github.com/mirusu400/ebiten/v2 v2.9.10-0.20260731124307-b6f31d44c846/go.mod h1:DAt4tnkYYpCvu3x9i1X/nK/vOruNXIlYq/tBXxnhrXM=
+github.com/mirusu400/ebiten/v2 v2.9.10-0.20260801111254-3858a8d6e077 h1:74Qh2BpRPIsDboRkL1K8yi/lyaCg0YnN0DQRWWzQZRw=
+github.com/mirusu400/ebiten/v2 v2.9.10-0.20260801111254-3858a8d6e077/go.mod h1:DAt4tnkYYpCvu3x9i1X/nK/vOruNXIlYq/tBXxnhrXM=
 github.com/ncruces/zenity v0.10.14 h1:OBFl7qfXcvsdo1NUEGxTlZvAakgWMqz9nG38TuiaGLI=
 github.com/ncruces/zenity v0.10.14/go.mod h1:ZBW7uVe/Di3IcRYH0Br8X59pi+O6EPnNIOU66YHpOO4=
 github.com/pierrec/lz4/v4 v4.1.22 h1:cKFw6uJDK+/gfw5BcDL0JL5aBsAFdsIT18eRtLj7VIU=
