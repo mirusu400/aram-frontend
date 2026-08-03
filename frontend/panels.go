@@ -10,14 +10,22 @@ import (
 )
 
 type Panel struct {
-	Kind        string
-	Tool        ToolKind
-	Title       string
-	Lines       []string
-	Fields      []ToolField
-	Actions     []ToolAction
-	FieldValues map[string]string
-	Busy        bool
+	Kind            string
+	Tool            ToolKind
+	Title           string
+	Lines           []string
+	Fields          []ToolField
+	Actions         []ToolAction
+	FieldValues     map[string]string
+	Busy            bool
+	AllowGuestInput bool
+}
+
+// guestInputAllowed reports whether host controls still reach the guest. Any
+// open panel captures input unless it opted out, so a cheat can be toggled
+// without the game losing the keypress that advances it.
+func (s *Shell) guestInputAllowed() bool {
+	return s.panel == nil || s.panel.AllowGuestInput
 }
 
 type toolResult struct {
@@ -81,6 +89,7 @@ func (s *Shell) consumeToolResult(result toolResult) {
 	s.panel.Lines = append([]string(nil), result.snapshot.Lines...)
 	s.panel.Fields = append([]ToolField(nil), result.snapshot.Fields...)
 	s.panel.Actions = append([]ToolAction(nil), result.snapshot.Actions...)
+	s.panel.AllowGuestInput = result.snapshot.AllowGuestInput
 	s.panel.FieldValues = make(map[string]string, len(result.snapshot.Fields))
 	for _, field := range result.snapshot.Fields {
 		s.panel.FieldValues[field.ID] = field.Value

@@ -31,7 +31,8 @@ func (backend *cheatToolBackend) snapshot() ToolSnapshot {
 			Checkbox: true,
 			Action:   "toggle",
 		}},
-		Actions: []ToolAction{{ID: "refresh", Label: "Update", Enabled: true}},
+		Actions:         []ToolAction{{ID: "refresh", Label: "Update", Enabled: true}},
+		AllowGuestInput: true,
 	}
 }
 
@@ -106,6 +107,27 @@ func issueDraftBody(t *testing.T, input InputInfo) string {
 		t.Fatal(err)
 	}
 	return decoded
+}
+
+// A cheat is toggled while playing, so the panel must not swallow the keypress
+// that advances the game. Panels with text entry still capture input.
+func TestCheatPanelLetsHostInputReachTheGuest(t *testing.T) {
+	backend := &cheatToolBackend{requests: make(chan ToolRequest, 1)}
+	shell := NewShell(backend, nil, "")
+	if !shell.guestInputAllowed() {
+		t.Fatal("guest input is blocked with no panel open")
+	}
+
+	shell.openToolPanel(ToolCheats)
+	shell.consumeToolResult(waitToolResult(t, shell.toolResults))
+	if !shell.panel.AllowGuestInput || !shell.guestInputAllowed() {
+		t.Fatalf("cheat panel blocks guest input: %#v", shell.panel)
+	}
+
+	shell.panel = &Panel{Kind: "tool", Tool: ToolMemory, Title: "Memory Search"}
+	if shell.guestInputAllowed() {
+		t.Fatal("a panel that did not opt in still passes guest input")
+	}
 }
 
 func TestIssueDiagnosticsCarryTheImageIdentity(t *testing.T) {

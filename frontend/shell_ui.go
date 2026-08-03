@@ -1149,7 +1149,13 @@ func newToolFieldCheckbox(
 	if checked {
 		initialState = widget.WidgetChecked
 	}
-	return widget.NewCheckbox(
+	options := []widget.CheckboxOpt{}
+	if panel.AllowGuestInput {
+		// The same keys reach the guest while this panel is open, so a focused
+		// control must not also answer to them.
+		options = append(options, widget.CheckboxOpts.DisableDefaultKeys())
+	}
+	return widget.NewCheckbox(append(options,
 		widget.CheckboxOpts.Image(design.Components.Checkbox),
 		widget.CheckboxOpts.InitialState(initialState),
 		widget.CheckboxOpts.Spacing(design.Space.S),
@@ -1179,7 +1185,7 @@ func newToolFieldCheckbox(
 				}
 			},
 		),
-	)
+	)...)
 }
 
 func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {

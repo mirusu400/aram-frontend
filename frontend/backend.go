@@ -161,6 +161,10 @@ type ToolSnapshot struct {
 	Lines   []string
 	Fields  []ToolField
 	Actions []ToolAction
+	// AllowGuestInput keeps host input reaching the guest while this panel is
+	// open. A panel meant to be used mid-play, such as cheats, sets it; one
+	// with text entry must not, or typing would drive the game as well.
+	AllowGuestInput bool
 }
 
 type ToolField struct {

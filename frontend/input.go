@@ -440,7 +440,7 @@ func (s *Shell) handleMappedInput() {
 	}
 
 	next := make(map[string]bool)
-	if s.panel == nil && s.activeMenu < 0 {
+	if s.guestInputAllowed() && s.activeMenu < 0 {
 		profile := s.controllerProfile()
 		modifierPressed := ebiten.IsKeyPressed(ebiten.KeyControl) ||
 			ebiten.IsKeyPressed(ebiten.KeyControlLeft) ||

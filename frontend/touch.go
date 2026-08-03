@@ -85,7 +85,7 @@ func (s *Shell) handleTouch() {
 	}
 	for _, id := range inpututil.AppendJustPressedTouchIDs(nil) {
 		x, y := ebiten.TouchPosition(id)
-		if s.panel == nil && s.activeMenu < 0 {
+		if s.guestInputAllowed() && s.activeMenu < 0 {
 			if control, ok := s.touchControlAt(x, y); ok {
 				s.touchControls[id] = control
 				continue
