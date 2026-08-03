@@ -1131,6 +1131,7 @@ func newToolFieldDropdown(
 
 func newToolFieldCheckbox(
 	design *ARAMDesignSystem,
+	shell *Shell,
 	panel *Panel,
 	field ToolField,
 	translateLabel func(string) string,
@@ -1173,6 +1174,9 @@ func newToolFieldCheckbox(
 					"%t",
 					args.State == widget.WidgetChecked,
 				)
+				if field.Action != "" {
+					shell.executeToolAction(field.Action, panel.FieldValues)
+				}
 			},
 		),
 	)
@@ -1189,14 +1193,23 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 		fmt.Sprintf("busy=%t", panel.Busy),
 	)
 	for _, field := range panel.Fields {
+		// A self-applying control reports its state through Value, so the
+		// signature has to notice when the backend answers with a new one.
+		state := ""
+		if field.Action != "" {
+			state = field.Value
+		}
 		signatureParts = append(
 			signatureParts,
 			fmt.Sprintf(
-				"field:%s:%s:%s:checkbox=%t",
+				"field:%s:%s:%s:%s:checkbox=%t:action=%s:state=%s",
 				field.ID,
 				field.Label,
 				field.Placeholder,
+				field.Detail,
 				field.Checkbox,
+				field.Action,
+				state,
 			),
 		)
 		for _, option := range field.Options {
@@ -1273,6 +1286,7 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 		if field.Checkbox {
 			checkbox := newToolFieldCheckbox(
 				design,
+				shell,
 				panel,
 				field,
 				shell.tr,
@@ -1280,6 +1294,14 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 			checkbox.GetWidget().Disabled = panel.Busy
 			u.panelCheckboxes[field.ID] = checkbox
 			fieldBlock.AddChild(checkbox)
+			if field.Detail != "" {
+				fieldBlock.AddChild(design.text(
+					shell.tr(field.Detail),
+					design.Type.Caption,
+					design.Palette.TextMuted,
+					widget.RowLayoutData{Stretch: true},
+				))
+			}
 			form.AddChild(fieldBlock)
 			continue
 		}

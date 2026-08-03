@@ -851,6 +851,15 @@ func buildIssueDraftURL(
 			shorten(input.ProfileID, 100),
 			shorten(input.SHA256, 64),
 		)
+		if input.ImageSHA256 != "" {
+			// Cheat catalogs are keyed on the image, so a report that asks for
+			// one has to carry the identity that answers.
+			fmt.Fprintf(
+				&body,
+				"- Image SHA-256: `%s`\n",
+				shorten(input.ImageSHA256, 64),
+			)
+		}
 	}
 	fmt.Fprintf(
 		&body,

@@ -36,6 +36,10 @@ type InputInfo struct {
 	Format      string
 	Size        int64
 	SHA256      string
+	// ImageSHA256 identifies the loaded executable image rather than the file
+	// that delivered it, so it survives re-archiving. Backends that cannot
+	// describe an image leave it empty.
+	ImageSHA256 string
 	ProfileID   string
 }
 
@@ -164,8 +168,13 @@ type ToolField struct {
 	Label       string
 	Value       string
 	Placeholder string
+	Detail      string
 	Options     []ToolFieldOption
 	Checkbox    bool
+	// Action makes a control self-applying: changing it runs that tool action
+	// with the panel's current field values instead of waiting for a button.
+	// A list of toggles needs it, since a per-row button would be noise.
+	Action string
 }
 
 type ToolFieldOption struct {
