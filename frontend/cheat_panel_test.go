@@ -58,6 +58,7 @@ func (backend *cheatToolBackend) ExecuteToolAction(
 }
 
 func TestCheatTogglesApplyThroughTheBackendBoundary(t *testing.T) {
+	isolateSettledSettings(t)
 	backend := &cheatToolBackend{requests: make(chan ToolRequest, 1)}
 	shell := NewShell(backend, nil, "")
 	shell.openToolPanel(ToolCheats)
@@ -112,6 +113,7 @@ func issueDraftBody(t *testing.T, input InputInfo) string {
 // A cheat is toggled while playing, so the panel must not swallow the keypress
 // that advances the game. Panels with text entry still capture input.
 func TestCheatPanelLetsHostInputReachTheGuest(t *testing.T) {
+	isolateSettledSettings(t)
 	backend := &cheatToolBackend{requests: make(chan ToolRequest, 1)}
 	shell := NewShell(backend, nil, "")
 	if !shell.guestInputAllowed() {

@@ -41,6 +41,20 @@ func isolateSettings(t *testing.T) {
 	t.Setenv("HOME", temporary)
 }
 
+// isolateSettledSettings isolates the settings directory and records Welcome as
+// finished, which is the state of every launch after the first. A Shell built
+// without it opens the Welcome panel, so a test that expects no panel passes
+// only on a machine that already has ARAM settings and fails on a clean one.
+func isolateSettledSettings(t *testing.T) {
+	t.Helper()
+	isolateSettings(t)
+	settings := defaultSettings()
+	settings.WelcomeCompleted = true
+	if err := settings.save(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestShellBuildsEbitenUIDesignSystem(t *testing.T) {
 	shell := NewShell(NullBackend{}, nil, "")
 	if shell.design == nil {
