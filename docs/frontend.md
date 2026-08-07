@@ -146,6 +146,13 @@ desktop product host extracts first-run updates into a content-addressed
 runtime directory and relaunches it; manual developer-tool and standalone
 frontend downloads never replace the running executable.
 
+An installed product archive is deleted once the host has extracted it, along
+with the repository, channel, and version folders the download created, so a
+product the app installs itself does not also accumulate a copy of every build
+under `Downloads`. A folder still holding another download is left alone, and an
+archive a failed install left behind stays so it can be installed by hand.
+Developer-tool and standalone frontend downloads are never deleted.
+
 ## Audio
 
 Mute, volume, requested latency, and output device are configured from the

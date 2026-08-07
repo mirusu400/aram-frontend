@@ -371,3 +371,107 @@ func TestSettingsNormalizeUpdateChannel(t *testing.T) {
 		t.Fatalf("nightly update channel = %q", settings.UpdateChannel)
 	}
 }
+
+func TestInstalledProductArchiveIsRemovedWithItsDownloadFolders(t *testing.T) {
+	isolateSettings(t)
+	root := t.TempDir()
+	directory := filepath.Join(root, "aram-emu", "nightly", "Nightly-760f53f")
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	archive := filepath.Join(directory, "aram-windows-amd64.zip")
+	if err := os.WriteFile(archive, []byte("product archive"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	backend := &installingWelcomeBackend{
+		updates: make(chan ProductUpdate, 1),
+	}
+	shell := NewShell(backend, nil, "")
+
+	shell.installProductUpdate(updateDownload{
+		Component: updateComponentProduct,
+		Channel:   updateChannelNightly,
+		Version:   "Nightly 760f53f",
+		Path:      archive,
+	}, false)
+
+	select {
+	case installed := <-backend.updates:
+		if installed.ArchivePath != archive {
+			t.Fatalf("installed product = %#v", installed)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("product update was not installed")
+	}
+	if _, err := os.Stat(archive); !os.IsNotExist(err) {
+		t.Fatalf("the installed archive was kept: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "aram-emu")); !os.IsNotExist(err) {
+		t.Fatal("the emptied download folders were kept")
+	}
+	if _, err := os.Stat(root); err != nil {
+		t.Fatalf("deletion climbed past the download root: %v", err)
+	}
+	if progress := shell.updateProgress[updateComponentProduct]; progress.Path != "" {
+		t.Fatalf("progress still offers the deleted archive: %#v", progress)
+	}
+}
+
+func TestDownloadFolderSharedWithAnotherUpdateSurvives(t *testing.T) {
+	isolateSettings(t)
+	root := t.TempDir()
+	directory := filepath.Join(root, "aram-emu", "nightly", "Nightly-760f53f")
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	archive := filepath.Join(directory, "aram-windows-amd64.zip")
+	if err := os.WriteFile(archive, []byte("product archive"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	neighbour := filepath.Join(directory, "aram-linux-amd64.tar.gz")
+	if err := os.WriteFile(neighbour, []byte("other asset"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	removeInstalledArchive(archive)
+
+	if _, err := os.Stat(archive); !os.IsNotExist(err) {
+		t.Fatalf("the installed archive was kept: %v", err)
+	}
+	if _, err := os.Stat(neighbour); err != nil {
+		t.Fatalf("deletion took a folder holding another download: %v", err)
+	}
+}
+
+func TestFailedProductInstallKeepsTheDownloadedArchive(t *testing.T) {
+	isolateSettings(t)
+	directory := t.TempDir()
+	archive := filepath.Join(directory, "aram-windows-amd64.zip")
+	if err := os.WriteFile(archive, []byte("product archive"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	backend := &installingWelcomeBackend{
+		updates: make(chan ProductUpdate, 1),
+		err:     errors.New("runtime is busy"),
+	}
+	shell := NewShell(backend, nil, "")
+
+	shell.installProductUpdate(updateDownload{
+		Component: updateComponentProduct,
+		Channel:   updateChannelNightly,
+		Version:   "Nightly 760f53f",
+		Path:      archive,
+	}, false)
+
+	select {
+	case <-backend.updates:
+	case <-time.After(time.Second):
+		t.Fatal("product update was not attempted")
+	}
+	if _, err := os.Stat(archive); err != nil {
+		t.Fatalf("a failed install discarded the archive: %v", err)
+	}
+	if shell.quitting {
+		t.Fatal("a failed install requested a restart")
+	}
+}

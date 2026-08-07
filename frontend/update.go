@@ -673,9 +673,11 @@ func (s *Shell) installProductUpdate(
 		return
 	}
 
+	removeInstalledArchive(download.Path)
+
 	progress.Busy = false
 	progress.Message = s.tr("Installed; restarting ARAM...")
-	progress.Path = download.Path
+	progress.Path = ""
 	progress.Version = download.Version
 	s.updateProgress[updateComponentProduct] = progress
 	if firstRun {
@@ -684,6 +686,30 @@ func (s *Shell) installProductUpdate(
 	}
 	s.quitting = true
 	s.setStatus(s.tr("Installed; restarting ARAM..."))
+}
+
+// removeInstalledArchive deletes a product archive the installer has already
+// extracted into its own runtime directory, along with the empty folders the
+// download left around it. Keeping it would cost a copy of the product on disk
+// for every update, and the next download of the same version would be saved
+// beside it rather than replacing it. An archive left by a failed install stays
+// put so it can still be installed by hand.
+func removeInstalledArchive(path string) {
+	if path == "" {
+		return
+	}
+	if err := os.Remove(path); err != nil {
+		return
+	}
+	// Only the repository, channel, and version folders belong to this
+	// download. os.Remove refuses a folder that still holds another download.
+	directory := filepath.Dir(path)
+	for depth := 0; depth < 3; depth++ {
+		if err := os.Remove(directory); err != nil {
+			return
+		}
+		directory = filepath.Dir(directory)
+	}
 }
 
 func (s *Shell) failProductInstall(err error, firstRun bool) {
