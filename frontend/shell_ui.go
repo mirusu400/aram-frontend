@@ -2233,7 +2233,7 @@ func (u *shellUI) buildSettingsRow(model settingsRowModel) *widget.Container {
 				widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 					HorizontalPosition: widget.AnchorLayoutPositionEnd,
 					VerticalPosition:   widget.AnchorLayoutPositionCenter,
-					Padding:            &widget.Insets{Right: design.Space.S},
+					Padding:            &widget.Insets{Right: design.Space.XS},
 				}),
 			),
 			widget.ListComboButtonOpts.ButtonParams(&widget.ButtonParams{
@@ -2250,7 +2250,7 @@ func (u *shellUI) buildSettingsRow(model settingsRowModel) *widget.Container {
 					Left: design.Space.S, Right: design.Space.S,
 				},
 				TextPosition: &widget.TextPositioning{
-					HTextPosition: widget.TextPositionCenter,
+					HTextPosition: widget.TextPositionEnd,
 					VTextPosition: widget.TextPositionCenter,
 				},
 				MinSize: &image.Point{Y: 32},
@@ -2315,13 +2315,14 @@ func (u *shellUI) buildSettingsRow(model settingsRowModel) *widget.Container {
 	if model.slider != nil {
 		sliderModel := model.slider
 		current := clampInt(sliderModel.value(), sliderModel.min, sliderModel.max)
-		valueLabel := design.text(
-			sliderModel.format(current),
-			design.Type.Strong,
-			design.Palette.Text,
-			widget.RowLayoutData{Position: widget.RowLayoutPositionCenter},
+		valueLabel := widget.NewText(
+			widget.TextOpts.Text(sliderModel.format(current), design.Type.Strong, design.Palette.Text),
+			widget.TextOpts.Position(widget.TextPositionEnd, widget.TextPositionCenter),
+			widget.TextOpts.WidgetOpts(
+				widget.WidgetOpts.LayoutData(widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}),
+				widget.WidgetOpts.MinSize(sliderValueWidth, 0),
+			),
 		)
-		valueLabel.GetWidget().MinWidth = sliderValueWidth
 		slider := widget.NewSlider(
 			widget.SliderOpts.Direction(widget.DirectionHorizontal),
 			widget.SliderOpts.MinMax(sliderModel.min, sliderModel.max),
@@ -2385,17 +2386,19 @@ func (u *shellUI) buildSettingsRow(model settingsRowModel) *widget.Container {
 		design.Type.Strong,
 		actionWidth,
 		32,
-		widget.TextPositionCenter,
+		widget.TextPositionEnd,
 		func() {
 			action()
 			u.panelSignature = ""
 		},
 	)
 	valueButton.GetWidget().Disabled = model.disabled
+	// Right inset of XS plus the button's own text padding lines the label up
+	// with the Space.M edge used by the static value rows.
 	valueButton.GetWidget().LayoutData = widget.AnchorLayoutData{
 		HorizontalPosition: widget.AnchorLayoutPositionEnd,
 		VerticalPosition:   widget.AnchorLayoutPositionCenter,
-		Padding:            &widget.Insets{Right: design.Space.S},
+		Padding:            &widget.Insets{Right: design.Space.XS},
 	}
 	row.AddChild(valueButton)
 	return row
