@@ -294,10 +294,13 @@ func (u *shellUI) sync(shell *Shell) {
 	}
 	statusLimit := max(24, min(92, (width-32)/7))
 	u.statusText.Label = shorten(shell.status, statusLimit)
+	// Show the achieved speed (e.g. "1x (98%)") rather than only the requested
+	// setting, so a title running below handset speed is visible in the
+	// always-on status bar without opening settings, which pauses the guest.
 	u.statusMeta.Label = fmt.Sprintf(
-		"%s  •  %gx  •  %s",
+		"%s  •  %s  •  %s",
 		strings.ToUpper(shell.tr(stateValueLabel(string(shell.backend.State())))),
-		shell.settings.Speed,
+		shell.speedSettingValue(),
 		strings.ToUpper(shell.tr(settingValueLabel(shell.settings.Filter))),
 	)
 	if shell.input == nil {
