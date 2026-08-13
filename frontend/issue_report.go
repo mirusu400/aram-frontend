@@ -595,6 +595,7 @@ func (s *Shell) consumeIssueReportFallback(result issueReportResult) {
 		s.consumeIssueReportResult(result)
 		return
 	}
+	s.appendLog(s.tr("Issue report: ") + result.relayErr.Error())
 	openErr := openExternalURL(draftURL)
 	folderErr := openArtifactFolder(filepath.Dir(result.path))
 
