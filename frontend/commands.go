@@ -98,6 +98,12 @@ func defaultMenus() []Menu {
 			Label: "View",
 			Commands: []Command{
 				{ID: "view.fullscreen", Label: "Toggle Fullscreen", Shortcut: "F11", Action: (*Shell).toggleFullscreen},
+				{
+					ID:      "view.focus",
+					Label:   "Focus Mode",
+					Enabled: func(*Shell) bool { return platformUsesTouchLayout() },
+					Action:  (*Shell).toggleFocusMode,
+				},
 				{ID: "view.integer", Label: "Integer Scaling", Action: (*Shell).toggleIntegerScaling},
 				{ID: "view.aspect", Label: "Preserve Aspect Ratio", Action: (*Shell).toggleAspectRatio},
 				{ID: "view.fit", Label: "Fit Window", Shortcut: "Ctrl+0", Action: (*Shell).fitWindow},

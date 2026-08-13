@@ -85,6 +85,19 @@ func (s *Shell) handleTouch() {
 	}
 	for _, id := range inpututil.AppendJustPressedTouchIDs(nil) {
 		x, y := ebiten.TouchPosition(id)
+		if s.focusMode {
+			width, height := s.viewportSize()
+			if pointInRect(x, y, focusExitBoundsFor(width, height)) {
+				s.toggleFocusMode()
+				continue
+			}
+			if s.guestInputAllowed() {
+				if control, ok := focusControlAtSize(x, y, width, height); ok {
+					s.touchControls[id] = control
+				}
+			}
+			continue
+		}
 		if s.guestInputAllowed() && s.activeMenu < 0 {
 			if control, ok := s.touchControlAt(x, y); ok {
 				s.touchControls[id] = control

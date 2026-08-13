@@ -61,6 +61,7 @@ type Shell struct {
 	state                     FrontendState
 	problem                   *FrontendProblem
 	activeMenu                int
+	focusMode                 bool
 	status                    string
 	input                     *InputInfo
 	selectedPath              string
@@ -244,7 +245,9 @@ func (s *Shell) Update() error {
 	}
 	s.handleTouch()
 	s.syncDesignSystem()
-	if s.interfaceUI != nil {
+	if s.focusModeActive() {
+		// The chrome is hidden, so the interface UI must not consume input.
+	} else if s.interfaceUI != nil {
 		s.interfaceUI.sync(s)
 		s.interfaceUI.ui.Update()
 	} else {
@@ -269,6 +272,10 @@ func (s *Shell) Draw(screen *ebiten.Image) {
 		palette = s.design.Palette
 	}
 	screen.Fill(palette.Canvas)
+	if s.focusModeActive() {
+		s.drawFocusMode(screen)
+		return
+	}
 	s.drawWorkspace(screen)
 	s.drawTouchControls(screen)
 	s.drawVirtualKeypad(screen)
