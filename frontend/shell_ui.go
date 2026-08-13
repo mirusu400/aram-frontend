@@ -1619,17 +1619,23 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 	for _, row := range u.settingsRows(shell) {
 		rowsContent.AddChild(row)
 	}
-	rowsScroll := widget.NewScrollContainer(
+	var rowsScroll *widget.ScrollContainer
+	rowsScroll = widget.NewScrollContainer(
 		widget.ScrollContainerOpts.Content(rowsContent),
 		widget.ScrollContainerOpts.StretchContentWidth(),
 		widget.ScrollContainerOpts.Image(design.Components.Scroll),
-		widget.ScrollContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-			HorizontalPosition: widget.AnchorLayoutPositionStart,
-			VerticalPosition:   widget.AnchorLayoutPositionStart,
-			StretchHorizontal:  true,
-			StretchVertical:    true,
-			Padding:            &widget.Insets{Top: 62},
-		})),
+		widget.ScrollContainerOpts.WidgetOpts(
+			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+				HorizontalPosition: widget.AnchorLayoutPositionStart,
+				VerticalPosition:   widget.AnchorLayoutPositionStart,
+				StretchHorizontal:  true,
+				StretchVertical:    true,
+				Padding:            &widget.Insets{Top: 62},
+			}),
+			widget.WidgetOpts.ScrolledHandler(func(args *widget.WidgetScrolledEventArgs) {
+				scrollContainerByWheel(rowsScroll, args.Y)
+			}),
+		),
 	)
 	rowsScroll.ScrollTop = u.settingsOffsets[u.settingsSection]
 	u.settingsScroll = rowsScroll
@@ -1706,6 +1712,23 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 	)
 	u.panelWindow = settingsWindow
 	u.ui.AddWindow(settingsWindow)
+}
+
+// scrollContainerByWheel moves sc by wheelY notches, one notch covering a
+// fixed pixel step regardless of how tall the scrolled content is.
+func scrollContainerByWheel(sc *widget.ScrollContainer, wheelY float64) {
+	overflow := float64(sc.ContentRect().Dy() - sc.ViewRect().Dy())
+	if overflow <= 0 {
+		return
+	}
+	const wheelScrollStep = 48
+	top := sc.ScrollTop - wheelY*wheelScrollStep/overflow
+	if top < 0 {
+		top = 0
+	} else if top > 1 {
+		top = 1
+	}
+	sc.ScrollTop = top
 }
 
 func settingsSectionDescription(section string) string {

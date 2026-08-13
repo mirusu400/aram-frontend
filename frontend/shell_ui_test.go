@@ -678,3 +678,32 @@ func TestSubmittedReportHistoryRendersScrollableDropdownAtCompactSize(
 		)
 	}
 }
+
+func TestScrollContainerByWheel(t *testing.T) {
+	content := widget.NewContainer()
+	sc := widget.NewScrollContainer(widget.ScrollContainerOpts.Content(content))
+	sc.SetLocation(image.Rect(0, 0, 400, 200))
+	content.GetWidget().Rect = image.Rect(0, 0, 400, 680)
+
+	scrollContainerByWheel(sc, -1)
+	if diff := sc.ScrollTop - 0.1; diff < -1e-9 || diff > 1e-9 {
+		t.Fatalf("ScrollTop after one notch down = %v, want 0.1", sc.ScrollTop)
+	}
+
+	scrollContainerByWheel(sc, 100)
+	if sc.ScrollTop != 0 {
+		t.Fatalf("ScrollTop after large scroll up = %v, want clamped to 0", sc.ScrollTop)
+	}
+
+	scrollContainerByWheel(sc, -100)
+	if sc.ScrollTop != 1 {
+		t.Fatalf("ScrollTop after large scroll down = %v, want clamped to 1", sc.ScrollTop)
+	}
+
+	content.GetWidget().Rect = image.Rect(0, 0, 400, 100)
+	sc.ScrollTop = 0.5
+	scrollContainerByWheel(sc, -1)
+	if sc.ScrollTop != 0.5 {
+		t.Fatalf("ScrollTop with short content = %v, want unchanged 0.5", sc.ScrollTop)
+	}
+}
