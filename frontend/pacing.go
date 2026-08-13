@@ -63,11 +63,23 @@ func (s *Shell) now() time.Time {
 
 // resetFramePacing drops banked time. It runs whenever the guest is not
 // executing so a pause does not become a burst of catch-up on resume.
+//
+// The last measured speed is deliberately kept. This runs on every idle tick,
+// including while the settings panel is open - which is exactly where the
+// achieved-speed readout is shown. Zeroing it here blanked the value the
+// moment the user opened settings to read it, so a title running below handset
+// speed looked identical to one running at full speed.
 func (s *Shell) resetFramePacing() {
 	s.frameAccumulator = 0
 	s.lastFramePacingAt = time.Time{}
 	s.pacingQuantaIssued = 0
 	s.pacingSampleStartedAt = time.Time{}
+}
+
+// clearMeasuredSpeed forgets the achieved-speed readout. It runs when the
+// sample no longer applies - a different title is loaded or the machine is
+// fully unloaded - rather than on every transient pause.
+func (s *Shell) clearMeasuredSpeed() {
 	s.measuredSpeed = 0
 }
 

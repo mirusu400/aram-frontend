@@ -790,6 +790,7 @@ func (s *Shell) releaseCurrentInput() error {
 	s.hostPaused = false
 	s.frameGeneration++
 	s.frameRunPending = false
+	s.clearMeasuredSpeed()
 	s.frame = VideoFrame{}
 	s.frameImage = nil
 	s.state = FrontendEmpty

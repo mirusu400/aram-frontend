@@ -187,3 +187,30 @@ func TestMeasuredSpeedReportsTheAchievedRatio(t *testing.T) {
 		t.Fatalf("measured speed = %g, want about 1", speed)
 	}
 }
+
+// TestMeasuredSpeedSurvivesPacingReset keeps the achieved-speed readout legible
+// while the guest is paused. The settings panel - the only place the readout is
+// shown - pauses the guest, so resetFramePacing must not blank the last sample.
+func TestMeasuredSpeedSurvivesPacingReset(t *testing.T) {
+	const quantum = ktfQuantum
+	shell, advance := newPacingShell(quantum)
+	for elapsed := time.Duration(0); elapsed < 2*framePacingSampleWindow; elapsed += quantum {
+		advance(quantum)
+		shell.accumulateFramePacing(shell.now(), quantum)
+		if owed := shell.takeFrameQuanta(quantum); owed > 0 {
+			shell.recordPacingSample(shell.now(), owed, quantum)
+		}
+	}
+	measured := shell.MeasuredSpeed()
+	if measured <= 0 {
+		t.Fatalf("no speed sampled before reset: %g", measured)
+	}
+	shell.resetFramePacing()
+	if got := shell.MeasuredSpeed(); got != measured {
+		t.Fatalf("reset changed the readout to %g, want %g preserved", got, measured)
+	}
+	shell.clearMeasuredSpeed()
+	if got := shell.MeasuredSpeed(); got != 0 {
+		t.Fatalf("clear left readout at %g, want 0", got)
+	}
+}
