@@ -231,18 +231,38 @@ func (s *Shell) toggleMuted() {
 }
 
 func (s *Shell) cycleVolume() {
-	s.settings.Volume += 5
-	if s.settings.Volume > 100 {
-		s.settings.Volume = 0
+	volume := s.settings.Volume + 5
+	if volume > 100 {
+		volume = 0
 	}
+	s.setVolume(volume)
+}
+
+func (s *Shell) setVolume(volume int) {
+	if volume < 0 {
+		volume = 0
+	} else if volume > 100 {
+		volume = 100
+	}
+	s.settings.Volume = volume
 	s.applyAudioSettings()
 }
 
 func (s *Shell) cycleAudioLatency() {
-	s.settings.AudioLatencyMS += 10
-	if s.settings.AudioLatencyMS > 250 {
-		s.settings.AudioLatencyMS = 20
+	latency := s.settings.AudioLatencyMS + 10
+	if latency > 250 {
+		latency = 20
 	}
+	s.setAudioLatency(latency)
+}
+
+func (s *Shell) setAudioLatency(latencyMS int) {
+	if latencyMS < 20 {
+		latencyMS = 20
+	} else if latencyMS > 250 {
+		latencyMS = 250
+	}
+	s.settings.AudioLatencyMS = latencyMS
 	s.applyAudioSettings()
 }
 

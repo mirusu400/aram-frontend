@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"path/filepath"
 	"strings"
 	"time"
@@ -970,23 +971,42 @@ func (s *Shell) cycleFilter() {
 }
 
 func (s *Shell) cycleStateSlot() {
-	s.settings.StateSlot = (s.settings.StateSlot + 1) % 10
+	s.setStateSlot((s.settings.StateSlot + 1) % 10)
+}
+
+func (s *Shell) setStateSlot(slot int) {
+	if slot < 0 {
+		slot = 0
+	} else if slot > 9 {
+		slot = 9
+	}
+	s.settings.StateSlot = slot
 	_ = s.settings.save()
 	s.setStatus(s.trf("State slot: %d", s.settings.StateSlot))
 }
 
-func (s *Shell) cycleSpeed() {
-	speeds := []float64{0.5, 1, 2, 4}
-	for index, speed := range speeds {
-		if s.settings.Speed == speed {
-			s.settings.Speed = speeds[(index+1)%len(speeds)]
-			_ = s.settings.save()
-			s.setStatus(s.trf("Emulation speed: %gx", s.settings.Speed))
-			return
+var speedPresets = []float64{0.5, 1, 2, 4}
+
+// speedPresetIndex returns the preset closest to speed, so values saved by
+// older builds still land on a valid slider position.
+func speedPresetIndex(speed float64) int {
+	best := 0
+	for index, preset := range speedPresets {
+		if math.Abs(preset-speed) < math.Abs(speedPresets[best]-speed) {
+			best = index
 		}
 	}
-	s.settings.Speed = 1
+	return best
+}
+
+func (s *Shell) cycleSpeed() {
+	s.setSpeed(speedPresets[(speedPresetIndex(s.settings.Speed)+1)%len(speedPresets)])
+}
+
+func (s *Shell) setSpeed(speed float64) {
+	s.settings.Speed = speed
 	_ = s.settings.save()
+	s.setStatus(s.trf("Emulation speed: %gx", s.settings.Speed))
 }
 
 func (s *Shell) showAbout() {

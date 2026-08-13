@@ -88,6 +88,8 @@ type ARAMComponents struct {
 	ControlGroup  *euiimage.NineSlice
 	Scrim         *euiimage.NineSlice
 	Scroll        *widget.ScrollContainerImage
+	SliderTrack   *widget.SliderTrackImage
+	SliderHandle  *widget.ButtonImage
 	Checkbox      *widget.CheckboxImage
 	MenuButton    ARAMButtonStyle
 	CommandButton ARAMButtonStyle
@@ -167,6 +169,18 @@ func newARAMDesignSystem(mode string) *ARAMDesignSystem {
 			Idle: euiimage.NewNineSliceColor(color.NRGBA{}),
 			Mask: euiimage.NewNineSliceColor(color.White),
 		},
+		SliderTrack: &widget.SliderTrackImage{
+			Idle:     roundedNineSlice(palette.CanvasRaised, palette.Border, radius.Pill, 1),
+			Hover:    roundedNineSlice(palette.CanvasRaised, palette.BorderStrong, radius.Pill, 1),
+			Disabled: roundedNineSlice(palette.CanvasRaised, palette.Border, radius.Pill, 1),
+		},
+		SliderHandle: buttonImages(
+			roundedNineSlice(palette.SurfaceRaised, palette.BorderStrong, radius.Small, 1),
+			roundedNineSlice(palette.SurfaceHover, palette.Accent, radius.Small, 1),
+			roundedNineSlice(palette.AccentSoft, palette.Accent, radius.Small, 1),
+			roundedNineSlice(palette.AccentSoft, palette.Accent, radius.Small, 1),
+			roundedNineSlice(palette.SurfaceRaised, palette.Border, radius.Small, 1),
+		),
 		Checkbox: checkboxImages(palette),
 		MenuButton: ARAMButtonStyle{
 			Image:     buttonImages(menuIdle, menuHover, menuPressed, menuPressed, commandDisabled),

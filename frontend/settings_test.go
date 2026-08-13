@@ -179,3 +179,66 @@ func TestShortenPreservesKoreanRunes(t *testing.T) {
 		t.Fatalf("shorten Korean = %q", got)
 	}
 }
+
+func TestSliderSettingSettersClamp(t *testing.T) {
+	temporary := t.TempDir()
+	t.Setenv("APPDATA", temporary)
+	t.Setenv("XDG_CONFIG_HOME", temporary)
+	shell := &Shell{settings: defaultSettings()}
+
+	shell.setVolume(140)
+	if shell.settings.Volume != 100 {
+		t.Fatalf("setVolume(140) = %d, want clamped to 100", shell.settings.Volume)
+	}
+	shell.setVolume(-10)
+	if shell.settings.Volume != 0 {
+		t.Fatalf("setVolume(-10) = %d, want clamped to 0", shell.settings.Volume)
+	}
+	shell.setAudioLatency(5)
+	if shell.settings.AudioLatencyMS != 20 {
+		t.Fatalf("setAudioLatency(5) = %d, want clamped to 20", shell.settings.AudioLatencyMS)
+	}
+	shell.setAudioLatency(999)
+	if shell.settings.AudioLatencyMS != 250 {
+		t.Fatalf("setAudioLatency(999) = %d, want clamped to 250", shell.settings.AudioLatencyMS)
+	}
+	shell.setStateSlot(42)
+	if shell.settings.StateSlot != 9 {
+		t.Fatalf("setStateSlot(42) = %d, want clamped to 9", shell.settings.StateSlot)
+	}
+	shell.setStateSlot(-3)
+	if shell.settings.StateSlot != 0 {
+		t.Fatalf("setStateSlot(-3) = %d, want clamped to 0", shell.settings.StateSlot)
+	}
+}
+
+func TestSpeedPresetIndexPicksClosest(t *testing.T) {
+	cases := []struct {
+		speed float64
+		index int
+	}{
+		{0.5, 0}, {1, 1}, {2, 2}, {4, 3},
+		{0, 0}, {1.4, 1}, {3.9, 3}, {100, 3},
+	}
+	for _, c := range cases {
+		if got := speedPresetIndex(c.speed); got != c.index {
+			t.Fatalf("speedPresetIndex(%g) = %d, want %d", c.speed, got, c.index)
+		}
+	}
+}
+
+func TestCycleSpeedAdvancesThroughPresets(t *testing.T) {
+	temporary := t.TempDir()
+	t.Setenv("APPDATA", temporary)
+	t.Setenv("XDG_CONFIG_HOME", temporary)
+	shell := &Shell{settings: defaultSettings()}
+	shell.settings.Speed = 1
+
+	expected := []float64{2, 4, 0.5, 1}
+	for _, want := range expected {
+		shell.cycleSpeed()
+		if shell.settings.Speed != want {
+			t.Fatalf("cycleSpeed advanced to %g, want %g", shell.settings.Speed, want)
+		}
+	}
+}

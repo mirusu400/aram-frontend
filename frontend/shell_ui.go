@@ -43,6 +43,8 @@ type shellUI struct {
 	viewportHeight       int
 	compact              bool
 	settingsScroll       *widget.ScrollContainer
+	settingsSliders      []settingsSliderBinding
+	settingsDropdowns    []settingsDropdownBinding
 	settingsOffsets      map[string]float64
 	recentList           *widget.List
 	welcomeStableButton  *widget.Button
@@ -1466,8 +1468,11 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 		u.settingsSection = "General"
 	}
 	profile := shell.controllerProfile()
+	// Slider-backed values (speed, state slot, volume, latency) are absent on
+	// purpose: rebuilding the panel on every slider tick would destroy the
+	// handle mid-drag. refreshSettingsSliders keeps their widgets in sync.
 	signature := fmt.Sprintf(
-		"settings|%s|%dx%d|%s|%s|%t|%t|%d|%s|%s|%d|%g|%t|%d|%d|%s|%s|%s|%s|%s|%s|%t|%s|%s|%s|%s",
+		"settings|%s|%dx%d|%s|%s|%t|%t|%d|%s|%s|%t|%s|%s|%s|%s|%s|%s|%t|%s|%s|%s|%s",
 		shell.settings.Language,
 		u.viewportWidth,
 		u.viewportHeight,
@@ -1478,11 +1483,7 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 		shell.settings.Rotation,
 		shell.settings.ScreenLayout,
 		shell.settings.Filter,
-		shell.settings.StateSlot,
-		shell.settings.Speed,
 		shell.settings.Muted,
-		shell.settings.Volume,
-		shell.settings.AudioLatencyMS,
 		shell.settings.AudioDeviceID,
 		controllerProfileSignature(profile),
 		shell.controllerProfileScopeLabel(),
@@ -1496,6 +1497,7 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 		shell.updateProgressSignature(),
 	)
 	if signature == u.panelSignature && u.panelWindow != nil {
+		u.refreshSettingsSliders()
 		return
 	}
 
@@ -1714,6 +1716,37 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 	u.ui.AddWindow(settingsWindow)
 }
 
+// refreshSettingsSliders re-syncs slider and dropdown rows from the live
+// settings, covering changes made outside the panel (menu commands,
+// shortcuts) without rebuilding the panel widgets.
+func (u *shellUI) refreshSettingsSliders() {
+	for _, binding := range u.settingsSliders {
+		value := clampInt(binding.model.value(), binding.model.min, binding.model.max)
+		if binding.slider.Current != value {
+			binding.slider.Current = value
+		}
+		if label := binding.model.format(value); binding.label.Label != label {
+			binding.label.Label = label
+		}
+	}
+	for _, binding := range u.settingsDropdowns {
+		value := clampInt(binding.model.value(), 0, binding.model.count-1)
+		if selected, ok := binding.dropdown.SelectedEntry().(int); !ok || selected != value {
+			binding.dropdown.SetSelectedEntry(value)
+		}
+	}
+}
+
+func clampInt(value, low, high int) int {
+	if value < low {
+		return low
+	}
+	if value > high {
+		return high
+	}
+	return value
+}
+
 // scrollContainerByWheel moves sc by wheelY notches, one notch covering a
 // fixed pixel step regardless of how tall the scrolled content is.
 func scrollContainerByWheel(sc *widget.ScrollContainer, wheelY float64) {
@@ -1756,6 +1789,39 @@ type settingsRowModel struct {
 	value       string
 	action      func()
 	disabled    bool
+	slider      *settingsSliderModel
+	dropdown    *settingsDropdownModel
+}
+
+// settingsSliderModel drives a slider-backed settings row. Slider positions
+// run min..max in whole steps; value/format/apply translate between the
+// position and the underlying setting.
+type settingsSliderModel struct {
+	min    int
+	max    int
+	value  func() int
+	format func(int) string
+	apply  func(int)
+}
+
+type settingsSliderBinding struct {
+	slider *widget.Slider
+	label  *widget.Text
+	model  *settingsSliderModel
+}
+
+// settingsDropdownModel drives a dropdown-backed settings row with entries
+// indexed 0..count-1.
+type settingsDropdownModel struct {
+	count int
+	label func(int) string
+	value func() int
+	apply func(int)
+}
+
+type settingsDropdownBinding struct {
+	dropdown *widget.ListComboButton
+	model    *settingsDropdownModel
 }
 
 func (u *shellUI) settingsRows(shell *Shell) []*widget.Container {
@@ -1819,15 +1885,25 @@ func (u *shellUI) settingsRows(shell *Shell) []*widget.Container {
 			},
 			{
 				label:       "Volume",
-				description: "Click to advance in five-percent steps.",
-				value:       fmt.Sprintf("%d%%", shell.settings.Volume),
-				action:      shell.cycleVolume,
+				description: "Output volume in five-percent steps.",
+				slider: &settingsSliderModel{
+					min:    0,
+					max:    20,
+					value:  func() int { return (shell.settings.Volume + 2) / 5 },
+					format: func(v int) string { return fmt.Sprintf("%d%%", v*5) },
+					apply:  func(v int) { shell.setVolume(v * 5) },
+				},
 			},
 			{
 				label:       "Requested latency",
-				description: "Click to advance in ten-millisecond steps.",
-				value:       fmt.Sprintf("%d ms", shell.settings.AudioLatencyMS),
-				action:      shell.cycleAudioLatency,
+				description: "Audio buffer target in ten-millisecond steps.",
+				slider: &settingsSliderModel{
+					min:    2,
+					max:    25,
+					value:  func() int { return (shell.settings.AudioLatencyMS + 5) / 10 },
+					format: func(v int) string { return fmt.Sprintf("%d ms", v*10) },
+					apply:  func(v int) { shell.setAudioLatency(v * 10) },
+				},
 			},
 			{
 				label:       "Output device",
@@ -1984,14 +2060,27 @@ func (u *shellUI) settingsRows(shell *Shell) []*widget.Container {
 			{
 				label:       "Emulation speed",
 				description: "Guest execution speed relative to the original handset.",
-				value:       shell.speedSettingValue(),
-				action:      shell.cycleSpeed,
+				slider: &settingsSliderModel{
+					min:   0,
+					max:   len(speedPresets) - 1,
+					value: func() int { return speedPresetIndex(shell.settings.Speed) },
+					format: func(v int) string {
+						return fmt.Sprintf("%gx", speedPresets[clampInt(v, 0, len(speedPresets)-1)])
+					},
+					apply: func(v int) {
+						shell.setSpeed(speedPresets[clampInt(v, 0, len(speedPresets)-1)])
+					},
+				},
 			},
 			{
 				label:       "Save-state slot",
 				description: "Slot used by load and save state commands.",
-				value:       shell.trf("Slot %d", shell.settings.StateSlot),
-				action:      shell.cycleStateSlot,
+				dropdown: &settingsDropdownModel{
+					count: 10,
+					label: func(v int) string { return shell.trf("Slot %d", v) },
+					value: func() int { return shell.settings.StateSlot },
+					apply: shell.setStateSlot,
+				},
 			},
 			{
 				label:       "Backend",
@@ -2068,8 +2157,14 @@ func updateSettingsRowModels(shell *Shell) []settingsRowModel {
 func (u *shellUI) buildSettingsRow(model settingsRowModel) *widget.Container {
 	design := u.design
 	actionWidth := 126
+	sliderWidth := 150
 	if u.viewportWidth < 600 {
 		actionWidth = 92
+		sliderWidth = 110
+	}
+	const sliderValueWidth = 56
+	if model.slider != nil {
+		actionWidth = sliderWidth + design.Space.S + sliderValueWidth
 	}
 	row := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(design.Components.ControlGroup),
@@ -2115,6 +2210,159 @@ func (u *shellUI) buildSettingsRow(model settingsRowModel) *widget.Container {
 		)
 	}
 	row.AddChild(copyBlock)
+
+	if model.dropdown != nil {
+		dropdownModel := model.dropdown
+		entries := make([]any, dropdownModel.count)
+		for index := range entries {
+			entries[index] = index
+		}
+		initial := clampInt(dropdownModel.value(), 0, dropdownModel.count-1)
+		entryLabel := func(entry any) string {
+			index, _ := entry.(int)
+			return dropdownModel.label(index)
+		}
+		trackIdle := euiimage.NewNineSliceColor(design.Palette.Border)
+		trackHover := euiimage.NewNineSliceColor(design.Palette.BorderStrong)
+		dropdown := widget.NewListComboButton(
+			widget.ListComboButtonOpts.Entries(entries),
+			widget.ListComboButtonOpts.InitialEntry(initial),
+			widget.ListComboButtonOpts.MaxContentHeight(148),
+			widget.ListComboButtonOpts.WidgetOpts(
+				widget.WidgetOpts.MinSize(actionWidth, 32),
+				widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+					HorizontalPosition: widget.AnchorLayoutPositionEnd,
+					VerticalPosition:   widget.AnchorLayoutPositionCenter,
+					Padding:            &widget.Insets{Right: design.Space.S},
+				}),
+			),
+			widget.ListComboButtonOpts.ButtonParams(&widget.ButtonParams{
+				Image: buttonImages(
+					design.Components.ControlGroup,
+					design.Components.Dropdown,
+					design.Components.Dropdown,
+					design.Components.Dropdown,
+					design.Components.ControlGroup,
+				),
+				TextColor: design.Components.CommandButton.Text,
+				TextFace:  design.Type.Strong,
+				TextPadding: &widget.Insets{
+					Left: design.Space.S, Right: design.Space.S,
+				},
+				TextPosition: &widget.TextPositioning{
+					HTextPosition: widget.TextPositionCenter,
+					VTextPosition: widget.TextPositionCenter,
+				},
+				MinSize: &image.Point{Y: 32},
+			}),
+			widget.ListComboButtonOpts.ListParams(&widget.ListParams{
+				ScrollContainerImage: &widget.ScrollContainerImage{
+					Idle:     design.Components.Dropdown,
+					Disabled: design.Components.Dropdown,
+					Mask:     design.Components.Scroll.Mask,
+				},
+				Slider: &widget.SliderParams{
+					TrackImage: &widget.SliderTrackImage{
+						Idle:     trackIdle,
+						Hover:    trackHover,
+						Disabled: trackIdle,
+					},
+					HandleImage:   design.Components.TouchButton.Image,
+					MinHandleSize: intPointer(24),
+					TrackPadding:  &widget.Insets{Left: 3, Right: 3},
+				},
+				EntryFace: design.Type.Body,
+				EntryColor: &widget.ListEntryColor{
+					Unselected:                 design.Palette.Text,
+					Selected:                   design.Palette.Text,
+					DisabledUnselected:         design.Palette.TextDisabled,
+					DisabledSelected:           design.Palette.TextDisabled,
+					SelectingBackground:        design.Palette.SurfaceHover,
+					SelectedBackground:         design.Palette.AccentSoft,
+					FocusedBackground:          design.Palette.SurfaceHover,
+					SelectingFocusedBackground: design.Palette.AccentSoft,
+					SelectedFocusedBackground:  design.Palette.AccentSoft,
+					DisabledSelectedBackground: design.Palette.Surface,
+				},
+				EntryTextPadding: &widget.Insets{
+					Left:   design.Space.S,
+					Top:    design.Space.XS,
+					Right:  design.Space.S,
+					Bottom: design.Space.XS,
+				},
+				MinSize: &image.Point{X: actionWidth},
+			}),
+			widget.ListComboButtonOpts.EntryLabelFunc(entryLabel, entryLabel),
+			widget.ListComboButtonOpts.EntrySelectedHandler(
+				func(args *widget.ListComboButtonEntrySelectedEventArgs) {
+					index, ok := args.Entry.(int)
+					if !ok {
+						return
+					}
+					dropdownModel.apply(index)
+				},
+			),
+		)
+		dropdown.GetWidget().Disabled = model.disabled
+		row.AddChild(dropdown)
+		u.settingsDropdowns = append(u.settingsDropdowns, settingsDropdownBinding{
+			dropdown: dropdown,
+			model:    dropdownModel,
+		})
+		return row
+	}
+
+	if model.slider != nil {
+		sliderModel := model.slider
+		current := clampInt(sliderModel.value(), sliderModel.min, sliderModel.max)
+		valueLabel := design.text(
+			sliderModel.format(current),
+			design.Type.Strong,
+			design.Palette.Text,
+			widget.RowLayoutData{Position: widget.RowLayoutPositionCenter},
+		)
+		valueLabel.GetWidget().MinWidth = sliderValueWidth
+		slider := widget.NewSlider(
+			widget.SliderOpts.Direction(widget.DirectionHorizontal),
+			widget.SliderOpts.MinMax(sliderModel.min, sliderModel.max),
+			widget.SliderOpts.InitialCurrent(current),
+			widget.SliderOpts.Images(design.Components.SliderTrack, design.Components.SliderHandle),
+			widget.SliderOpts.FixedHandleSize(14),
+			widget.SliderOpts.PageSizeFunc(func() int { return 1 }),
+			widget.SliderOpts.ChangedHandler(func(args *widget.SliderChangedEventArgs) {
+				sliderModel.apply(args.Current)
+				applied := clampInt(sliderModel.value(), sliderModel.min, sliderModel.max)
+				if applied != args.Slider.Current {
+					args.Slider.Current = applied
+				}
+				valueLabel.Label = sliderModel.format(applied)
+			}),
+			widget.SliderOpts.WidgetOpts(
+				widget.WidgetOpts.MinSize(sliderWidth, 22),
+				widget.WidgetOpts.LayoutData(widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}),
+			),
+		)
+		slider.GetWidget().Disabled = model.disabled
+		sliderGroup := widget.NewContainer(
+			widget.ContainerOpts.Layout(widget.NewRowLayout(
+				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+				widget.RowLayoutOpts.Spacing(design.Space.S),
+			)),
+			widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+				HorizontalPosition: widget.AnchorLayoutPositionEnd,
+				VerticalPosition:   widget.AnchorLayoutPositionCenter,
+				Padding:            &widget.Insets{Right: design.Space.M},
+			})),
+		)
+		sliderGroup.AddChild(slider, valueLabel)
+		row.AddChild(sliderGroup)
+		u.settingsSliders = append(u.settingsSliders, settingsSliderBinding{
+			slider: slider,
+			label:  valueLabel,
+			model:  sliderModel,
+		})
+		return row
+	}
 
 	if model.action == nil {
 		row.AddChild(design.text(
@@ -2195,6 +2443,8 @@ func (u *shellUI) closePanel() {
 	u.panelSignature = ""
 	u.panelDropdowns = nil
 	u.panelCheckboxes = nil
+	u.settingsSliders = nil
+	u.settingsDropdowns = nil
 	// Release the text input session so the IME is detached again once the
 	// form is gone.
 	for _, input := range u.panelTextInputs {
