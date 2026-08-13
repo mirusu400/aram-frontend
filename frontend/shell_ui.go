@@ -28,6 +28,7 @@ type shellUI struct {
 	commandButtons       map[string]*widget.Button
 	toolbarButtons       map[string]*widget.Button
 	toolbarTitle         *widget.Text
+	buildStampText       *widget.Text
 	statusText           *widget.Text
 	statusMeta           *widget.Text
 	panelWindow          *widget.Window
@@ -131,6 +132,19 @@ func (u *shellUI) buildTopBar(shell *Shell) *widget.Container {
 		menuRow.AddChild(button)
 	}
 	bar.AddChild(menuRow)
+	if stamp := currentNightlyBuildStamp(); stamp != "" && !platformUsesTouchLayout() {
+		u.buildStampText = design.text(
+			shell.trf("Nightly build %s", stamp),
+			design.Type.Caption,
+			design.Palette.TextMuted,
+			widget.AnchorLayoutData{
+				HorizontalPosition: widget.AnchorLayoutPositionEnd,
+				VerticalPosition:   widget.AnchorLayoutPositionCenter,
+				Padding:            &widget.Insets{Right: design.Space.M},
+			},
+		)
+		bar.AddChild(u.buildStampText)
+	}
 	return bar
 }
 
@@ -264,6 +278,9 @@ func (u *shellUI) sync(shell *Shell) {
 		u.closeMenu()
 	}
 	u.toolbarTitle.GetWidget().SetVisibility(visibility(width >= 760))
+	if u.buildStampText != nil {
+		u.buildStampText.GetWidget().SetVisibility(visibility(width >= 700))
+	}
 	u.statusMeta.GetWidget().SetVisibility(visibility(width >= 700))
 	for id, button := range u.toolbarButtons {
 		visible := true

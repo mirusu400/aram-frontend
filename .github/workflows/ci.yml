@@ -58,6 +58,7 @@ jobs:
             build_version="Development-${GITHUB_SHA::7}"
           fi
           echo "ARAM_BUILD_VERSION=${build_version}" >> "${GITHUB_ENV}"
+          echo "ARAM_BUILD_TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "${GITHUB_ENV}"
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
@@ -79,7 +80,7 @@ jobs:
         run: |
           mkdir -p build/package dist
           go build -trimpath \
-            -ldflags="-s -w -X=github.com/mirusu400/aram-frontend/frontend.BuildVersion=${ARAM_BUILD_VERSION}" \
+            -ldflags="-s -w -X=github.com/mirusu400/aram-frontend/frontend.BuildVersion=${ARAM_BUILD_VERSION} -X=github.com/mirusu400/aram-frontend/frontend.BuildTimestamp=${ARAM_BUILD_TIMESTAMP}" \
             -o "build/package/${{ matrix.executable }}" \
             ./cmd/aram-frontend
           cp README.md build/package/
@@ -126,6 +127,7 @@ jobs:
             build_version="Development-${GITHUB_SHA::7}"
           fi
           echo "ARAM_BUILD_VERSION=${build_version}" >> "${GITHUB_ENV}"
+          echo "ARAM_BUILD_TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "${GITHUB_ENV}"
       - name: Install Ebitengine mobile binder
         run: go install github.com/hajimehoshi/ebiten/v2/cmd/ebitenmobile@v2.9.9
       - name: Build Android AAR
@@ -133,7 +135,7 @@ jobs:
           mkdir -p build
           ebitenmobile bind \
             -target android \
-            -ldflags="-s -w -X=github.com/mirusu400/aram-frontend/frontend.BuildVersion=${ARAM_BUILD_VERSION}" \
+            -ldflags="-s -w -X=github.com/mirusu400/aram-frontend/frontend.BuildVersion=${ARAM_BUILD_VERSION} -X=github.com/mirusu400/aram-frontend/frontend.BuildTimestamp=${ARAM_BUILD_TIMESTAMP}" \
             -javapkg io.github.mirusu400.aram \
             -o build/aram.aar \
             ./mobile
@@ -157,6 +159,7 @@ jobs:
             build_version="Development-${GITHUB_SHA::7}"
           fi
           echo "ARAM_BUILD_VERSION=${build_version}" >> "${GITHUB_ENV}"
+          echo "ARAM_BUILD_TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "${GITHUB_ENV}"
       - name: Install Ebitengine mobile binder
         run: go install github.com/hajimehoshi/ebiten/v2/cmd/ebitenmobile@v2.9.9
       - name: Build iOS XCFramework
@@ -164,7 +167,7 @@ jobs:
           mkdir -p build
           ebitenmobile bind \
             -target ios \
-            -ldflags="-s -w -X=github.com/mirusu400/aram-frontend/frontend.BuildVersion=${ARAM_BUILD_VERSION}" \
+            -ldflags="-s -w -X=github.com/mirusu400/aram-frontend/frontend.BuildVersion=${ARAM_BUILD_VERSION} -X=github.com/mirusu400/aram-frontend/frontend.BuildTimestamp=${ARAM_BUILD_TIMESTAMP}" \
             -o build/ARAM.xcframework \
             ./mobile
   publish-nightly:
