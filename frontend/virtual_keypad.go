@@ -108,25 +108,6 @@ func virtualKeypadControlAtSize(x, y, width, height int) (string, bool) {
 	return "", false
 }
 
-func (s *Shell) collectVirtualKeypadState(state map[string]bool) {
-	if !s.virtualKeypadVisible() {
-		return
-	}
-	width, height := s.viewportSize()
-	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
-		x, y := ebiten.CursorPosition()
-		if control, ok := virtualKeypadControlAtSize(x, y, width, height); ok {
-			state[control] = true
-		}
-	}
-	for _, id := range ebiten.AppendTouchIDs(nil) {
-		x, y := ebiten.TouchPosition(id)
-		if control, ok := virtualKeypadControlAtSize(x, y, width, height); ok {
-			state[control] = true
-		}
-	}
-}
-
 func (s *Shell) drawVirtualKeypad(screen *ebiten.Image) {
 	if !s.virtualKeypadVisible() {
 		return

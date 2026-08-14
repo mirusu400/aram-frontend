@@ -5,7 +5,6 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
-	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
 type touchButton struct {
@@ -76,57 +75,8 @@ func rectAt(x, y, width, height int) image.Rectangle {
 	return image.Rect(x, y, x+width, y+height)
 }
 
-func (s *Shell) handleTouch() {
-	if !platformUsesTouchLayout() {
-		return
-	}
-	for _, id := range inpututil.AppendJustReleasedTouchIDs(nil) {
-		delete(s.touchControls, id)
-	}
-	for _, id := range inpututil.AppendJustPressedTouchIDs(nil) {
-		x, y := ebiten.TouchPosition(id)
-		if s.focusMode {
-			width, height := s.viewportSize()
-			if pointInRect(x, y, focusExitBoundsFor(width, height)) {
-				s.toggleFocusMode()
-				continue
-			}
-			if s.guestInputAllowed() {
-				if control, ok := focusControlAtSize(x, y, width, height); ok {
-					s.touchControls[id] = control
-				}
-			}
-			continue
-		}
-		if s.guestInputAllowed() && s.activeMenu < 0 {
-			if control, ok := s.touchControlAt(x, y); ok {
-				s.touchControls[id] = control
-				continue
-			}
-		}
-		if s.panel == nil {
-			if index, ok := s.touchNavigationAt(x, y); ok {
-				if s.activeMenu == index {
-					s.activeMenu = -1
-				} else {
-					s.activeMenu = index
-				}
-				continue
-			}
-		}
-		if s.interfaceUI == nil {
-			s.handlePointerPress(x, y)
-		}
-	}
-}
-
 func touchNavigationAt(x, y int) (int, bool) {
 	return touchNavigationAtSize(x, y, logicalWidth, logicalHeight)
-}
-
-func (s *Shell) touchNavigationAt(x, y int) (int, bool) {
-	width, height := s.viewportSize()
-	return touchNavigationAtSize(x, y, width, height)
 }
 
 func touchNavigationAtSize(x, y, width, height int) (int, bool) {
@@ -140,11 +90,6 @@ func touchNavigationAtSize(x, y, width, height int) (int, bool) {
 
 func touchControlAt(x, y int) (string, bool) {
 	return touchControlAtSize(x, y, logicalWidth, logicalHeight)
-}
-
-func (s *Shell) touchControlAt(x, y int) (string, bool) {
-	width, height := s.viewportSize()
-	return touchControlAtSize(x, y, width, height)
 }
 
 func touchControlAtSize(x, y, width, height int) (string, bool) {
