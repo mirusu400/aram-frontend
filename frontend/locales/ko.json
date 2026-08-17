@@ -506,5 +506,18 @@
   "Game title or carrier is too long.": "게임 제목 또는 통신사 입력이 너무 깁니다.",
   "Issue report is too long; shorten the situation or game title.": "이슈 제보 내용이 너무 깁니다. 문제 상황이나 게임 제목을 줄여 주세요.",
   "Frontend preview only; run `go run ./cmd/aram` from aram-emu to use emulation commands": "프런트엔드 미리 보기 전용입니다. 에뮬레이션 명령을 사용하려면 aram-emu에서 `go run ./cmd/aram`을 실행하세요",
-  "not attached": "연결 안 됨"
+  "not attached": "연결 안 됨",
+  "Touch button size": "터치 버튼 크기",
+  "Scale of the on-screen touch controls.": "화면 터치 컨트롤의 크기 배율입니다.",
+  "Touch button size: %d%%": "터치 버튼 크기: %d%%",
+  "Touch button layout": "터치 버튼 배치",
+  "Drag the on-screen buttons into custom positions.": "화면 버튼을 끌어서 원하는 위치에 배치합니다.",
+  "Customized": "사용자 지정",
+  "Default": "기본값",
+  "Save": "저장",
+  "Drag the touch buttons, then save the layout": "터치 버튼을 끌어 배치한 뒤 저장하세요",
+  "Touch layout saved": "터치 버튼 배치를 저장했습니다",
+  "Touch layout reset to defaults": "터치 버튼 배치를 기본값으로 되돌렸습니다",
+  "Touch layout unchanged": "터치 버튼 배치를 변경하지 않았습니다",
+  "Touch layout: ": "터치 버튼 배치: "
 }

@@ -2,6 +2,7 @@ package frontend
 
 import (
 	"fmt"
+	"image"
 	"strings"
 	"time"
 
@@ -68,6 +69,10 @@ type Shell struct {
 	bindingCapture            *bindingCapture
 	gamepadMappingsLoaded     bool
 	touchControls             map[ebiten.TouchID]string
+	touchLayoutEditing        bool
+	touchLayoutDraft          map[string]TouchPlacement
+	touchLayoutDrag           map[ebiten.TouchID]string
+	touchLayoutDragOffset     map[ebiten.TouchID]image.Point
 	busyCommands              map[BackendCommand]bool
 	frameRunPending           bool
 	frameGeneration           uint64
@@ -228,7 +233,7 @@ func (s *Shell) Update() error {
 	}
 	s.handleTouch()
 	s.syncDesignSystem()
-	if s.focusModeActive() {
+	if s.focusModeActive() || s.touchLayoutEditing {
 		// The chrome is hidden, so the interface UI must not consume input.
 	} else if s.interfaceUI != nil {
 		s.interfaceUI.sync(s)
@@ -257,6 +262,10 @@ func (s *Shell) Draw(screen *ebiten.Image) {
 	screen.Fill(palette.Canvas)
 	if s.focusModeActive() {
 		s.drawFocusMode(screen)
+		return
+	}
+	if s.touchLayoutEditing {
+		s.drawTouchLayoutEditor(screen)
 		return
 	}
 	s.drawWorkspace(screen)
@@ -292,6 +301,12 @@ func (s *Shell) handleShortcuts() {
 		ebiten.IsKeyPressed(ebiten.KeyShiftLeft) ||
 		ebiten.IsKeyPressed(ebiten.KeyShiftRight)
 
+	if s.touchLayoutEditing {
+		if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
+			s.cancelTouchLayoutEdit()
+		}
+		return
+	}
 	if s.panel != nil {
 		s.handlePanelShortcuts(control)
 		return

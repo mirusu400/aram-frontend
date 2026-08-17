@@ -210,6 +210,27 @@ func (u *shellUI) settingsRows(shell *Shell) []*widget.Container {
 				},
 			},
 		}
+		if platformUsesTouchLayout() {
+			rows = append(rows,
+				settingsRowModel{
+					label:       "Touch button size",
+					description: "Scale of the on-screen touch controls.",
+					slider: &settingsSliderModel{
+						min:    touchControlScaleMin / 10,
+						max:    touchControlScaleMax / 10,
+						value:  func() int { return shell.touchControlScalePercent() / 10 },
+						format: func(v int) string { return fmt.Sprintf("%d%%", v*10) },
+						apply:  func(v int) { shell.setTouchControlScale(v * 10) },
+					},
+				},
+				settingsRowModel{
+					label:       "Touch button layout",
+					description: "Drag the on-screen buttons into custom positions.",
+					value:       touchLayoutValueLabel(shell),
+					action:      shell.beginTouchLayoutEdit,
+				},
+			)
+		}
 	case "Bindings":
 		if u.bindingDevice != bindingDeviceKeyboard &&
 			u.bindingDevice != bindingDeviceGamepad {
@@ -376,6 +397,13 @@ func updateSettingsRowModels(shell *Shell) []settingsRowModel {
 			value:       downloadRootLabel,
 		},
 	}
+}
+
+func touchLayoutValueLabel(shell *Shell) string {
+	if len(shell.settings.TouchLayout) > 0 {
+		return "Customized"
+	}
+	return "Default"
 }
 
 func onOff(value bool) string {

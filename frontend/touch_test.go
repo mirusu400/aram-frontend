@@ -28,7 +28,7 @@ func TestTouchControlHitTargets(t *testing.T) {
 			}
 		}
 	}
-	if control, ok := touchControlAt(900, 300); ok {
+	if control, ok := touchControlAtSize(900, 300, logicalWidth, logicalHeight); ok {
 		t.Fatalf("non-control point mapped to %q", control)
 	}
 }

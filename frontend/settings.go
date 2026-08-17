@@ -45,9 +45,33 @@ type Settings struct {
 	PerTitleControls  bool                         `json:"per_title_controls"`
 	TitleControllers  map[string]ControllerProfile `json:"title_controller_profiles,omitempty"`
 	ShowVirtualKeypad bool                         `json:"show_virtual_keypad"`
+	TouchControlScale int                          `json:"touch_control_scale,omitempty"`
+	TouchLayout       map[string]TouchPlacement    `json:"touch_layout,omitempty"`
 	UpdateChannel     string                       `json:"update_channel"`
 	WelcomeCompleted  bool                         `json:"welcome_completed"`
 	IssueReports      []IssueReportRecord          `json:"issue_reports,omitempty"`
+}
+
+// TouchPlacement stores a custom on-screen button position as its center
+// point, normalized to the current display size so a saved layout survives
+// rotation and window-size changes.
+type TouchPlacement struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+}
+
+const (
+	touchControlScaleMin = 80
+	touchControlScaleMax = 140
+)
+
+// touchScaleFactor maps the persisted percentage (0 means unset) to a
+// clamped multiplier for the on-screen touch controls.
+func touchScaleFactor(percent int) float64 {
+	if percent == 0 {
+		return 1
+	}
+	return float64(clampInt(percent, touchControlScaleMin, touchControlScaleMax)) / 100
 }
 
 func defaultSettings() Settings {

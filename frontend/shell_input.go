@@ -54,7 +54,7 @@ func (s *Shell) handleMappedInput() {
 	}
 
 	next := make(map[string]bool)
-	if s.guestInputAllowed() && s.activeMenu < 0 {
+	if s.guestInputAllowed() && s.activeMenu < 0 && !s.touchLayoutEditing {
 		profile := s.controllerProfile()
 		modifierPressed := ebiten.IsKeyPressed(ebiten.KeyControl) ||
 			ebiten.IsKeyPressed(ebiten.KeyControlLeft) ||
@@ -202,6 +202,10 @@ func (s *Shell) handleTouch() {
 	if !platformUsesTouchLayout() {
 		return
 	}
+	if s.touchLayoutEditing {
+		s.handleTouchLayoutEditTouches()
+		return
+	}
 	for _, id := range inpututil.AppendJustReleasedTouchIDs(nil) {
 		delete(s.touchControls, id)
 	}
@@ -214,7 +218,7 @@ func (s *Shell) handleTouch() {
 				continue
 			}
 			if s.guestInputAllowed() {
-				if control, ok := focusControlAtSize(x, y, width, height); ok {
+				if control, ok := focusControlAtScaled(x, y, width, height, s.touchScale()); ok {
 					s.touchControls[id] = control
 				}
 			}
@@ -234,7 +238,11 @@ func (s *Shell) handleTouch() {
 
 func (s *Shell) touchControlAt(x, y int) (string, bool) {
 	width, height := s.viewportSize()
-	return touchControlAtSize(x, y, width, height)
+	button, ok := touchButtonAtWithOptions(x, y, width, height, s.touchLayoutOptions())
+	if !ok {
+		return "", false
+	}
+	return button.Control, true
 }
 
 func (s *Shell) collectVirtualKeypadState(state map[string]bool) {

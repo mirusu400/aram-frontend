@@ -506,5 +506,18 @@
   "Game title or carrier is too long.": "Game title or carrier is too long.",
   "Issue report is too long; shorten the situation or game title.": "Issue report is too long; shorten the situation or game title.",
   "Frontend preview only; run `go run ./cmd/aram` from aram-emu to use emulation commands": "Frontend preview only; run `go run ./cmd/aram` from aram-emu to use emulation commands",
-  "not attached": "not attached"
+  "not attached": "not attached",
+  "Touch button size": "Touch button size",
+  "Scale of the on-screen touch controls.": "Scale of the on-screen touch controls.",
+  "Touch button size: %d%%": "Touch button size: %d%%",
+  "Touch button layout": "Touch button layout",
+  "Drag the on-screen buttons into custom positions.": "Drag the on-screen buttons into custom positions.",
+  "Customized": "Customized",
+  "Default": "Default",
+  "Save": "Save",
+  "Drag the touch buttons, then save the layout": "Drag the touch buttons, then save the layout",
+  "Touch layout saved": "Touch layout saved",
+  "Touch layout reset to defaults": "Touch layout reset to defaults",
+  "Touch layout unchanged": "Touch layout unchanged",
+  "Touch layout: ": "Touch layout: "
 }
