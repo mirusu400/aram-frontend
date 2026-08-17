@@ -226,25 +226,10 @@ func (s *Shell) handleTouch() {
 				continue
 			}
 		}
-		if s.panel == nil {
-			if index, ok := s.touchNavigationAt(x, y); ok {
-				if s.activeMenu == index {
-					s.activeMenu = -1
-				} else {
-					s.activeMenu = index
-				}
-				continue
-			}
-		}
 		if s.interfaceUI == nil {
 			s.handlePointerPress(x, y)
 		}
 	}
-}
-
-func (s *Shell) touchNavigationAt(x, y int) (int, bool) {
-	width, height := s.viewportSize()
-	return touchNavigationAtSize(x, y, width, height)
 }
 
 func (s *Shell) touchControlAt(x, y int) (string, bool) {

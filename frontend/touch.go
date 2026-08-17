@@ -13,6 +13,11 @@ type touchButton struct {
 	Bounds  image.Rectangle
 }
 
+const (
+	touchDeckPadding   = 12
+	touchDeckCenterGap = 24
+)
+
 func touchControlButtons() []touchButton {
 	return touchControlButtonsFor(logicalWidth, logicalHeight)
 }
@@ -22,10 +27,19 @@ func touchControlButtonsFor(width, height int) []touchButton {
 	deckTop := height - statusBarHeight - deckHeight
 	margin := max(12, min(28, width/32))
 	gap := max(6, min(12, width/96))
-	buttonSize := max(40, min(62, min(width/12, (deckHeight-64-gap*2)/3)))
+	// The D-pad and action clusters are both three columns wide. Cap the
+	// button size by the horizontal room left after margins, the center
+	// gap, and in-cluster gaps so the clusters can never overlap, and by
+	// the vertical room for three rows.
+	horizontalFit := (width - margin*2 - touchDeckCenterGap - gap*4) / 6
+	verticalFit := (deckHeight - touchDeckPadding*2 - gap*2) / 3
+	buttonSize := max(40, min(88, min(horizontalFit, verticalFit)))
+	gridHeight := buttonSize*3 + gap*2
+	gridTop := deckTop + touchDeckPadding +
+		max(0, (deckHeight-touchDeckPadding*2-gridHeight)/2)
 	dpadX := margin + buttonSize
-	dpadY := deckTop + 40 + buttonSize + gap
-	actionX := width - margin - buttonSize*3
+	dpadY := gridTop + buttonSize + gap
+	actionX := width - margin - buttonSize*3 - gap*2
 	actionY := dpadY
 
 	return []touchButton{
@@ -42,50 +56,15 @@ func touchControlButtonsFor(width, height int) []touchButton {
 	}
 }
 
-func touchNavigationButtons() []touchButton {
-	return touchNavigationButtonsFor(logicalWidth, logicalHeight)
-}
-
-func touchNavigationButtonsFor(width, height int) []touchButton {
-	labels := []string{"File", "Emulation", "View", "Tools", "Help"}
-	margin := max(12, min(28, width/32))
-	gap := max(4, min(10, width/120))
-	available := width - margin*2 - gap*(len(labels)-1)
-	buttonWidth := max(72, available/len(labels))
-	y := height - statusBarHeight - touchDeckHeight(width, height) + 8
-	buttons := make([]touchButton, 0, len(labels))
-	for index, label := range labels {
-		x := margin + index*(buttonWidth+gap)
-		buttons = append(buttons, touchButton{
-			Label:  label,
-			Bounds: rectAt(x, y, buttonWidth, 32),
-		})
-	}
-	return buttons
-}
-
 func touchDeckHeight(width, height int) int {
 	if width <= 0 || height <= 0 {
 		return 0
 	}
-	return min(230, max(174, height*3/10))
+	return min(280, max(190, height*32/100))
 }
 
 func rectAt(x, y, width, height int) image.Rectangle {
 	return image.Rect(x, y, x+width, y+height)
-}
-
-func touchNavigationAt(x, y int) (int, bool) {
-	return touchNavigationAtSize(x, y, logicalWidth, logicalHeight)
-}
-
-func touchNavigationAtSize(x, y, width, height int) (int, bool) {
-	for index, button := range touchNavigationButtonsFor(width, height) {
-		if pointInRect(x, y, button.Bounds) {
-			return index, true
-		}
-	}
-	return 0, false
 }
 
 func touchControlAt(x, y int) (string, bool) {
@@ -116,9 +95,6 @@ func (s *Shell) drawTouchControls(screen *ebiten.Image) {
 	width, height := screen.Bounds().Dx(), screen.Bounds().Dy()
 	for _, button := range touchControlButtonsFor(width, height) {
 		s.drawTouchButton(screen, button, active[button.Control])
-	}
-	for index, button := range touchNavigationButtonsFor(width, height) {
-		s.drawTouchButton(screen, button, s.activeMenu == index)
 	}
 }
 

@@ -344,18 +344,6 @@ func (s *Shell) handlePointerPress(x, y int) {
 		}
 		return
 	}
-	if platformUsesTouchLayout() {
-		for index, button := range touchNavigationButtons() {
-			if pointInRect(x, y, button.Bounds) {
-				if s.activeMenu == index {
-					s.activeMenu = -1
-				} else {
-					s.activeMenu = index
-				}
-				return
-			}
-		}
-	}
 	if y < menuHeight {
 		offset := 0
 		for index, width := range menuWidths(s.menus) {

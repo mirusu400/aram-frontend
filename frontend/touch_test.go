@@ -33,15 +33,52 @@ func TestTouchControlHitTargets(t *testing.T) {
 	}
 }
 
-func TestTouchNavigationMatchesPersistentMenus(t *testing.T) {
-	buttons := touchNavigationButtons()
-	menus := defaultMenus()
-	if len(buttons) != len(menus) {
-		t.Fatalf("touch navigation count = %d, menu count = %d", len(buttons), len(menus))
+func TestTouchDeckHasNoNavigationRow(t *testing.T) {
+	for _, size := range [][2]int{{411, 914}, {914, 411}, {logicalWidth, logicalHeight}} {
+		width, height := size[0], size[1]
+		deckTop := height - statusBarHeight - touchDeckHeight(width, height)
+		for _, button := range touchControlButtonsFor(width, height) {
+			if button.Bounds.Min.Y < deckTop {
+				t.Errorf(
+					"touch button %q above deck at %dx%d: %v (deck top %d)",
+					button.Control,
+					width,
+					height,
+					button.Bounds,
+					deckTop,
+				)
+			}
+		}
 	}
-	for index := range menus {
-		if buttons[index].Label != menus[index].Label {
-			t.Errorf("touch navigation %d = %q, want %q", index, buttons[index].Label, menus[index].Label)
+}
+
+func TestTouchControlButtonsGrewWithoutOverlap(t *testing.T) {
+	for _, size := range [][2]int{{411, 914}, {914, 411}, {720, 540}, {1440, 900}} {
+		width, height := size[0], size[1]
+		buttons := touchControlButtonsFor(width, height)
+		for _, button := range buttons {
+			if button.Bounds.Dx() < 44 || button.Bounds.Dy() < 44 {
+				t.Errorf(
+					"touch button %q too small at %dx%d: %v",
+					button.Control,
+					width,
+					height,
+					button.Bounds,
+				)
+			}
+		}
+		for i, first := range buttons {
+			for _, second := range buttons[i+1:] {
+				if first.Bounds.Overlaps(second.Bounds) {
+					t.Errorf(
+						"touch buttons %q and %q overlap at %dx%d",
+						first.Control,
+						second.Control,
+						width,
+						height,
+					)
+				}
+			}
 		}
 	}
 }
