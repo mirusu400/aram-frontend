@@ -7,6 +7,7 @@ import (
 	"github.com/ebitenui/ebitenui"
 	euiimage "github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 type shellUI struct {
@@ -37,6 +38,9 @@ type shellUI struct {
 	settingsSliders      []settingsSliderBinding
 	settingsDropdowns    []settingsDropdownBinding
 	settingsOffsets      map[string]float64
+	settingsTouchID      ebiten.TouchID
+	settingsTouchActive  bool
+	settingsTouchLastY   int
 	recentList           *widget.List
 	welcomeStableButton  *widget.Button
 	welcomeNightlyButton *widget.Button
@@ -138,6 +142,7 @@ func (u *shellUI) sync(shell *Shell) {
 		}
 	}
 	u.syncPanel(shell)
+	u.updateSettingsTouchScroll(shell)
 }
 
 func (u *shellUI) syncPanel(shell *Shell) {

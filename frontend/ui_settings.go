@@ -2,10 +2,55 @@ package frontend
 
 import (
 	"fmt"
+	"image"
 
 	euiimage "github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
+	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
+
+// updateSettingsTouchScroll drags the settings rows with a finger. The
+// scroll container itself only reacts to the mouse wheel, which touch
+// layouts do not have, so the drag is tracked directly from the raw touch
+// state each frame.
+func (u *shellUI) updateSettingsTouchScroll(shell *Shell) {
+	scroll := u.settingsScroll
+	if !platformUsesTouchLayout() || scroll == nil ||
+		shell.panel == nil || shell.panel.Kind != "settings" {
+		u.settingsTouchActive = false
+		return
+	}
+	if u.settingsTouchActive {
+		if inpututil.IsTouchJustReleased(u.settingsTouchID) {
+			u.settingsTouchActive = false
+			return
+		}
+		_, y := ebiten.TouchPosition(u.settingsTouchID)
+		delta := y - u.settingsTouchLastY
+		if delta == 0 {
+			return
+		}
+		u.settingsTouchLastY = y
+		overflow := float64(scroll.ContentRect().Dy() - scroll.ViewRect().Dy())
+		if overflow <= 0 {
+			return
+		}
+		top := scroll.ScrollTop - float64(delta)/overflow
+		scroll.ScrollTop = min(1, max(0, top))
+		u.settingsOffsets[u.settingsSection] = scroll.ScrollTop
+		return
+	}
+	for _, id := range inpututil.AppendJustPressedTouchIDs(nil) {
+		x, y := ebiten.TouchPosition(id)
+		if image.Pt(x, y).In(scroll.ViewRect()) {
+			u.settingsTouchID = id
+			u.settingsTouchActive = true
+			u.settingsTouchLastY = y
+			return
+		}
+	}
+}
 
 func (u *shellUI) syncSettingsPanel(shell *Shell) {
 	switch u.settingsSection {
