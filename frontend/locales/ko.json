@@ -362,6 +362,7 @@
   "Supported inputs": "지원하는 입력",
   "The report contains metadata only; no game or firmware bytes are copied.": "이 보고서에는 메타데이터만 포함되며 게임이나 펌웨어 데이터는 복사되지 않습니다.",
   "Title closed": "게임을 닫았습니다",
+  "Title exited - press Start to restart": "게임이 종료되었습니다 - 시작을 눌러 다시 시작하세요",
   "Unable to start this input": "이 입력을 시작할 수 없음",
   "unknown": "알 수 없음",
   "Unknown command: %s": "알 수 없는 명령: %s",

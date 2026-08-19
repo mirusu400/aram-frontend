@@ -43,6 +43,7 @@ type Shell struct {
 	menus                     []Menu
 	settings                  Settings
 	state                     FrontendState
+	lastRunState              FrontendState
 	problem                   *FrontendProblem
 	activeMenu                int
 	focusMode                 bool

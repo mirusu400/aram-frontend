@@ -362,6 +362,7 @@
   "Supported inputs": "Supported inputs",
   "The report contains metadata only; no game or firmware bytes are copied.": "The report contains metadata only; no game or firmware bytes are copied.",
   "Title closed": "Title closed",
+  "Title exited - press Start to restart": "Title exited - press Start to restart",
   "Unable to start this input": "Unable to start this input",
   "unknown": "unknown",
   "Unknown command: %s": "Unknown command: %s",

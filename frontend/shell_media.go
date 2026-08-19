@@ -85,6 +85,13 @@ func (s *Shell) syncBackendState() {
 	if state == FrontendEmpty {
 		state = FrontendReady
 	}
+	// Announce when the guest ends on its own (for example a Clet calling
+	// MC_knlExit). Without this the screen freezes on the last frame with no
+	// hint that the title exited or how to relaunch it.
+	if state == FrontendStopped && s.lastRunState != FrontendStopped {
+		s.setStatus(s.tr("Title exited - press Start to restart"))
+	}
+	s.lastRunState = state
 	s.state = state
 }
 
