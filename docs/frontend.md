@@ -101,10 +101,10 @@ phone-number controls to mouse or touch input.
 On touch layouts, the menu bar, toolbar, and status bar disappear when a
 title enters the running state so the guest screen can fill everything above
 the on-screen control deck at its largest aspect-preserving size; the
-integer-scaling preference applies only to the windowed workspace. A floating
-MENU button at the top-right restores the chrome, and a HIDE button at the
-right end of the toolbar strips it again. Open panels, the touch layout
-editor, and focus mode always present their own full surface.
+integer-scaling preference applies only to the windowed workspace. A faint
+hamburger toggle floating at the top-right restores the chrome, and a HIDE
+button at the right end of the toolbar strips it again. Open panels, the
+touch layout editor, and focus mode always present their own full surface.
 
 ## Updates
 

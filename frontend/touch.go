@@ -2,6 +2,7 @@ package frontend
 
 import (
 	"image"
+	"image/color"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -131,14 +132,14 @@ func touchDeckHeight(width, height int) int {
 	return min(280, max(190, height*32/100))
 }
 
-// touchChromeToggleBounds places the floating MENU/HIDE toggle at the
-// top-right. With the chrome hidden it floats over the guest viewport like
-// the focus-mode EXIT button; with the chrome visible it sits inside the
-// otherwise empty right end of the toolbar, because narrow phone widths fill
-// the whole menu bar with menu titles.
+// touchChromeToggleBounds places the floating chrome toggle at the
+// top-right. With the chrome hidden it is a small translucent hamburger
+// floating over the guest viewport; with the chrome visible it is a HIDE
+// button inside the otherwise empty right end of the toolbar, because narrow
+// phone widths fill the whole menu bar with menu titles.
 func touchChromeToggleBounds(width int, hidden bool) image.Rectangle {
 	if hidden {
-		return rectAt(width-12-76, 12, 76, 36)
+		return rectAt(width-12-44, 12, 44, 44)
 	}
 	return rectAt(
 		width-8-76,
@@ -191,22 +192,67 @@ func (s *Shell) drawTouchControls(screen *ebiten.Image) {
 	}
 }
 
-// drawTouchChromeToggle draws the floating button that hides the shell
-// chrome for a full-size guest screen and brings it back afterwards.
+// drawTouchChromeToggle draws the floating control that hides the shell
+// chrome for a full-size guest screen and brings it back afterwards. Over
+// the game it is a faint hamburger glyph so it does not compete with play;
+// inside the chrome it is a regular HIDE button.
 func (s *Shell) drawTouchChromeToggle(screen *ebiten.Image) {
 	if !s.touchChromeToggleAvailable() {
 		return
 	}
 	width := screen.Bounds().Dx()
-	hidden := s.touchChromeHiddenActive()
-	label := "HIDE"
-	if hidden {
-		label = "MENU"
+	if s.touchChromeHiddenActive() {
+		s.drawHamburgerToggle(screen, touchChromeToggleBounds(width, true))
+		return
 	}
 	s.drawTouchButton(screen, touchButton{
-		Label:  label,
-		Bounds: touchChromeToggleBounds(width, hidden),
+		Label:  "HIDE",
+		Bounds: touchChromeToggleBounds(width, false),
 	}, false)
+}
+
+// drawHamburgerToggle draws a translucent square with three menu bars.
+func (s *Shell) drawHamburgerToggle(
+	screen *ebiten.Image,
+	bounds image.Rectangle,
+) {
+	palette := defaultARAMPalette()
+	if s.design != nil {
+		palette = s.design.Palette
+	}
+	ebitenutil.DrawRect(
+		screen,
+		float64(bounds.Min.X),
+		float64(bounds.Min.Y),
+		float64(bounds.Dx()),
+		float64(bounds.Dy()),
+		fadeColor(palette.SurfaceRaised, 0.25),
+	)
+	barColor := fadeColor(palette.Text, 0.55)
+	barWidth := bounds.Dx() - 24
+	const barHeight = 3
+	centerY := bounds.Min.Y + bounds.Dy()/2
+	for _, offset := range []int{-8, 0, 8} {
+		ebitenutil.DrawRect(
+			screen,
+			float64(bounds.Min.X+12),
+			float64(centerY+offset-barHeight/2),
+			float64(barWidth),
+			barHeight,
+			barColor,
+		)
+	}
+}
+
+// fadeColor scales a color's premultiplied channels toward transparency.
+func fadeColor(base color.Color, opacity float64) color.Color {
+	red, green, blue, alpha := base.RGBA()
+	return color.RGBA64{
+		R: uint16(float64(red) * opacity),
+		G: uint16(float64(green) * opacity),
+		B: uint16(float64(blue) * opacity),
+		A: uint16(float64(alpha) * opacity),
+	}
 }
 
 func (s *Shell) drawTouchButton(screen *ebiten.Image, button touchButton, active bool) {
