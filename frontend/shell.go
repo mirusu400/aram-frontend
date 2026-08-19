@@ -46,6 +46,10 @@ type Shell struct {
 	problem                   *FrontendProblem
 	activeMenu                int
 	focusMode                 bool
+	touchChromeHidden         bool
+	touchChromeSyncState      FrontendState
+	fillGuestViewport         bool
+	uiPointerSuppressed       bool
 	status                    string
 	input                     *InputInfo
 	selectedPath              string
@@ -224,6 +228,7 @@ func (s *Shell) Update() error {
 	}
 	s.consumeResults()
 	s.syncBackendState()
+	s.syncTouchChrome()
 	s.syncHostLifecycle()
 	s.updateVideo()
 	s.updateAudio()
@@ -233,8 +238,11 @@ func (s *Shell) Update() error {
 	}
 	s.handleTouch()
 	s.syncDesignSystem()
-	if s.focusModeActive() || s.touchLayoutEditing {
-		// The chrome is hidden, so the interface UI must not consume input.
+	s.syncUIPointerSuppression()
+	if s.focusModeActive() || s.touchLayoutEditing ||
+		s.touchChromeHiddenActive() || s.uiPointerSuppressed {
+		// The chrome is hidden or a chrome toggle owns the current touch,
+		// so the interface UI must not consume input.
 	} else if s.interfaceUI != nil {
 		s.interfaceUI.sync(s)
 		s.interfaceUI.ui.Update()
@@ -268,12 +276,19 @@ func (s *Shell) Draw(screen *ebiten.Image) {
 		s.drawTouchLayoutEditor(screen)
 		return
 	}
+	if s.touchChromeHiddenActive() {
+		s.drawImmersiveWorkspace(screen)
+		s.drawTouchControls(screen)
+		s.drawTouchChromeToggle(screen)
+		return
+	}
 	s.drawWorkspace(screen)
 	s.drawTouchControls(screen)
 	s.drawVirtualKeypad(screen)
 	if s.interfaceUI != nil {
 		s.interfaceUI.ui.Draw(screen)
 	}
+	s.drawTouchChromeToggle(screen)
 }
 
 func (s *Shell) Layout(outsideWidth, outsideHeight int) (int, int) {

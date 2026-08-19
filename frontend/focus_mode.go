@@ -118,7 +118,7 @@ func (s *Shell) drawFocusMode(screen *ebiten.Image) {
 	width, height := screen.Bounds().Dx(), screen.Bounds().Dy()
 	viewport := focusViewportFor(width, height)
 	if viewport.Dx() >= 32 && viewport.Dy() >= 32 {
-		s.drawGuestViewport(screen, viewport)
+		s.drawFilledGuestViewport(screen, viewport)
 	}
 	active := make(map[string]bool)
 	for _, control := range s.touchControls {

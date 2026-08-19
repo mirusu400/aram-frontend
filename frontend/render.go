@@ -55,6 +55,34 @@ func (s *Shell) drawWorkspace(screen *ebiten.Image) {
 	s.drawGuestViewport(screen, viewport)
 }
 
+// drawImmersiveWorkspace fills everything above the touch control deck with
+// the guest viewport. The chrome is hidden, so there are no bars, panels, or
+// framing margins around the guest screen.
+func (s *Shell) drawImmersiveWorkspace(screen *ebiten.Image) {
+	bounds := screen.Bounds()
+	deckTop := bounds.Max.Y - statusBarHeight -
+		touchDeckHeight(bounds.Dx(), bounds.Dy())
+	viewport := image.Rect(bounds.Min.X, bounds.Min.Y, bounds.Max.X, deckTop)
+	if viewport.Dx() < 32 || viewport.Dy() < 32 {
+		return
+	}
+	s.drawFilledGuestViewport(screen, viewport)
+}
+
+// drawFilledGuestViewport draws the guest screen at the largest
+// aspect-preserving size. Chrome-less play surfaces exist to give the guest
+// the whole screen, so the integer-scaling preference must not floor a
+// fractional fit down to a fraction of that space; it still applies to the
+// windowed workspace.
+func (s *Shell) drawFilledGuestViewport(
+	screen *ebiten.Image,
+	viewport image.Rectangle,
+) {
+	s.fillGuestViewport = true
+	defer func() { s.fillGuestViewport = false }()
+	s.drawGuestViewport(screen, viewport)
+}
+
 func (s *Shell) drawGuestViewport(screen *ebiten.Image, viewport image.Rectangle) {
 	palette := defaultARAMPalette()
 	if s.design != nil {
@@ -127,7 +155,7 @@ func (s *Shell) frameDestination(viewport image.Rectangle, width, height int) im
 	}
 
 	scale := math.Min(scaleX, scaleY)
-	if s.settings.IntegerScaling && scale >= 1 {
+	if s.settings.IntegerScaling && !s.fillGuestViewport && scale >= 1 {
 		scale = math.Max(1, math.Floor(scale))
 	}
 	targetWidth := max(1, int(math.Round(float64(width)*scale)))

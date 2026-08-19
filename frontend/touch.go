@@ -131,6 +131,23 @@ func touchDeckHeight(width, height int) int {
 	return min(280, max(190, height*32/100))
 }
 
+// touchChromeToggleBounds places the floating MENU/HIDE toggle at the
+// top-right. With the chrome hidden it floats over the guest viewport like
+// the focus-mode EXIT button; with the chrome visible it sits inside the
+// otherwise empty right end of the toolbar, because narrow phone widths fill
+// the whole menu bar with menu titles.
+func touchChromeToggleBounds(width int, hidden bool) image.Rectangle {
+	if hidden {
+		return rectAt(width-12-76, 12, 76, 36)
+	}
+	return rectAt(
+		width-8-76,
+		menuBarHeight+(applicationToolbarHeight-32)/2,
+		76,
+		32,
+	)
+}
+
 func rectAt(x, y, width, height int) image.Rectangle {
 	return image.Rect(x, y, x+width, y+height)
 }
@@ -172,6 +189,24 @@ func (s *Shell) drawTouchControls(screen *ebiten.Image) {
 	for _, button := range buttons {
 		s.drawTouchButton(screen, button, active[button.Control])
 	}
+}
+
+// drawTouchChromeToggle draws the floating button that hides the shell
+// chrome for a full-size guest screen and brings it back afterwards.
+func (s *Shell) drawTouchChromeToggle(screen *ebiten.Image) {
+	if !s.touchChromeToggleAvailable() {
+		return
+	}
+	width := screen.Bounds().Dx()
+	hidden := s.touchChromeHiddenActive()
+	label := "HIDE"
+	if hidden {
+		label = "MENU"
+	}
+	s.drawTouchButton(screen, touchButton{
+		Label:  label,
+		Bounds: touchChromeToggleBounds(width, hidden),
+	}, false)
 }
 
 func (s *Shell) drawTouchButton(screen *ebiten.Image, button touchButton, active bool) {

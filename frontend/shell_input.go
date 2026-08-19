@@ -224,11 +224,23 @@ func (s *Shell) handleTouch() {
 			}
 			continue
 		}
+		if s.touchChromeToggleAvailable() {
+			width, _ := s.viewportSize()
+			bounds := touchChromeToggleBounds(width, s.touchChromeHiddenActive())
+			if pointInRect(x, y, bounds) {
+				s.toggleTouchChrome()
+				continue
+			}
+		}
 		if s.guestInputAllowed() && s.activeMenu < 0 {
 			if control, ok := s.touchControlAt(x, y); ok {
 				s.touchControls[id] = control
 				continue
 			}
+		}
+		if s.touchChromeHiddenActive() {
+			// The chrome is hidden; stray taps must not reach it.
+			continue
 		}
 		if s.interfaceUI == nil {
 			s.handlePointerPress(x, y)
