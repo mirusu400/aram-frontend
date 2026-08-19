@@ -393,11 +393,3 @@ func availableDownloadPath(path string) string {
 		}
 	}
 }
-
-func defaultUpdateDownloadRoot() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, "Downloads", "ARAM"), nil
-}

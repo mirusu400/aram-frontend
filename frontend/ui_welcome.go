@@ -48,7 +48,7 @@ func (u *shellUI) syncWelcomePanel(shell *Shell) {
 			"contains developer CLI utilities.\n\n" +
 			"You can change this later in Settings > Updates.",
 	)
-	if _, ok := shell.backend.(ProductUpdateInstaller); ok {
+	if shell.welcomeInstallsProduct() {
 		bodyText = shell.tr(
 			"Choose Stable or Nightly for the integrated ARAM product.\n\n" +
 				"ARAM downloads the latest build for that channel, including its " +

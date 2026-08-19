@@ -106,6 +106,11 @@ func updateAssetName(
 		platform = "linux-amd64.tar.gz"
 	case goos == "darwin" && goarch == "arm64":
 		platform = "macos-arm64.tar.gz"
+	case goos == "android" && component == updateComponentProduct:
+		// The product Nightly ships one APK carrying both arm64-v8a and
+		// x86_64 native libraries; the developer archives have no Android
+		// build.
+		platform = "android-universal.apk"
 	default:
 		return "", fmt.Errorf(
 			"%s updates are not built for %s/%s",

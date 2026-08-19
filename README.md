@@ -116,6 +116,12 @@ original bootstrap delegates future launches to the selected runtime. Windows
 amd64, Linux amd64, and macOS arm64 use the matching CI archive; unsupported
 host combinations are disabled in the UI.
 
+On Android, the ARAM product row downloads `aram-android-universal.apk` into
+an app-private update folder named by the native host and hands it to the
+system package installer, where the user confirms the update. The Welcome
+modal only records the chosen channel there because the installed APK is
+already the complete product. Developer archives have no Android build.
+
 ## Mobile
 
 Ebitengine mobile applications are generated as native libraries:

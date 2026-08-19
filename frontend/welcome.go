@@ -15,6 +15,14 @@ func (s *Shell) shouldOpenWelcome() bool {
 	return !s.settings.WelcomeCompleted && !isPreviewBackend(s.backend)
 }
 
+// welcomeInstallsProduct reports whether choosing a channel on Welcome
+// downloads and installs that channel right away. It needs a host that can
+// install the product and a platform whose bundled build is only a bootstrap.
+func (s *Shell) welcomeInstallsProduct() bool {
+	_, canInstall := s.backend.(ProductUpdateInstaller)
+	return canInstall && platformInstallsProductOnWelcome()
+}
+
 func (s *Shell) openWelcome() {
 	s.panel = &Panel{
 		Kind:  "welcome",
@@ -31,8 +39,7 @@ func (s *Shell) completeWelcome(channel updateChannel) {
 	previousCompleted := s.settings.WelcomeCompleted
 	s.settings.UpdateChannel = string(channel)
 
-	_, canInstall := s.backend.(ProductUpdateInstaller)
-	if canInstall {
+	if s.welcomeInstallsProduct() {
 		s.settings.WelcomeCompleted = false
 		if err := s.settings.save(); err != nil {
 			s.settings.UpdateChannel = previousChannel

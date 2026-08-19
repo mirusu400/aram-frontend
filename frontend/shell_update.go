@@ -161,6 +161,10 @@ func (s *Shell) installProductUpdate(
 		ArchivePath:  download.Path,
 		RelaunchPath: s.selectedPath,
 	})
+	if errors.Is(err, ErrProductInstallDeferred) {
+		s.deferProductInstall(download, firstRun)
+		return
+	}
 	if err != nil {
 		if firstRun {
 			s.settings.WelcomeCompleted = false
@@ -183,6 +187,32 @@ func (s *Shell) installProductUpdate(
 	}
 	s.quitting = true
 	s.setStatus(s.tr("Installed; restarting ARAM..."))
+}
+
+// deferProductInstall records that the platform installer now owns the
+// downloaded package. The package stays on disk because that installer reads
+// it after the host returns, and the shell keeps running because the platform
+// replaces the app only once the user confirms the installation there.
+func (s *Shell) deferProductInstall(download updateDownload, firstRun bool) {
+	progress := s.updateProgress[updateComponentProduct]
+	progress.Busy = false
+	progress.Message = s.trf(
+		"Finish installing %s in the system installer",
+		download.Version,
+	)
+	progress.Path = download.Path
+	progress.Version = download.Version
+	s.updateProgress[updateComponentProduct] = progress
+	if firstRun {
+		s.welcomeInstalling = false
+		s.panel = nil
+	}
+	s.invalidateSettingsPanel()
+	s.appendLog(s.trf(
+		"Product update handed to the system installer: %s",
+		download.Path,
+	))
+	s.setStatus(progress.Message)
 }
 
 // removeInstalledArchive deletes a product archive the installer has already
@@ -263,7 +293,7 @@ func (s *Shell) updateActionLabel(component updateComponent) string {
 	}
 	if component == updateComponentProduct {
 		if _, ok := s.backend.(ProductUpdateInstaller); ok {
-			return "Install & Restart"
+			return productInstallActionLabel()
 		}
 	}
 	return "Download"

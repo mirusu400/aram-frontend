@@ -293,8 +293,10 @@ type BackendNamer interface {
 }
 
 // ProductUpdate is a verified integrated ARAM archive selected by the shared
-// frontend. ProductUpdateInstaller is implemented by the desktop integration
-// host because only that host knows how to install and relaunch its executable.
+// frontend. ProductUpdateInstaller is implemented by the integration hosts
+// because only a host knows how to install its own package: the desktop host
+// extracts the archive and relaunches its executable, while the Android host
+// hands the APK to the system package installer.
 type ProductUpdate struct {
 	Channel      string
 	Version      string
@@ -305,6 +307,14 @@ type ProductUpdate struct {
 type ProductUpdateInstaller interface {
 	InstallProductUpdate(ProductUpdate) error
 }
+
+// ErrProductInstallDeferred is returned by a ProductUpdateInstaller whose
+// platform finishes the installation outside the running process, such as the
+// Android package installer. The frontend keeps the archive for that installer,
+// stays running, and reports the hand-off instead of restarting.
+var ErrProductInstallDeferred = errors.New(
+	"product installation delegated to the platform installer",
+)
 
 type NullBackend struct{}
 

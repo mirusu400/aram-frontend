@@ -227,6 +227,8 @@ func TestUpdateAssetNamesMatchPublishedArchives(t *testing.T) {
 		{updateComponentProduct, "windows", "amd64", "aram-windows-amd64.zip"},
 		{updateComponentCore, "linux", "amd64", "aram-core-linux-amd64.tar.gz"},
 		{updateComponentFrontend, "darwin", "arm64", "aram-frontend-macos-arm64.tar.gz"},
+		{updateComponentProduct, "android", "arm64", "aram-android-universal.apk"},
+		{updateComponentProduct, "android", "amd64", "aram-android-universal.apk"},
 	}
 	for _, test := range tests {
 		got, err := updateAssetName(test.component, test.goos, test.goarch)
@@ -237,12 +239,78 @@ func TestUpdateAssetNamesMatchPublishedArchives(t *testing.T) {
 			t.Fatalf("asset name = %q, want %q", got, test.want)
 		}
 	}
-	if _, err := updateAssetName(
-		updateComponentProduct,
-		"darwin",
-		"amd64",
-	); err == nil {
-		t.Fatal("unsupported platform unexpectedly has an update asset")
+	unsupported := []struct {
+		component updateComponent
+		goos      string
+		goarch    string
+	}{
+		{updateComponentProduct, "darwin", "amd64"},
+		// Only the integrated product publishes an Android package; the
+		// developer archives must stay disabled there.
+		{updateComponentCore, "android", "arm64"},
+		{updateComponentFrontend, "android", "arm64"},
+	}
+	for _, test := range unsupported {
+		if _, err := updateAssetName(
+			test.component,
+			test.goos,
+			test.goarch,
+		); err == nil {
+			t.Fatalf(
+				"%s on %s/%s unexpectedly has an update asset",
+				test.component,
+				test.goos,
+				test.goarch,
+			)
+		}
+	}
+}
+
+func TestDeferredProductInstallKeepsArchiveAndStaysRunning(t *testing.T) {
+	isolateSettings(t)
+	directory := t.TempDir()
+	archive := filepath.Join(directory, "aram-android-universal.apk")
+	if err := os.WriteFile(archive, []byte("product package"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	backend := &installingWelcomeBackend{
+		updates: make(chan ProductUpdate, 1),
+		err:     ErrProductInstallDeferred,
+	}
+	shell := NewShell(backend, nil, "")
+
+	shell.installProductUpdate(updateDownload{
+		Component: updateComponentProduct,
+		Channel:   updateChannelNightly,
+		Version:   "Nightly 760f53f",
+		Path:      archive,
+	}, false)
+
+	select {
+	case installed := <-backend.updates:
+		if installed.ArchivePath != archive {
+			t.Fatalf("deferred product = %#v", installed)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("product update was not handed to the installer")
+	}
+	if _, err := os.Stat(archive); err != nil {
+		t.Fatalf("the package still needed by the platform installer was removed: %v", err)
+	}
+	if shell.quitting {
+		t.Fatal("a deferred install requested a restart")
+	}
+	progress := shell.updateProgress[updateComponentProduct]
+	want := shell.trf(
+		"Finish installing %s in the system installer",
+		"Nightly 760f53f",
+	)
+	if progress.Busy || progress.Path != archive ||
+		progress.Version != "Nightly 760f53f" || progress.Message != want {
+		t.Fatalf("deferred install progress = %#v", progress)
+	}
+	if shell.status != want {
+		t.Fatalf("deferred install status = %q, want %q", shell.status, want)
 	}
 }
 

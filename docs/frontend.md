@@ -116,6 +116,14 @@ manual product update installs the selected channel immediately and passes the
 current input path to the relaunched runtime. Developer tools and standalone
 frontend archives remain download-only.
 
+On Android, the product row is an **Install** action: the verified
+`aram-android-universal.apk` is saved below the app-private update folder
+named by the native host, and the host's installer returns
+`ErrProductInstallDeferred` after handing the package to the system package
+installer. The shell keeps running and reports the hand-off; Android replaces
+the app only once the user confirms there. Developer tools and standalone
+frontend archives publish no Android build, so those rows stay unavailable.
+
 The first integrated launch opens a Welcome modal with Stable, Nightly, and
 Decide later actions. The selection is persisted in `settings.json`; Decide
 later closes the modal for the current session and presents it again next
