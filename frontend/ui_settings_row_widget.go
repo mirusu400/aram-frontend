@@ -120,7 +120,7 @@ func (u *shellUI) buildSettingsRow(model settingsRowModel) *widget.Container {
 						Hover:    trackHover,
 						Disabled: trackIdle,
 					},
-					HandleImage:   design.Components.TouchButton.Image,
+					HandleImage:   design.Components.SliderHandle,
 					MinHandleSize: intPointer(24),
 					TrackPadding:  &widget.Insets{Left: 3, Right: 3},
 				},

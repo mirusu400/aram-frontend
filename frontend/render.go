@@ -88,21 +88,39 @@ func (s *Shell) drawGuestViewport(screen *ebiten.Image, viewport image.Rectangle
 	if s.design != nil {
 		palette = s.design.Palette
 	}
-	ebitenutil.DrawRect(
-		screen,
-		float64(viewport.Min.X-2),
-		float64(viewport.Min.Y-2),
-		float64(viewport.Dx()+4),
-		float64(viewport.Dy()+4),
-		palette.BorderStrong,
-	)
+	if s.design != nil && s.design.Components.LCDBezel != nil {
+		// Sprite skins frame the guest screen with the pack's LCD bezel; its
+		// fixed border is 8px, so the tile is drawn one border larger than
+		// the viewport on every side.
+		bezel := s.design.Components.LCDBezel
+		bezel.Draw(
+			screen,
+			viewport.Dx()+2*retroSliceBorder,
+			viewport.Dy()+2*retroSliceBorder,
+			func(opts *ebiten.DrawImageOptions) {
+				opts.GeoM.Translate(
+					float64(viewport.Min.X-retroSliceBorder),
+					float64(viewport.Min.Y-retroSliceBorder),
+				)
+			},
+		)
+	} else {
+		ebitenutil.DrawRect(
+			screen,
+			float64(viewport.Min.X-2),
+			float64(viewport.Min.Y-2),
+			float64(viewport.Dx()+4),
+			float64(viewport.Dy()+4),
+			palette.BorderStrong,
+		)
+	}
 	ebitenutil.DrawRect(
 		screen,
 		float64(viewport.Min.X),
 		float64(viewport.Min.Y),
 		float64(viewport.Dx()),
 		float64(viewport.Dy()),
-		palette.Canvas,
+		palette.GuestSurface,
 	)
 
 	if s.frameImage == nil || s.frame.Image == nil {
@@ -225,10 +243,11 @@ func (s *Shell) drawEmptyViewport(screen *ebiten.Image, viewport image.Rectangle
 
 	blockHeight := 28 + len(details)*20
 	y := viewport.Min.Y + (viewport.Dy()-blockHeight)/2
-	drawCenteredText(screen, title, s.design.Type.Display, palette.Text, viewport, y)
+	drawCenteredText(screen, title, s.design.Type.Display, palette.GuestInk, viewport, y)
 	y += 36
+	detailInk := mixNRGBA(palette.GuestInk, palette.GuestSurface, 0.35)
 	for _, line := range details {
-		drawCenteredText(screen, line, s.design.Type.Body, palette.TextMuted, viewport, y)
+		drawCenteredText(screen, line, s.design.Type.Body, detailInk, viewport, y)
 		y += 20
 	}
 }

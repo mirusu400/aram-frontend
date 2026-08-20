@@ -76,6 +76,41 @@ func retroNineSlice(theme, name string) *euiimage.NineSlice {
 	return ns
 }
 
+// retroIconGraphic assembles a button icon: the normal ink glyph for idle,
+// the inverted (on-accent) glyph for the accent-filled pressed face, and a
+// faded copy for disabled controls.
+func retroIconGraphic(theme, name string) *widget.GraphicImage {
+	idle, err := retroSpriteImage(theme, "icon", name)
+	if err != nil {
+		panic(err)
+	}
+	pressed, err := retroSpriteImage(theme, "icon_inv", name)
+	if err != nil {
+		panic(err)
+	}
+	return &widget.GraphicImage{
+		Idle:     idle,
+		Pressed:  pressed,
+		Disabled: retroFadedIcon(theme, name, idle),
+	}
+}
+
+func retroFadedIcon(theme, name string, src *ebiten.Image) *ebiten.Image {
+	key := "faded/" + theme + "/" + name
+	retroMu.Lock()
+	defer retroMu.Unlock()
+	if img, ok := retroImages[key]; ok {
+		return img
+	}
+	bounds := src.Bounds()
+	faded := ebiten.NewImage(bounds.Dx(), bounds.Dy())
+	opts := &ebiten.DrawImageOptions{}
+	opts.ColorScale.ScaleAlpha(0.35)
+	faded.DrawImage(src, opts)
+	retroImages[key] = faded
+	return faded
+}
+
 // retroButtonImage assembles the EbitenUI button states from a base name.
 // Shipped bases: "button" and "button_primary"; the primary variant reuses the
 // neutral disabled face so every control greys out alike.

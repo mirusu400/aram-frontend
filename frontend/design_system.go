@@ -33,6 +33,9 @@ type ARAMPalette struct {
 	TextMuted     color.NRGBA
 	TextDisabled  color.NRGBA
 	OnAccent      color.NRGBA
+	OnWarm        color.NRGBA
+	GuestSurface  color.NRGBA
+	GuestInk      color.NRGBA
 	Accent        color.NRGBA
 	AccentHover   color.NRGBA
 	AccentPressed color.NRGBA
@@ -90,6 +93,7 @@ type ARAMComponents struct {
 	Badge         *euiimage.NineSlice
 	Divider       *euiimage.NineSlice
 	ControlGroup  *euiimage.NineSlice
+	LCDBezel      *euiimage.NineSlice
 	Scrim         *euiimage.NineSlice
 	Scroll        *widget.ScrollContainerImage
 	SliderTrack   *widget.SliderTrackImage
@@ -269,6 +273,9 @@ func aramPalette(mode string) ARAMPalette {
 			TextMuted:     color.NRGBA{R: 0xa3, G: 0xab, B: 0xc0, A: 0xff},
 			TextDisabled:  color.NRGBA{R: 0x5d, G: 0x64, B: 0x78, A: 0xff},
 			OnAccent:      color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff},
+			OnWarm:        color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff},
+			GuestSurface:  color.NRGBA{R: 0x0f, G: 0x11, B: 0x15, A: 0xff},
+			GuestInk:      color.NRGBA{R: 0xe9, G: 0xec, B: 0xf4, A: 0xff},
 			Accent:        color.NRGBA{R: 0x4c, G: 0x8d, B: 0xff, A: 0xff},
 			AccentHover:   color.NRGBA{R: 0x6b, G: 0xa1, B: 0xff, A: 0xff},
 			AccentPressed: color.NRGBA{R: 0x33, G: 0x72, B: 0xe0, A: 0xff},
@@ -291,6 +298,9 @@ func aramPalette(mode string) ARAMPalette {
 		TextMuted:     color.NRGBA{R: 0x59, G: 0x63, B: 0x7a, A: 0xff},
 		TextDisabled:  color.NRGBA{R: 0x9a, G: 0xa3, B: 0xb5, A: 0xff},
 		OnAccent:      color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff},
+		OnWarm:        color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff},
+		GuestSurface:  color.NRGBA{R: 0xf2, G: 0xf4, B: 0xf8, A: 0xff},
+		GuestInk:      color.NRGBA{R: 0x1c, G: 0x22, B: 0x30, A: 0xff},
 		Accent:        color.NRGBA{R: 0x2f, G: 0x6f, B: 0xe4, A: 0xff},
 		AccentHover:   color.NRGBA{R: 0x46, G: 0x81, B: 0xef, A: 0xff},
 		AccentPressed: color.NRGBA{R: 0x22, G: 0x58, B: 0xbd, A: 0xff},

@@ -108,17 +108,36 @@ func (u *shellUI) buildApplicationToolbar(shell *Shell) *widget.Container {
 		})),
 	)
 
-	addAction := func(id, label string, width int) {
+	addAction := func(id, label, icon string, width int) {
 		commandID := id
-		button := design.button(
-			label,
-			design.Components.SubtleButton,
-			design.Type.Strong,
-			width,
-			32,
-			widget.TextPositionCenter,
-			func() { shell.dispatchCommand(commandID) },
-		)
+		var button *widget.Button
+		if graphic := design.retroIcon(icon); graphic != nil {
+			// Sprite skins draw the era-style icon toolbar instead of the
+			// text actions; the labels stay available through the menus.
+			// The theme's DefaultTextColor makes EbitenUI add an empty text
+			// widget before the graphic, offsetting the icon by half the
+			// row spacing (10px); the right padding cancels that shift so
+			// the icon sits centered.
+			button = widget.NewButton(
+				widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.MinSize(36, 32)),
+				widget.ButtonOpts.Image(design.Components.SubtleButton.Image),
+				widget.ButtonOpts.Graphic(graphic),
+				widget.ButtonOpts.TextPadding(&widget.Insets{Right: 10}),
+				widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
+					shell.dispatchCommand(commandID)
+				}),
+			)
+		} else {
+			button = design.button(
+				label,
+				design.Components.SubtleButton,
+				design.Type.Strong,
+				width,
+				32,
+				widget.TextPositionCenter,
+				func() { shell.dispatchCommand(commandID) },
+			)
+		}
 		button.GetWidget().CustomData = commandID
 		u.toolbarButtons[commandID] = button
 		actions.AddChild(button)
@@ -135,14 +154,14 @@ func (u *shellUI) buildApplicationToolbar(shell *Shell) *widget.Container {
 		))
 	}
 
-	addAction("file.open", shell.tr("Open"), 68)
+	addAction("file.open", shell.tr("Open"), "open", 68)
 	addSeparator()
-	addAction("emu.start", shell.tr("Start"), 64)
-	addAction("emu.pause", shell.tr("Pause"), 64)
-	addAction("emu.stop", shell.tr("Stop"), 60)
-	addAction("emu.reset", shell.tr("Reset"), 62)
+	addAction("emu.start", shell.tr("Start"), "play", 64)
+	addAction("emu.pause", shell.tr("Pause"), "pause", 64)
+	addAction("emu.stop", shell.tr("Stop"), "stop", 60)
+	addAction("emu.reset", shell.tr("Reset"), "reset", 62)
 	addSeparator()
-	addAction("emu.configure", shell.tr("Settings"), 82)
+	addAction("emu.configure", shell.tr("Settings"), "settings", 82)
 
 	u.toolbarTitle = design.text(
 		"",

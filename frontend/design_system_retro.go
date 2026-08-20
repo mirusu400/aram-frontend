@@ -22,19 +22,47 @@ func applyRetroSkin(ds *ARAMDesignSystem, family string) {
 	}
 }
 
+// retroTheme reports the sprite theme id backing this design system; ok is
+// false for the modern vector-drawn family.
+func (d *ARAMDesignSystem) retroTheme() (string, bool) {
+	if !isRetroFamily(d.Family) {
+		return "", false
+	}
+	return retroThemeID(d.Family, d.Mode), true
+}
+
+// retroIcon returns the pack's 16×16 pixel icon for sprite skins and nil for
+// the modern family, letting UI code fall back to text-only controls.
+func (d *ARAMDesignSystem) retroIcon(name string) *widget.GraphicImage {
+	theme, ok := d.retroTheme()
+	if !ok {
+		return nil
+	}
+	return retroIconGraphic(theme, name)
+}
+
 // retroComponents maps the pack's slice vocabulary (panel, titlebar, selection,
 // …) onto the component roles the shell consumes. The checkbox stays
 // vector-drawn from the retro palette because the pack ships no checkbox tile.
 func retroComponents(theme string, palette ARAMPalette) ARAMComponents {
 	transparent := euiimage.NewNineSliceColor(color.NRGBA{})
 	button := retroButtonImage(theme, "button")
-	primary := retroButtonImage(theme, "button_primary")
 	hover := retroNineSlice(theme, "button_hover")
 	selection := retroNineSlice(theme, "selection")
 	panel := retroNineSlice(theme, "panel")
 	sunken := retroNineSlice(theme, "panel_sunken")
 	statusBar := retroNineSlice(theme, "statusbar")
 	progressTrack := retroNineSlice(theme, "progress_track")
+	// Primary actions wear the soft-key face (확인/취소 in the era's shells);
+	// the pack ships it with idle and pressed states only.
+	softKeyPressed := retroNineSlice(theme, "softkey_pressed")
+	softKey := &widget.ButtonImage{
+		Idle:         retroNineSlice(theme, "softkey_idle"),
+		Hover:        retroNineSlice(theme, "softkey_idle"),
+		Pressed:      softKeyPressed,
+		PressedHover: softKeyPressed,
+		Disabled:     retroNineSlice(theme, "button_disabled"),
+	}
 
 	return ARAMComponents{
 		MenuBar:       statusBar,
@@ -45,10 +73,11 @@ func retroComponents(theme string, palette ARAMPalette) ARAMComponents {
 		DialogTitle:   retroNineSlice(theme, "titlebar"),
 		DialogBody:    panel,
 		NavRail:       sunken,
-		Dropdown:      retroNineSlice(theme, "tooltip"),
+		Dropdown:      panel,
 		Badge:         selection,
 		Divider:       euiimage.NewNineSliceColor(palette.Border),
 		ControlGroup:  sunken,
+		LCDBezel:      retroNineSlice(theme, "lcd_bezel"),
 		Scrim:         euiimage.NewNineSliceColor(palette.Overlay),
 		Scroll: &widget.ScrollContainerImage{
 			Idle: retroNineSlice(theme, "scroll_track"),
@@ -62,9 +91,10 @@ func retroComponents(theme string, palette ARAMPalette) ARAMComponents {
 		SliderHandle: button,
 		Checkbox:     checkboxImages(palette),
 		MenuButton: ARAMButtonStyle{
-			Image: buttonImages(transparent, hover, selection, selection, transparent),
+			// Hover already draws the era-defining accent gradient bar.
+			Image: buttonImages(transparent, selection, selection, selection, transparent),
 			Text: buttonTextColors(
-				palette.Text, palette.Text, palette.OnAccent, palette.TextDisabled),
+				palette.Text, palette.OnAccent, palette.OnAccent, palette.TextDisabled),
 			Padding:   widget.Insets{Left: 8, Right: 8},
 			MinHeight: 28,
 		},
@@ -83,16 +113,24 @@ func retroComponents(theme string, palette ARAMPalette) ARAMComponents {
 			MinHeight: 30,
 		},
 		PrimaryButton: ARAMButtonStyle{
-			Image: primary,
+			Image: softKey,
 			Text: buttonTextColors(
-				palette.OnAccent, palette.OnAccent, palette.OnAccent, palette.TextDisabled),
+				palette.OnWarm, palette.OnWarm, palette.OnWarm, palette.TextDisabled),
 			Padding:   widget.Insets{Left: 18, Right: 18},
 			MinHeight: 36,
 		},
 		TouchButton: ARAMButtonStyle{
-			Image: button,
+			// A held key lights up with the accent fill, like the pressed
+			// digit on the pack's keypad mockups.
+			Image: &widget.ButtonImage{
+				Idle:         button.Idle,
+				Hover:        button.Hover,
+				Pressed:      retroNineSlice(theme, "button_primary_pressed"),
+				PressedHover: retroNineSlice(theme, "button_primary_pressed"),
+				Disabled:     button.Disabled,
+			},
 			Text: buttonTextColors(
-				palette.Text, palette.Text, palette.Text, palette.TextDisabled),
+				palette.Text, palette.Text, palette.OnAccent, palette.TextDisabled),
 			Padding:   widget.Insets{Left: 10, Right: 10},
 			MinHeight: 44,
 		},

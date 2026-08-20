@@ -14,8 +14,13 @@ var requiredRetroSlices = []string{
 	"button_idle", "button_hover", "button_pressed", "button_disabled",
 	"button_primary_idle", "button_primary_hover", "button_primary_pressed",
 	"selection", "panel", "panel_sunken", "statusbar", "titlebar",
-	"tooltip", "progress_track", "scroll_track",
+	"progress_track", "scroll_track", "lcd_bezel",
+	"softkey_idle", "softkey_pressed",
 }
+
+// requiredRetroIcons lists the toolbar icons buildApplicationToolbar wires up;
+// each must exist in both the normal and the inverted ink set.
+var requiredRetroIcons = []string{"open", "play", "pause", "stop", "reset", "settings"}
 
 func TestRetroThemeAssetsComplete(t *testing.T) {
 	for _, family := range retroFamilies() {
@@ -39,6 +44,14 @@ func TestRetroThemeAssetsComplete(t *testing.T) {
 				if cfg.Width != retroSliceTile || cfg.Height != retroSliceTile {
 					t.Errorf("%s is %dx%d, want %dx%d",
 						path, cfg.Width, cfg.Height, retroSliceTile, retroSliceTile)
+				}
+			}
+			for _, name := range requiredRetroIcons {
+				for _, kind := range []string{"icon", "icon_inv"} {
+					path := fmt.Sprintf("retrothemes/%s/%s/%s.png", theme, kind, name)
+					if _, err := retroThemeFS.ReadFile(path); err != nil {
+						t.Errorf("missing icon: %v", err)
+					}
 				}
 			}
 		}

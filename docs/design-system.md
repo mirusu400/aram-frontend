@@ -47,6 +47,14 @@ one design system: the retro path swaps `ARAMPalette` and `ARAMComponents`
 for sprite-backed equivalents (`design_system_retro*.go`) while typography,
 spacing, and the token contract stay unchanged. Switching either setting
 rebuilds the design system and shell UI at runtime; no restart is required.
+
+Sprite skins go beyond the nine-slice chrome: the application toolbar swaps
+its text actions for the pack's 16×16 pixel icons (inverted ink on pressed
+faces, faded for disabled), primary actions wear the era's soft-key face with
+the pack's `text_on_warm` ink, the menu highlight is the accent gradient
+selection bar, and the guest viewport is framed by the pack's LCD bezel with
+`lcd_bg`/`lcd_ink` driving the empty-state screen through the
+`GuestSurface`/`GuestInk` palette roles.
 Every retro tile is 17×17 with an 8px fixed border and a 1px stretchable
 center, which keeps gradients from banding at any control size.
 
