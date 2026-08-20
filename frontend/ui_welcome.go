@@ -3,7 +3,6 @@ package frontend
 import (
 	"fmt"
 
-	euiimage "github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
 )
 
@@ -26,7 +25,7 @@ func (u *shellUI) syncWelcomePanel(shell *Shell) {
 	u.scrim.GetWidget().SetVisibility(widget.Visibility_Show)
 	design := u.design
 	contents := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(design.Components.SurfaceRaised),
+		widget.ContainerOpts.BackgroundImage(design.Components.DialogBody),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 
@@ -155,9 +154,7 @@ func (u *shellUI) syncWelcomePanel(shell *Shell) {
 	contents.AddChild(actions)
 
 	titleBar := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(
-			euiimage.NewNineSliceColor(design.Palette.AccentSoft),
-		),
+		widget.ContainerOpts.BackgroundImage(design.Components.DialogTitle),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 	titleBar.AddChild(design.text(

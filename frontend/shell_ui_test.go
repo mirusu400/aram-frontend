@@ -441,7 +441,7 @@ func TestARAMRoundedRectHitModel(t *testing.T) {
 	}
 }
 
-func TestAppearanceSwitchRebuildsNeutralSquareDesign(t *testing.T) {
+func TestAppearanceSwitchRebuildsRoundedCoolDesign(t *testing.T) {
 	shell := NewShell(NullBackend{}, nil, "")
 	shell.settings.ThemeMode = "light"
 	shell.syncDesignSystem()
@@ -449,11 +449,11 @@ func TestAppearanceSwitchRebuildsNeutralSquareDesign(t *testing.T) {
 	if shell.design.Mode != "light" {
 		t.Fatalf("initial design mode = %q", shell.design.Mode)
 	}
-	if shell.design.Radius.Small != 0 ||
-		shell.design.Radius.Medium != 0 ||
-		shell.design.Radius.Large != 0 ||
-		shell.design.Radius.Pill != 0 {
-		t.Fatalf("design still uses rounded corners: %#v", shell.design.Radius)
+	if shell.design.Radius.Small <= 0 ||
+		shell.design.Radius.Medium <= shell.design.Radius.Small ||
+		shell.design.Radius.Large <= shell.design.Radius.Medium ||
+		shell.design.Radius.Pill <= 0 {
+		t.Fatalf("design lost its rounded corner scale: %#v", shell.design.Radius)
 	}
 
 	shell.settings.ThemeMode = "dark"
@@ -465,8 +465,8 @@ func TestAppearanceSwitchRebuildsNeutralSquareDesign(t *testing.T) {
 		t.Fatal("theme switch did not rebuild EbitenUI component styles")
 	}
 	canvas := shell.design.Palette.Canvas
-	if canvas.R != canvas.G || canvas.G != canvas.B {
-		t.Fatalf("dark canvas is not neutral: %#v", canvas)
+	if canvas.B < canvas.R || canvas.B < canvas.G {
+		t.Fatalf("dark canvas lost its cool tint: %#v", canvas)
 	}
 }
 

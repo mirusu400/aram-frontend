@@ -26,7 +26,7 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 	u.scrim.GetWidget().SetVisibility(widget.Visibility_Show)
 	design := u.design
 	contents := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(design.Components.SurfaceRaised),
+		widget.ContainerOpts.BackgroundImage(design.Components.DialogBody),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 	contents.AddChild(design.text(
@@ -218,7 +218,7 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 	contents.AddChild(recentList)
 
 	titleBar := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(euiimage.NewNineSliceColor(design.Palette.AccentSoft)),
+		widget.ContainerOpts.BackgroundImage(design.Components.DialogTitle),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 	titleBar.AddChild(design.text(

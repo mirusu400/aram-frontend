@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/ebitenui/ebitenui"
-	euiimage "github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -188,7 +187,7 @@ func (u *shellUI) syncPanel(shell *Shell) {
 
 	design := u.design
 	contents := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(design.Components.SurfaceRaised),
+		widget.ContainerOpts.BackgroundImage(design.Components.DialogBody),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 	body := widget.NewText(
@@ -252,7 +251,7 @@ func (u *shellUI) syncPanel(shell *Shell) {
 	contents.AddChild(closeButton)
 
 	titleBar := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(euiimage.NewNineSliceColor(design.Palette.AccentSoft)),
+		widget.ContainerOpts.BackgroundImage(design.Components.DialogTitle),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 	titleBar.AddChild(design.text(

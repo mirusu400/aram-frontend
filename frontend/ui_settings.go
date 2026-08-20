@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"image"
 
-	euiimage "github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -100,7 +99,7 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 	u.scrim.GetWidget().SetVisibility(widget.Visibility_Show)
 	design := u.design
 	contents := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(design.Components.SurfaceRaised),
+		widget.ContainerOpts.BackgroundImage(design.Components.DialogBody),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 
@@ -109,7 +108,7 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 		navWidth = 112
 	}
 	navigation := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(euiimage.NewNineSliceColor(design.Palette.CanvasRaised)),
+		widget.ContainerOpts.BackgroundImage(design.Components.NavRail),
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
 			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(design.Space.M)),
@@ -278,7 +277,7 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 	contents.AddChild(doneButton)
 
 	titleBar := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(euiimage.NewNineSliceColor(design.Palette.CanvasRaised)),
+		widget.ContainerOpts.BackgroundImage(design.Components.DialogTitle),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 	titleBar.AddChild(design.text(

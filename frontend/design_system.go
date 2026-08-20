@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"image"
 	"image/color"
+	"math"
 
 	euiimage "github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
@@ -82,6 +83,9 @@ type ARAMComponents struct {
 	StatusBar     *euiimage.NineSlice
 	Surface       *euiimage.NineSlice
 	SurfaceRaised *euiimage.NineSlice
+	DialogTitle   *euiimage.NineSlice
+	DialogBody    *euiimage.NineSlice
+	NavRail       *euiimage.NineSlice
 	Dropdown      *euiimage.NineSlice
 	Badge         *euiimage.NineSlice
 	Divider       *euiimage.NineSlice
@@ -114,7 +118,7 @@ type ARAMDesignSystem struct {
 func newARAMDesignSystem(mode string) *ARAMDesignSystem {
 	palette := aramPalette(mode)
 	spacing := ARAMSpacing{XXS: 2, XS: 4, S: 8, M: 12, L: 16, XL: 24, XXL: 32}
-	radius := ARAMRadius{}
+	radius := ARAMRadius{Small: 6, Medium: 10, Large: 14, Pill: 8}
 
 	regularSource, err := text.NewGoTextFaceSource(bytes.NewReader(goregular.TTF))
 	if err != nil {
@@ -132,8 +136,8 @@ func newARAMDesignSystem(mode string) *ARAMDesignSystem {
 		Caption: goTextFace(regularSource, koreanSource, 11, 400),
 		Body:    goTextFace(regularSource, koreanSource, 13, 400),
 		Strong:  goTextFace(boldSource, koreanSource, 13, 700),
-		Heading: goTextFace(boldSource, koreanSource, 16, 700),
-		Display: goTextFace(boldSource, koreanSource, 22, 700),
+		Heading: goTextFace(boldSource, koreanSource, 17, 700),
+		Display: goTextFace(boldSource, koreanSource, 24, 700),
 	}
 
 	transparent := euiimage.NewNineSliceColor(color.NRGBA{})
@@ -160,11 +164,17 @@ func newARAMDesignSystem(mode string) *ARAMDesignSystem {
 		StatusBar:     euiimage.NewNineSliceColor(palette.CanvasRaised),
 		Surface:       roundedNineSlice(palette.Surface, palette.Border, radius.Large, 1),
 		SurfaceRaised: roundedNineSlice(palette.SurfaceRaised, palette.BorderStrong, radius.Large, 1),
-		Dropdown:      roundedNineSlice(palette.SurfaceRaised, palette.BorderStrong, radius.Medium, 1),
-		Badge:         roundedNineSlice(palette.AccentSoft, palette.Accent, radius.Pill, 1),
-		Divider:       euiimage.NewNineSliceColor(palette.Border),
-		ControlGroup:  roundedNineSlice(palette.CanvasRaised, palette.Border, radius.Medium, 1),
-		Scrim:         euiimage.NewNineSliceColor(palette.Overlay),
+		DialogTitle: cornerNineSlice(palette.SurfaceRaised, palette.BorderStrong,
+			cornerRadii{TopLeft: radius.Large, TopRight: radius.Large}, 1),
+		DialogBody: cornerNineSlice(palette.SurfaceRaised, palette.BorderStrong,
+			cornerRadii{BottomLeft: radius.Large, BottomRight: radius.Large}, 1),
+		NavRail: cornerNineSlice(palette.CanvasRaised, color.NRGBA{},
+			cornerRadii{BottomLeft: radius.Large}, 0),
+		Dropdown:     roundedNineSlice(palette.SurfaceRaised, palette.BorderStrong, radius.Medium, 1),
+		Badge:        roundedNineSlice(palette.AccentSoft, palette.Accent, radius.Pill, 1),
+		Divider:      euiimage.NewNineSliceColor(palette.Border),
+		ControlGroup: roundedNineSlice(palette.CanvasRaised, palette.Border, radius.Medium, 1),
+		Scrim:        euiimage.NewNineSliceColor(palette.Overlay),
 		Scroll: &widget.ScrollContainerImage{
 			Idle: euiimage.NewNineSliceColor(color.NRGBA{}),
 			Mask: euiimage.NewNineSliceColor(color.White),
@@ -235,47 +245,47 @@ func defaultARAMPalette() ARAMPalette {
 func aramPalette(mode string) ARAMPalette {
 	if mode == "dark" {
 		return ARAMPalette{
-			Canvas:        color.NRGBA{R: 0x12, G: 0x12, B: 0x12, A: 0xff},
-			CanvasRaised:  color.NRGBA{R: 0x19, G: 0x19, B: 0x19, A: 0xff},
-			Surface:       color.NRGBA{R: 0x20, G: 0x20, B: 0x20, A: 0xff},
-			SurfaceRaised: color.NRGBA{R: 0x26, G: 0x26, B: 0x26, A: 0xff},
-			SurfaceHover:  color.NRGBA{R: 0x32, G: 0x32, B: 0x32, A: 0xff},
-			Border:        color.NRGBA{R: 0x3d, G: 0x3d, B: 0x3d, A: 0xff},
-			BorderStrong:  color.NRGBA{R: 0x55, G: 0x55, B: 0x55, A: 0xff},
-			Text:          color.NRGBA{R: 0xf2, G: 0xf2, B: 0xf2, A: 0xff},
-			TextMuted:     color.NRGBA{R: 0xb5, G: 0xb5, B: 0xb5, A: 0xff},
-			TextDisabled:  color.NRGBA{R: 0x69, G: 0x69, B: 0x69, A: 0xff},
+			Canvas:        color.NRGBA{R: 0x0f, G: 0x11, B: 0x15, A: 0xff},
+			CanvasRaised:  color.NRGBA{R: 0x15, G: 0x18, B: 0x20, A: 0xff},
+			Surface:       color.NRGBA{R: 0x1a, G: 0x1e, B: 0x27, A: 0xff},
+			SurfaceRaised: color.NRGBA{R: 0x22, G: 0x27, B: 0x33, A: 0xff},
+			SurfaceHover:  color.NRGBA{R: 0x2c, G: 0x32, B: 0x41, A: 0xff},
+			Border:        color.NRGBA{R: 0x33, G: 0x3a, B: 0x4a, A: 0xff},
+			BorderStrong:  color.NRGBA{R: 0x4a, G: 0x53, B: 0x67, A: 0xff},
+			Text:          color.NRGBA{R: 0xe9, G: 0xec, B: 0xf4, A: 0xff},
+			TextMuted:     color.NRGBA{R: 0xa3, G: 0xab, B: 0xc0, A: 0xff},
+			TextDisabled:  color.NRGBA{R: 0x5d, G: 0x64, B: 0x78, A: 0xff},
 			OnAccent:      color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff},
-			Accent:        color.NRGBA{R: 0x00, G: 0x78, B: 0xd4, A: 0xff},
-			AccentHover:   color.NRGBA{R: 0x18, G: 0x8c, B: 0xe8, A: 0xff},
-			AccentPressed: color.NRGBA{R: 0x00, G: 0x5a, B: 0x9e, A: 0xff},
-			AccentSoft:    color.NRGBA{R: 0x39, G: 0x39, B: 0x39, A: 0xff},
-			Success:       color.NRGBA{R: 0x35, G: 0xa8, B: 0x53, A: 0xff},
-			Warning:       color.NRGBA{R: 0xd9, G: 0x9b, B: 0x26, A: 0xff},
-			Fault:         color.NRGBA{R: 0xe0, G: 0x52, B: 0x5c, A: 0xff},
-			Overlay:       color.NRGBA{R: 0x00, G: 0x00, B: 0x00, A: 0xb0},
+			Accent:        color.NRGBA{R: 0x4c, G: 0x8d, B: 0xff, A: 0xff},
+			AccentHover:   color.NRGBA{R: 0x6b, G: 0xa1, B: 0xff, A: 0xff},
+			AccentPressed: color.NRGBA{R: 0x33, G: 0x72, B: 0xe0, A: 0xff},
+			AccentSoft:    color.NRGBA{R: 0x24, G: 0x33, B: 0x4f, A: 0xff},
+			Success:       color.NRGBA{R: 0x3f, G: 0xb9, B: 0x60, A: 0xff},
+			Warning:       color.NRGBA{R: 0xe0, G: 0xa6, B: 0x3a, A: 0xff},
+			Fault:         color.NRGBA{R: 0xef, G: 0x5b, B: 0x66, A: 0xff},
+			Overlay:       color.NRGBA{R: 0x06, G: 0x08, B: 0x0c, A: 0xb4},
 		}
 	}
 	return ARAMPalette{
-		Canvas:        color.NRGBA{R: 0xf3, G: 0xf3, B: 0xf3, A: 0xff},
-		CanvasRaised:  color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff},
-		Surface:       color.NRGBA{R: 0xf7, G: 0xf7, B: 0xf7, A: 0xff},
+		Canvas:        color.NRGBA{R: 0xf2, G: 0xf4, B: 0xf8, A: 0xff},
+		CanvasRaised:  color.NRGBA{R: 0xfb, G: 0xfc, B: 0xfe, A: 0xff},
+		Surface:       color.NRGBA{R: 0xf6, G: 0xf8, B: 0xfb, A: 0xff},
 		SurfaceRaised: color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff},
-		SurfaceHover:  color.NRGBA{R: 0xe8, G: 0xe8, B: 0xe8, A: 0xff},
-		Border:        color.NRGBA{R: 0xd0, G: 0xd0, B: 0xd0, A: 0xff},
-		BorderStrong:  color.NRGBA{R: 0xa9, G: 0xa9, B: 0xa9, A: 0xff},
-		Text:          color.NRGBA{R: 0x20, G: 0x20, B: 0x20, A: 0xff},
-		TextMuted:     color.NRGBA{R: 0x5f, G: 0x5f, B: 0x5f, A: 0xff},
-		TextDisabled:  color.NRGBA{R: 0xa2, G: 0xa2, B: 0xa2, A: 0xff},
+		SurfaceHover:  color.NRGBA{R: 0xe9, G: 0xed, B: 0xf4, A: 0xff},
+		Border:        color.NRGBA{R: 0xd5, G: 0xda, B: 0xe4, A: 0xff},
+		BorderStrong:  color.NRGBA{R: 0xaa, G: 0xb2, B: 0xc4, A: 0xff},
+		Text:          color.NRGBA{R: 0x1c, G: 0x22, B: 0x30, A: 0xff},
+		TextMuted:     color.NRGBA{R: 0x59, G: 0x63, B: 0x7a, A: 0xff},
+		TextDisabled:  color.NRGBA{R: 0x9a, G: 0xa3, B: 0xb5, A: 0xff},
 		OnAccent:      color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff},
-		Accent:        color.NRGBA{R: 0x00, G: 0x67, B: 0xc0, A: 0xff},
-		AccentHover:   color.NRGBA{R: 0x00, G: 0x78, B: 0xd4, A: 0xff},
-		AccentPressed: color.NRGBA{R: 0x00, G: 0x4f, B: 0x94, A: 0xff},
-		AccentSoft:    color.NRGBA{R: 0xe5, G: 0xf1, B: 0xfb, A: 0xff},
-		Success:       color.NRGBA{R: 0x21, G: 0x78, B: 0x3b, A: 0xff},
-		Warning:       color.NRGBA{R: 0x9a, G: 0x67, B: 0x00, A: 0xff},
-		Fault:         color.NRGBA{R: 0xc4, G: 0x2b, B: 0x38, A: 0xff},
-		Overlay:       color.NRGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x66},
+		Accent:        color.NRGBA{R: 0x2f, G: 0x6f, B: 0xe4, A: 0xff},
+		AccentHover:   color.NRGBA{R: 0x46, G: 0x81, B: 0xef, A: 0xff},
+		AccentPressed: color.NRGBA{R: 0x22, G: 0x58, B: 0xbd, A: 0xff},
+		AccentSoft:    color.NRGBA{R: 0xe3, G: 0xec, B: 0xfc, A: 0xff},
+		Success:       color.NRGBA{R: 0x1f, G: 0x7a, B: 0x3d, A: 0xff},
+		Warning:       color.NRGBA{R: 0x96, G: 0x66, B: 0x0a, A: 0xff},
+		Fault:         color.NRGBA{R: 0xc9, G: 0x38, B: 0x43, A: 0xff},
+		Overlay:       color.NRGBA{R: 0x10, G: 0x14, B: 0x1c, A: 0x66},
 	}
 }
 
@@ -378,48 +388,114 @@ func checkboxImage(
 	return euiimage.NewFixedNineSlice(result)
 }
 
+// cornerRadii carries per-corner rounding so composite surfaces (dialog title
+// above dialog body, the settings navigation rail) can share flat seams
+// without square corners overdrawing rounded ones.
+type cornerRadii struct {
+	TopLeft     int
+	TopRight    int
+	BottomLeft  int
+	BottomRight int
+}
+
+func (c cornerRadii) maxRadius() int {
+	return max(max(c.TopLeft, c.TopRight), max(c.BottomLeft, c.BottomRight))
+}
+
 // roundedNineSlice rasterizes a small scalable rounded surface once. Runtime
 // widgets then use EbitenUI's nine-slice renderer without per-frame geometry.
 func roundedNineSlice(fill, border color.Color, radius, borderWidth int) *euiimage.NineSlice {
-	if radius <= 0 {
+	return cornerNineSlice(fill, border, cornerRadii{
+		TopLeft:     radius,
+		TopRight:    radius,
+		BottomLeft:  radius,
+		BottomRight: radius,
+	}, borderWidth)
+}
+
+func cornerNineSlice(fill, border color.Color, corners cornerRadii, borderWidth int) *euiimage.NineSlice {
+	maxRadius := corners.maxRadius()
+	if maxRadius <= 0 {
 		if borderWidth <= 0 {
 			return euiimage.NewNineSliceColor(fill)
 		}
 		return euiimage.NewBorderedNineSliceColor(fill, border, borderWidth)
 	}
-	radius = max(1, radius)
-	size := radius*2 + 3
+	size := maxRadius*2 + 5
 	source := image.NewNRGBA(image.Rect(0, 0, size, size))
 	fillNRGBA := color.NRGBAModel.Convert(fill).(color.NRGBA)
 	borderNRGBA := color.NRGBAModel.Convert(border).(color.NRGBA)
 
+	innerCorners := cornerRadii{
+		TopLeft:     max(0, corners.TopLeft-borderWidth),
+		TopRight:    max(0, corners.TopRight-borderWidth),
+		BottomLeft:  max(0, corners.BottomLeft-borderWidth),
+		BottomRight: max(0, corners.BottomRight-borderWidth),
+	}
+	edge := float64(size)
+	inset := float64(borderWidth)
 	for y := 0; y < size; y++ {
 		for x := 0; x < size; x++ {
-			if !insideRoundedRect(x, y, 0, 0, size, size, radius) {
+			px := float64(x) + 0.5
+			py := float64(y) + 0.5
+			outer := roundedRectCoverage(px, py, 0, 0, edge, edge, corners)
+			inner := outer
+			if borderWidth > 0 {
+				inner = roundedRectCoverage(
+					px, py, inset, inset, edge-inset, edge-inset, innerCorners)
+			}
+			fillWeight := inner * float64(fillNRGBA.A)
+			borderWeight := max(0, outer-inner) * float64(borderNRGBA.A)
+			alpha := fillWeight + borderWeight
+			if alpha <= 0 {
 				continue
 			}
-			pixel := borderNRGBA
-			if borderWidth == 0 || insideRoundedRect(
-				x,
-				y,
-				borderWidth,
-				borderWidth,
-				size-borderWidth*2,
-				size-borderWidth*2,
-				max(0, radius-borderWidth),
-			) {
-				pixel = fillNRGBA
-			}
-			source.SetNRGBA(x, y, pixel)
+			source.SetNRGBA(x, y, color.NRGBA{
+				R: uint8((float64(fillNRGBA.R)*fillWeight + float64(borderNRGBA.R)*borderWeight) / alpha),
+				G: uint8((float64(fillNRGBA.G)*fillWeight + float64(borderNRGBA.G)*borderWeight) / alpha),
+				B: uint8((float64(fillNRGBA.B)*fillWeight + float64(borderNRGBA.B)*borderWeight) / alpha),
+				A: uint8(min(255, alpha)),
+			})
 		}
 	}
 
-	corner := radius + 1
+	left := max(corners.TopLeft, corners.BottomLeft) + 2
+	right := max(corners.TopRight, corners.BottomRight) + 2
+	top := max(corners.TopLeft, corners.TopRight) + 2
+	bottom := max(corners.BottomLeft, corners.BottomRight) + 2
 	return euiimage.NewNineSlice(
 		ebiten.NewImageFromImage(source),
-		[3]int{corner, 1, corner},
-		[3]int{corner, 1, corner},
+		[3]int{left, size - left - right, right},
+		[3]int{top, size - top - bottom, bottom},
 	)
+}
+
+// roundedRectCoverage approximates pixel coverage of a rounded rectangle from
+// its signed distance, giving one-pixel antialiased edges.
+func roundedRectCoverage(px, py, left, top, right, bottom float64, corners cornerRadii) float64 {
+	if right <= left || bottom <= top {
+		return 0
+	}
+	centerX := (left + right) / 2
+	centerY := (top + bottom) / 2
+	var radius float64
+	switch {
+	case px < centerX && py < centerY:
+		radius = float64(corners.TopLeft)
+	case px >= centerX && py < centerY:
+		radius = float64(corners.TopRight)
+	case px < centerX:
+		radius = float64(corners.BottomLeft)
+	default:
+		radius = float64(corners.BottomRight)
+	}
+	halfWidth := (right - left) / 2
+	halfHeight := (bottom - top) / 2
+	radius = min(radius, min(halfWidth, halfHeight))
+	qx := math.Abs(px-centerX) - (halfWidth - radius)
+	qy := math.Abs(py-centerY) - (halfHeight - radius)
+	distance := math.Hypot(max(qx, 0), max(qy, 0)) + min(max(qx, qy), 0) - radius
+	return min(1, max(0, 0.5-distance))
 }
 
 func insideRoundedRect(x, y, left, top, width, height, radius int) bool {
