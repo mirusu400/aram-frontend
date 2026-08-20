@@ -15,6 +15,9 @@ type touchButton struct {
 	Control string
 	Label   string
 	Bounds  image.Rectangle
+	// Hidden marks a button the user has put away. Only the layout editor
+	// draws these, in its tray.
+	Hidden bool
 }
 
 const (
@@ -33,6 +36,14 @@ type touchLayoutOptions struct {
 	// for digits, star, and hash as often as they ask for a direction, and a
 	// touch layout has no keyboard to fall back on.
 	Keypad bool
+	// DeckRatio is the share of screen height the deck claims, as a percent.
+	// Zero keeps the automatic height, which only knows whether the keypad is
+	// on; a title that needs a bigger picture more than it needs big buttons
+	// can trade one for the other.
+	DeckRatio int
+	// Hidden drops buttons a title never uses. They keep their placement so
+	// bringing one back does not lose where it sat.
+	Hidden map[string]bool
 }
 
 func defaultTouchLayoutOptions() touchLayoutOptions {
@@ -56,13 +67,13 @@ func touchControlButtonsWithOptions(
 	// gap, and in-cluster gaps so the clusters can never overlap, and by
 	// the vertical room for the rows on show — three for the clusters, four
 	// more when the numeric keypad sits below them.
-	rows := 3
-	if options.Keypad {
-		rows = 7
-	}
+	rows := touchDeckRowCount(options)
 	horizontalFit := (width - margin*2 - touchDeckCenterGap - gap*4) / 6
 	verticalFit := (deckHeight - touchDeckPadding*2 - gap*(rows-1)) / rows
-	fit := max(40, min(88, min(horizontalFit, verticalFit)))
+	// The floor is the smallest button the deck will draw. Anything higher
+	// would let the grid outgrow a short deck and push its last row under the
+	// status bar, which is what a hand-set deck ratio can produce.
+	fit := max(touchControlMinSize, min(88, min(horizontalFit, verticalFit)))
 	scale := options.Scale
 	if scale <= 0 {
 		scale = 1
@@ -100,6 +111,7 @@ func touchControlButtonsWithOptions(
 		buttons = append(buttons, numericTouchButtons(
 			width, gridTop+buttonSize*3+gap*3, buttonSize, gap)...)
 	}
+	buttons = visibleTouchButtons(buttons, options.Hidden)
 	for index := range buttons {
 		placement, ok := options.Placements[buttons[index].ID]
 		if !ok {
@@ -152,10 +164,30 @@ func touchDeckHeightWithOptions(
 	if width <= 0 || height <= 0 {
 		return 0
 	}
+	if ratio := options.DeckRatio; ratio > 0 {
+		ratio = clampInt(ratio, touchDeckRatioMin, touchDeckRatioMax)
+		// A ratio that cannot seat every row is raised to one that can: the
+		// alternative is a row drawn under the status bar, unreachable.
+		return min(
+			height-statusBarHeight,
+			max(minimumTouchDeckHeight(options), height*ratio/100),
+		)
+	}
 	if options.Keypad {
 		return min(560, max(320, height*54/100))
 	}
 	return min(280, max(190, height*32/100))
+}
+
+// touchDeckRatioPercent reports the deck's share of the screen, whether it
+// came from the setting or from the automatic height. The editor shows this
+// number, so it has to describe the deck actually on screen.
+func touchDeckRatioPercent(width, height int, options touchLayoutOptions) int {
+	if height <= 0 {
+		return touchDeckRatioMin
+	}
+	deck := touchDeckHeightWithOptions(width, height, options)
+	return clampInt(deck*100/height, touchDeckRatioMin, touchDeckRatioMax)
 }
 
 // touchChromeToggleBounds places the floating chrome toggle at the
@@ -350,4 +382,62 @@ func numericTouchButtons(width, top, size, gap int) []touchButton {
 		}
 	}
 	return buttons
+}
+
+// visibleTouchButtons drops the buttons the user has put away. The deck the
+// player touches never carries them; only the layout editor still shows them,
+// in its tray.
+func visibleTouchButtons(
+	buttons []touchButton,
+	hidden map[string]bool,
+) []touchButton {
+	if len(hidden) == 0 {
+		return buttons
+	}
+	kept := buttons[:0]
+	for _, button := range buttons {
+		if hidden[button.ID] {
+			continue
+		}
+		kept = append(kept, button)
+	}
+	return kept
+}
+
+// touchButtonCatalog is every slot the deck can hold for these options,
+// hidden ones included, in deck order. The editor needs the full set and
+// settings normalization needs the vocabulary.
+func touchButtonCatalog(width, height int, options touchLayoutOptions) []touchButton {
+	full := options
+	full.Hidden = nil
+	return touchControlButtonsWithOptions(width, height, full)
+}
+
+// isTouchButtonID reports whether an id names a deck slot. Sizes do not matter
+// here — the slots are the same whatever the screen.
+func isTouchButtonID(id string) bool {
+	options := defaultTouchLayoutOptions()
+	options.Keypad = true
+	for _, button := range touchButtonCatalog(1080, 1920, options) {
+		if button.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+// touchDeckRowCount is how many button rows the deck has to seat.
+func touchDeckRowCount(options touchLayoutOptions) int {
+	if options.Keypad {
+		return 7
+	}
+	return 3
+}
+
+// minimumTouchDeckHeight is the shortest deck that still fits every row at the
+// smallest button the deck draws, using the tightest gap any width produces.
+func minimumTouchDeckHeight(options touchLayoutOptions) int {
+	const tightestGap = 6
+	rows := touchDeckRowCount(options)
+	return touchControlMinSize*rows + tightestGap*(rows-1) + touchDeckPadding*2
 }

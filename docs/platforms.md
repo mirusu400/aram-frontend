@@ -51,7 +51,16 @@ hash — to the deck, which grows to hold four more rows; a handset has no
 keyboard, so those keys are otherwise unreachable. Every deck button, keypad
 keys included, is a placement slot: `Touch button layout` drags them into
 custom positions stored normalized in `touch_layout`, so a saved arrangement
-survives rotation and resizes. Native hosts can dispatch the same stable command IDs and forward
+survives rotation and resizes.
+
+That editor owns the whole trade between picture and controls. Steppers set
+how much height the deck takes (`touch_deck_ratio`, 20-65% of the screen; the
+guest display keeps the rest) and how large the buttons are
+(`touch_control_scale`). Dragging a button into the tray puts it away
+(`touch_hidden`) and dragging it back out restores it where it is dropped, so
+a title that needs only a D-pad can clear everything else off the screen.
+Every one of these is drafted while the editor is open and only written on
+save, which is what makes `Cancel` mean cancel. Native hosts can dispatch the same stable command IDs and forward
 inactive/active lifecycle changes. The lifecycle bridge resumes only a machine
 that it automatically paused; it never overrides a manual user pause.
 

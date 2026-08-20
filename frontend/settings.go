@@ -49,7 +49,9 @@ type Settings struct {
 	TitleControllers  map[string]ControllerProfile `json:"title_controller_profiles,omitempty"`
 	ShowVirtualKeypad bool                         `json:"show_virtual_keypad"`
 	TouchControlScale int                          `json:"touch_control_scale,omitempty"`
+	TouchDeckRatio    int                          `json:"touch_deck_ratio,omitempty"`
 	TouchLayout       map[string]TouchPlacement    `json:"touch_layout,omitempty"`
+	TouchHidden       map[string]bool              `json:"touch_hidden,omitempty"`
 	UpdateChannel     string                       `json:"update_channel"`
 	WelcomeCompleted  bool                         `json:"welcome_completed"`
 	IssueReports      []IssueReportRecord          `json:"issue_reports,omitempty"`
@@ -66,6 +68,11 @@ type TouchPlacement struct {
 const (
 	touchControlScaleMin = 80
 	touchControlScaleMax = 140
+	// touchDeckRatio bounds how much of the screen height the control deck
+	// may claim. The guest display keeps the rest, so the floor protects the
+	// controls and the ceiling protects the game.
+	touchDeckRatioMin = 20
+	touchDeckRatioMax = 65
 )
 
 // touchScaleFactor maps the persisted percentage (0 means unset) to a
@@ -142,6 +149,18 @@ func (s *Settings) normalize() {
 	}
 	if s.FontChoice == "custom" && s.CustomFontPath == "" {
 		s.FontChoice = "galmuri9"
+	}
+	if s.TouchDeckRatio != 0 {
+		s.TouchDeckRatio = clampInt(s.TouchDeckRatio, touchDeckRatioMin, touchDeckRatioMax)
+	}
+	if len(s.TouchHidden) > 0 {
+		// A button hidden by an older layout that no longer exists would
+		// otherwise sit in the file forever.
+		for id := range s.TouchHidden {
+			if !s.TouchHidden[id] || !isTouchButtonID(id) {
+				delete(s.TouchHidden, id)
+			}
+		}
 	}
 	if s.StateSlot < 0 || s.StateSlot > 9 {
 		s.StateSlot = 0

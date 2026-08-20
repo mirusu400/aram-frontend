@@ -77,8 +77,12 @@ type Shell struct {
 	touchControls             map[ebiten.TouchID]string
 	touchLayoutEditing        bool
 	touchLayoutDraft          map[string]TouchPlacement
+	touchHiddenDraft          map[string]bool
+	touchDeckRatioDraft       int
+	touchScaleDraft           int
 	touchLayoutDrag           map[ebiten.TouchID]string
 	touchLayoutDragOffset     map[ebiten.TouchID]image.Point
+	touchLayoutDragPoint      map[ebiten.TouchID]image.Point
 	busyCommands              map[BackendCommand]bool
 	frameRunPending           bool
 	frameGeneration           uint64
