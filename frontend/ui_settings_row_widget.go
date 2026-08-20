@@ -16,45 +16,74 @@ func (u *shellUI) buildSettingsRow(
 	actionWidth int,
 ) *widget.Container {
 	design := u.design
+	// A compact panel is too narrow to seat a label and its control side by
+	// side — a phone leaves the copy barely any width once the nav rail and
+	// the control have taken theirs — so the row stacks instead, which is
+	// also what a handset settings list looks like.
+	sliderValueWidth := 56
 	sliderWidth := 150
 	if u.viewportWidth < 600 {
 		sliderWidth = 110
 	}
-	const sliderValueWidth = 56
 	if model.slider != nil {
 		actionWidth = sliderWidth + design.Space.S + sliderValueWidth
 	}
+	stacked := u.settingsRowStacks(design, actionWidth)
+	if stacked {
+		actionWidth = u.settingsCopyWidth(design, actionWidth)
+		sliderWidth = max(64, actionWidth-sliderValueWidth-design.Space.S)
+	}
 	copyWidth := u.settingsCopyWidth(design, actionWidth)
 	actionLabelWidth := actionWidth - 2*design.Space.S
+	var rowLayout widget.Layouter = widget.NewAnchorLayout()
+	minHeight := 58
+	if stacked {
+		minHeight = 50
+		rowLayout = widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
+			widget.RowLayoutOpts.Padding(&widget.Insets{
+				Left:   design.Space.M,
+				Right:  design.Space.M,
+				Top:    design.Space.S,
+				Bottom: design.Space.S,
+			}),
+			widget.RowLayoutOpts.Spacing(design.Space.XS),
+		)
+	}
 	row := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(design.Components.ControlGroup),
-		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
+		widget.ContainerOpts.Layout(rowLayout),
 		widget.ContainerOpts.WidgetOpts(
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
-			widget.WidgetOpts.MinSize(0, func() int {
-				if u.compact {
-					return 50
-				}
-				return 58
-			}()),
+			widget.WidgetOpts.MinSize(0, minHeight),
 		),
 	)
+	// Where the copy and the control sit depends on whether the row stacks.
+	var copyLayout, actionLayout any = widget.AnchorLayoutData{
+		HorizontalPosition: widget.AnchorLayoutPositionStart,
+		VerticalPosition:   widget.AnchorLayoutPositionCenter,
+		Padding: &widget.Insets{
+			Left:  design.Space.M,
+			Right: actionWidth + design.Space.L,
+		},
+	}, widget.AnchorLayoutData{
+		HorizontalPosition: widget.AnchorLayoutPositionEnd,
+		VerticalPosition:   widget.AnchorLayoutPositionCenter,
+		Padding:            &widget.Insets{Right: design.Space.XS},
+	}
+	if stacked {
+		copyLayout = widget.RowLayoutData{Stretch: true}
+		actionLayout = widget.RowLayoutData{Stretch: true}
+	}
 	copyBlock := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
 			widget.RowLayoutOpts.Spacing(design.Space.XXS),
 		)),
-		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-			HorizontalPosition: widget.AnchorLayoutPositionStart,
-			VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			Padding: &widget.Insets{
-				Left:  design.Space.M,
-				Right: actionWidth + design.Space.L,
-			},
-		})),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(copyLayout)),
 	)
 	copyBlock.AddChild(design.wrappedText(
-		u.owner.tr(model.label),
+		fitWordsToWidth(u.owner.tr(model.label), design.Type.Strong, copyWidth),
 		design.Type.Strong,
 		design.Palette.Text,
 		copyWidth,
@@ -63,7 +92,7 @@ func (u *shellUI) buildSettingsRow(
 	if !u.compact {
 		copyBlock.AddChild(
 			design.wrappedText(
-				u.owner.tr(model.description),
+				fitWordsToWidth(u.owner.tr(model.description), design.Type.Caption, copyWidth),
 				design.Type.Caption,
 				design.Palette.TextMuted,
 				copyWidth,
@@ -97,11 +126,7 @@ func (u *shellUI) buildSettingsRow(
 			widget.ListComboButtonOpts.MaxContentHeight(148),
 			widget.ListComboButtonOpts.WidgetOpts(
 				widget.WidgetOpts.MinSize(actionWidth, 32),
-				widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-					HorizontalPosition: widget.AnchorLayoutPositionEnd,
-					VerticalPosition:   widget.AnchorLayoutPositionCenter,
-					Padding:            &widget.Insets{Right: design.Space.XS},
-				}),
+				widget.WidgetOpts.LayoutData(actionLayout),
 			),
 			widget.ListComboButtonOpts.ButtonParams(&widget.ButtonParams{
 				Image: buttonImages(
@@ -216,11 +241,7 @@ func (u *shellUI) buildSettingsRow(
 				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
 				widget.RowLayoutOpts.Spacing(design.Space.S),
 			)),
-			widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-				HorizontalPosition: widget.AnchorLayoutPositionEnd,
-				VerticalPosition:   widget.AnchorLayoutPositionCenter,
-				Padding:            &widget.Insets{Right: design.Space.M},
-			})),
+			widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(actionLayout)),
 		)
 		sliderGroup.AddChild(slider, valueLabel)
 		row.AddChild(sliderGroup)
@@ -233,15 +254,16 @@ func (u *shellUI) buildSettingsRow(
 	}
 
 	if model.action == nil {
-		row.AddChild(design.text(
-			fitTextToWidth(u.owner.tr(model.value), design.Type.Strong, actionLabelWidth),
-			design.Type.Strong,
-			design.Palette.TextMuted,
-			widget.AnchorLayoutData{
-				HorizontalPosition: widget.AnchorLayoutPositionEnd,
-				VerticalPosition:   widget.AnchorLayoutPositionCenter,
-				Padding:            &widget.Insets{Right: design.Space.M},
-			},
+		// A read-only value keeps to the same edge as the controls beside or
+		// under it, which a stretched text widget would otherwise abandon.
+		row.AddChild(widget.NewText(
+			widget.TextOpts.Text(
+				fitTextToWidth(u.owner.tr(model.value), design.Type.Strong, actionLabelWidth),
+				design.Type.Strong,
+				design.Palette.TextMuted,
+			),
+			widget.TextOpts.Position(widget.TextPositionEnd, widget.TextPositionCenter),
+			widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(actionLayout)),
 		))
 		return row
 	}
@@ -262,11 +284,7 @@ func (u *shellUI) buildSettingsRow(
 	valueButton.GetWidget().Disabled = model.disabled
 	// Right inset of XS plus the button's own text padding lines the label up
 	// with the Space.M edge used by the static value rows.
-	valueButton.GetWidget().LayoutData = widget.AnchorLayoutData{
-		HorizontalPosition: widget.AnchorLayoutPositionEnd,
-		VerticalPosition:   widget.AnchorLayoutPositionCenter,
-		Padding:            &widget.Insets{Right: design.Space.XS},
-	}
+	valueButton.GetWidget().LayoutData = actionLayout
 	row.AddChild(valueButton)
 	return row
 }

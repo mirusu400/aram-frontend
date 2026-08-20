@@ -76,6 +76,12 @@ selection bar, and the guest viewport is framed by the pack's LCD bezel with
 Every retro tile is 17×17 with an 8px fixed border and a 1px stretchable
 center, which keeps gradients from banding at any control size.
 
+A compact panel stacks each settings row instead: the label takes the full
+width and the control sits under it. At a phone's logical width a nav rail
+plus a control leaves the label almost nothing, which is how a slider ended up
+drawn over its own label; stacking is also what a handset settings list looks
+like.
+
 The `Configure ARAM` panel derives its geometry from the active ramp rather
 than from the modern faces it was first drawn for
 (`frontend/ui_settings_metrics.go`): the dialog scales with the body line

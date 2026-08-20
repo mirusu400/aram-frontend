@@ -1,6 +1,8 @@
 package frontend
 
 import (
+	"strings"
+
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
@@ -19,10 +21,17 @@ const (
 	settingsBaseLineHeight = 16.0
 	// settingsActionMinWidth keeps narrow labels from collapsing the action
 	// column; settingsActionMaxShare stops a long one from crowding out the
-	// label and description.
-	settingsActionMinWidth  = 92
-	settingsActionMaxShare  = 0.45
-	settingsCompactNavWidth = 112
+	// label and description. A compact panel has so little width to divide
+	// that the column has to give up more of it, accepting a trimmed control
+	// label to keep the label beside it readable.
+	settingsActionMinWidth        = 92
+	settingsActionMaxShare        = 0.45
+	settingsCompactActionMinWidth = 72
+	settingsCompactActionMaxShare = 0.34
+	settingsCompactNavWidth       = 112
+	// settingsMinCopyWidth is the least a label and description can be
+	// given before a row is better off stacking its control underneath.
+	settingsMinCopyWidth = 160
 )
 
 // typeRampScale reports how much larger the active body ramp is than the one
@@ -101,14 +110,30 @@ func (u *shellUI) settingsActionWidth(shell *Shell, models []settingsRowModel) i
 	// padding, and the dropdown needs room for its own frame.
 	width := int(widest) + 2*design.Space.M
 	rows := u.settingsRowsWidth(design)
-	return clampInt(width, settingsActionMinWidth, int(float64(rows)*settingsActionMaxShare))
+	minWidth, share := settingsActionMinWidth, settingsActionMaxShare
+	if u.compact {
+		minWidth, share = settingsCompactActionMinWidth, settingsCompactActionMaxShare
+	}
+	return clampInt(width, minWidth, int(float64(rows)*share))
 }
 
-// settingsCopyWidth is what is left for a row's label and description once the
-// action column and the row's own padding are taken out. Text wider than this
-// wraps instead of stretching the row.
+// settingsRowStacks reports whether a row puts its control under the copy
+// instead of beside it. The decision is made from what is actually left for
+// the copy, not from the compact flag: a phone leaves too little either way,
+// while a merely short desktop window still has room to sit them side by
+// side, and stacking there would be a surprise.
+func (u *shellUI) settingsRowStacks(design *ARAMDesignSystem, actionWidth int) bool {
+	rows := u.settingsRowsWidth(design)
+	return rows-design.Space.M-actionWidth-design.Space.L < settingsMinCopyWidth
+}
+
+// settingsCopyWidth is the width a row's label and description have to work
+// with. Text wider than this wraps instead of stretching the row.
 func (u *shellUI) settingsCopyWidth(design *ARAMDesignSystem, actionWidth int) int {
 	rows := u.settingsRowsWidth(design)
+	if u.settingsRowStacks(design, actionWidth) {
+		return max(80, rows-2*design.Space.M)
+	}
 	return max(80, rows-design.Space.M-actionWidth-design.Space.L)
 }
 
@@ -131,4 +156,31 @@ func fitTextToWidth(label string, face *text.Face, maxWidth int) string {
 		}
 	}
 	return "…"
+}
+
+// fitWordsToWidth trims the words a wrap cannot break. Wrapping only splits on
+// spaces, so a single long token — a component name, a path — keeps reporting
+// its full width no matter the wrap budget, which is enough to widen the row
+// and carry its control out of reach.
+func fitWordsToWidth(label string, face *text.Face, maxWidth int) string {
+	if label == "" || maxWidth <= 0 {
+		return label
+	}
+	if width, _ := text.Measure(label, *face, 0); int(width) <= maxWidth {
+		return label
+	}
+	words := strings.Fields(label)
+	trimmed := false
+	for index, word := range words {
+		width, _ := text.Measure(word, *face, 0)
+		if int(width) <= maxWidth {
+			continue
+		}
+		words[index] = fitTextToWidth(word, face, maxWidth)
+		trimmed = true
+	}
+	if !trimmed {
+		return label
+	}
+	return strings.Join(words, " ")
 }

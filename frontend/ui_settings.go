@@ -184,21 +184,35 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 			StretchHorizontal:  true,
 		})),
 	)
+	// The header shares the rows' width budget; without a wrap it runs past
+	// the panel edge exactly like the row copy did.
+	headerWidth := u.settingsRowsWidth(design)
 	header.AddChild(
-		design.text(
+		design.wrappedText(
 			shell.tr(u.settingsSection),
 			design.Type.Display,
 			design.Palette.Text,
+			headerWidth,
 			widget.RowLayoutData{Stretch: true},
 		),
-		design.text(
-			shell.tr(settingsSectionDescription(u.settingsSection)),
+		design.wrappedText(
+			fitWordsToWidth(
+				shell.tr(settingsSectionDescription(u.settingsSection)),
+				design.Type.Body,
+				headerWidth,
+			),
 			design.Type.Body,
 			design.Palette.TextMuted,
+			headerWidth,
 			widget.RowLayoutData{Stretch: true},
 		),
 	)
 	settingsContent.AddChild(header)
+	// The rows start below whatever the header actually needs. A fixed offset
+	// held only while the header was one line of the modern ramp; a wrapped or
+	// larger heading slid underneath the scroll container.
+	_, headerHeight := header.PreferredSize()
+	headerHeight = max(headerHeight+design.Space.S, 62)
 	rowsContent := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
@@ -219,7 +233,7 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 				VerticalPosition:   widget.AnchorLayoutPositionStart,
 				StretchHorizontal:  true,
 				StretchVertical:    true,
-				Padding:            &widget.Insets{Top: 62},
+				Padding:            &widget.Insets{Top: headerHeight},
 			}),
 			widget.WidgetOpts.ScrolledHandler(func(args *widget.WidgetScrolledEventArgs) {
 				scrollContainerByWheel(rowsScroll, args.Y)

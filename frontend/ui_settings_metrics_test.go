@@ -27,7 +27,12 @@ func TestSettingsRowGeometryFitsPanel(t *testing.T) {
 		shell.syncDesignSystem()
 		design := shell.design
 		u := shell.interfaceUI
-		for _, viewport := range [][2]int{{976, 759}, {1280, 900}, {640, 480}} {
+		// Phone-shaped viewports matter as much as desktop ones: the mobile
+		// build reports the device's pixel size, which is narrow and tall.
+		for _, viewport := range [][2]int{
+			{976, 759}, {1280, 900}, {640, 480},
+			{1080, 2280}, {720, 1440}, {390, 844},
+		} {
 			u.viewportWidth, u.viewportHeight = viewport[0], viewport[1]
 			u.compact = viewport[0] < 820 || viewport[1] < 620
 			rowsWidth := u.settingsRowsWidth(design)
@@ -35,12 +40,22 @@ func TestSettingsRowGeometryFitsPanel(t *testing.T) {
 				u.settingsSection = section
 				models := u.settingsRowModels(shell)
 				actionWidth := u.settingsActionWidth(shell, models)
-				if actionWidth < settingsActionMinWidth {
-					t.Errorf("%s/%s: action column %dpx is below the %dpx floor",
-						family, section, actionWidth, settingsActionMinWidth)
+				floor := settingsActionMinWidth
+				if u.compact {
+					floor = settingsCompactActionMinWidth
+				}
+				if actionWidth < floor {
+					t.Errorf("%s/%dx%d/%s: action column %dpx is below the %dpx floor",
+						family, viewport[0], viewport[1], section, actionWidth, floor)
 				}
 				copyWidth := u.settingsCopyWidth(design, actionWidth)
-				if budget := design.Space.M + copyWidth + design.Space.L + actionWidth; budget > rowsWidth {
+				// A stacked row spends its width on one thing at a time; a
+				// side-by-side row has to fit the copy and the control at once.
+				budget := copyWidth + 2*design.Space.M
+				if !u.settingsRowStacks(design, actionWidth) {
+					budget = design.Space.M + copyWidth + design.Space.L + actionWidth
+				}
+				if budget > rowsWidth {
 					t.Errorf("%s/%dx%d/%s: budget %dpx exceeds the %dpx row",
 						family, viewport[0], viewport[1], section, budget, rowsWidth)
 				}
