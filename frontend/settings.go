@@ -23,6 +23,7 @@ type Settings struct {
 	RecentFiles       []string                     `json:"recent_files"`
 	Language          string                       `json:"language"`
 	ThemeMode         string                       `json:"theme_mode"`
+	ThemeFamily       string                       `json:"theme_family"`
 	IntegerScaling    bool                         `json:"integer_scaling"`
 	PreserveAspect    bool                         `json:"preserve_aspect"`
 	LastFirmwarePath  string                       `json:"last_firmware_path,omitempty"`
@@ -80,6 +81,7 @@ func defaultSettings() Settings {
 	return Settings{
 		Language:         string(systemLanguage()),
 		ThemeMode:        "light",
+		ThemeFamily:      themeFamilyModern,
 		IntegerScaling:   true,
 		PreserveAspect:   true,
 		ScreenLayout:     "center",
@@ -120,6 +122,9 @@ func (s *Settings) normalize() {
 	s.Language = string(normalizeLanguage(s.Language))
 	if s.ThemeMode != "light" && s.ThemeMode != "dark" {
 		s.ThemeMode = "light"
+	}
+	if s.ThemeFamily != themeFamilyModern && !isRetroFamily(s.ThemeFamily) {
+		s.ThemeFamily = themeFamilyModern
 	}
 	switch s.Rotation {
 	case 0, 90, 180, 270:

@@ -13,6 +13,25 @@ func (s *Shell) cycleThemeMode() {
 	))
 }
 
+// setThemeFamily switches the shell skin. The design system itself is rebuilt
+// by syncDesignSystem on the next update once the setting no longer matches.
+func (s *Shell) setThemeFamily(family string) {
+	if family == s.settings.ThemeFamily {
+		return
+	}
+	if family != themeFamilyModern && !isRetroFamily(family) {
+		return
+	}
+	previous := s.settings.ThemeFamily
+	s.settings.ThemeFamily = family
+	if err := s.settings.save(); err != nil {
+		s.settings.ThemeFamily = previous
+		s.setStatus(s.tr("Appearance: ") + err.Error())
+		return
+	}
+	s.setStatus(s.trf("UI skin: %s", s.tr(themeFamilyLabel(family))))
+}
+
 func (s *Shell) cycleLanguage() {
 	previous := s.settings.Language
 	if normalizeLanguage(previous) == LanguageKorean {

@@ -61,6 +61,29 @@ func (u *shellUI) settingsRows(shell *Shell) []*widget.Container {
 				action:      shell.cycleThemeMode,
 			},
 			{
+				label:       "UI skin",
+				description: "Sprite skin for the shell chrome. Retro skins follow the light/dark theme above.",
+				dropdown: &settingsDropdownModel{
+					count: len(themeFamilyChoices()),
+					label: func(i int) string {
+						choices := themeFamilyChoices()
+						if i < 0 || i >= len(choices) {
+							return ""
+						}
+						return shell.tr(themeFamilyLabel(choices[i]))
+					},
+					value: func() int {
+						return themeFamilyIndex(shell.settings.ThemeFamily)
+					},
+					apply: func(i int) {
+						choices := themeFamilyChoices()
+						if i >= 0 && i < len(choices) {
+							shell.setThemeFamily(choices[i])
+						}
+					},
+				},
+			},
+			{
 				label:       "Handset font",
 				description: "Bitmap font used to render in-game text. Galmuri is crisp; Dunggeunmo is softer.",
 				dropdown: &settingsDropdownModel{

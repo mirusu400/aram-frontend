@@ -41,7 +41,7 @@ func TestRuneBoundaryNavigationStepsWholeRunes(t *testing.T) {
 }
 
 func TestByteIndexAtAdvanceSnapsToNearestRune(t *testing.T) {
-	face := newARAMDesignSystem("light").Type.Body
+	face := newARAMDesignSystem("light", themeFamilyModern).Type.Body
 	const value = "한글 입력"
 	for _, boundary := range runeBoundaries(value) {
 		offset := text.Advance(value[:boundary], *face)
@@ -65,7 +65,7 @@ func TestByteIndexAtAdvanceSnapsToNearestRune(t *testing.T) {
 
 func TestIMETextInputEditsWholeRunes(t *testing.T) {
 	changes := []string{}
-	field := newIMETextInput(newARAMDesignSystem("light"), imeTextInputConfig{
+	field := newIMETextInput(newARAMDesignSystem("light", themeFamilyModern), imeTextInputConfig{
 		Changed: func(value string) { changes = append(changes, value) },
 	})
 	field.SetText("한글")

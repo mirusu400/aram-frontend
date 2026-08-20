@@ -166,7 +166,7 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		shell.openWelcome()
 	}
 	shell.menus = defaultMenus()
-	shell.design = newARAMDesignSystem(shell.settings.ThemeMode)
+	shell.design = newARAMDesignSystem(shell.settings.ThemeMode, shell.settings.ThemeFamily)
 	shell.interfaceUI = newShellUI(shell, shell.design)
 	if audio, ok := shell.backend.(AudioBackend); ok {
 		if err := audio.ConfigureAudio(shell.currentAudioSettings()); err != nil {
@@ -263,10 +263,11 @@ func (s *Shell) Update() error {
 }
 
 func (s *Shell) syncDesignSystem() {
-	if s.design != nil && s.design.Mode == s.settings.ThemeMode {
+	if s.design != nil && s.design.Mode == s.settings.ThemeMode &&
+		s.design.Family == s.settings.ThemeFamily {
 		return
 	}
-	s.design = newARAMDesignSystem(s.settings.ThemeMode)
+	s.design = newARAMDesignSystem(s.settings.ThemeMode, s.settings.ThemeFamily)
 	s.interfaceUI = newShellUI(s, s.design)
 }
 

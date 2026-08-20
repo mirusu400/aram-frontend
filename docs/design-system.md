@@ -32,9 +32,23 @@ New UI should consume semantic roles rather than adding raw colors or
 component-local spacing. Guest framebuffer scaling and filtering remain in
 `frontend/render.go` and must not move into the widget layer.
 
-`ARAMRadius` remains explicit but all production radius tokens are zero.
 Light is the default theme; the Appearance settings page switches to the
 neutral dark palette at runtime and persists the choice.
+
+## Sprite skins
+
+Besides the vector-drawn `modern` family, the Appearance page offers five
+retro sprite skins (`chrome-blue`, `candy-orange`, `mono-lcd`, `glass-touch`,
+`neon-edge`) embedded under `frontend/retrothemes/` (original CC0 artwork).
+Each family ships a light and a dark variant selected by the existing theme
+mode, so the skin choice and the light/dark toggle stay independent settings
+(`theme_family` and `theme_mode`). `newARAMDesignSystem` resolves both into
+one design system: the retro path swaps `ARAMPalette` and `ARAMComponents`
+for sprite-backed equivalents (`design_system_retro*.go`) while typography,
+spacing, and the token contract stay unchanged. Switching either setting
+rebuilds the design system and shell UI at runtime; no restart is required.
+Every retro tile is 17×17 with an 8px fixed border and a 1px stretchable
+center, which keeps gradients from banding at any control size.
 
 Persistent runtime metadata must not consume a sidebar beside the guest
 display. The user-enabled virtual keypad is the sole right-rail exception and

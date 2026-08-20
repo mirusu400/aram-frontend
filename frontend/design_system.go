@@ -107,6 +107,7 @@ type ARAMComponents struct {
 // reuse the same language without importing widget construction details.
 type ARAMDesignSystem struct {
 	Mode       string
+	Family     string
 	Palette    ARAMPalette
 	Space      ARAMSpacing
 	Radius     ARAMRadius
@@ -115,7 +116,18 @@ type ARAMDesignSystem struct {
 	Theme      *widget.Theme
 }
 
-func newARAMDesignSystem(mode string) *ARAMDesignSystem {
+// newARAMDesignSystem builds the style entry point for a light/dark mode and a
+// skin family. The modern family draws its chrome from the palette; the retro
+// families swap the palette and component images for the embedded sprite pack.
+func newARAMDesignSystem(mode, family string) *ARAMDesignSystem {
+	ds := newModernARAMDesignSystem(mode)
+	if isRetroFamily(family) {
+		applyRetroSkin(ds, family)
+	}
+	return ds
+}
+
+func newModernARAMDesignSystem(mode string) *ARAMDesignSystem {
 	palette := aramPalette(mode)
 	spacing := ARAMSpacing{XXS: 2, XS: 4, S: 8, M: 12, L: 16, XL: 24, XXL: 32}
 	radius := ARAMRadius{Small: 6, Medium: 10, Large: 14, Pill: 8}
@@ -226,6 +238,7 @@ func newARAMDesignSystem(mode string) *ARAMDesignSystem {
 
 	return &ARAMDesignSystem{
 		Mode:       mode,
+		Family:     themeFamilyModern,
 		Palette:    palette,
 		Space:      spacing,
 		Radius:     radius,
