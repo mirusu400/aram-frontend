@@ -138,6 +138,7 @@
   "Handset font": "게임 폰트",
   "Bitmap font used to render in-game text. Galmuri is crisp; Dunggeunmo is softer.": "게임 화면 텍스트에 쓰는 비트맵 폰트. 갈무리는 또렷하고, 둥근모는 부드럽습니다.",
   "Galmuri (crisp)": "갈무리 (또렷)",
+  "Mulmaru (bold)": "물마루 (굵게)",
   "Dunggeunmo (soft)": "둥근모 (부드럽게)",
   "Load custom font…": "사용자 폰트 불러오기…",
   "Use your own BDF or TrueType/OpenType font for in-game text.": "게임 텍스트에 직접 만든 BDF 또는 TrueType/OpenType 폰트를 사용합니다.",

@@ -8,7 +8,7 @@ import (
 
 // handsetFontChoices lists the selectable built-in fallback fonts in dropdown
 // order. The values are the identifiers the backend and core understand.
-var handsetFontChoices = []string{"galmuri9", "neodgm"}
+var handsetFontChoices = []string{"galmuri9", "mulmaru", "neodgm"}
 
 // fontDropdownChoices returns the font identifiers offered in the dropdown,
 // appending the loaded custom font when one is configured.
@@ -21,10 +21,14 @@ func (s *Shell) fontDropdownChoices() []string {
 }
 
 func fontChoiceBuiltinLabel(name string) string {
-	if name == "neodgm" {
+	switch name {
+	case "neodgm":
 		return "Dunggeunmo (soft)"
+	case "mulmaru":
+		return "Mulmaru (bold)"
+	default:
+		return "Galmuri (crisp)"
 	}
-	return "Galmuri (crisp)"
 }
 
 // fontChoiceLabel returns the localized display label for a font identifier; the

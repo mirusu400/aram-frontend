@@ -137,7 +137,7 @@ func (s *Settings) normalize() {
 	if s.Filter != "nearest" && s.Filter != "linear" {
 		s.Filter = "nearest"
 	}
-	if s.FontChoice != "galmuri9" && s.FontChoice != "neodgm" && s.FontChoice != "custom" {
+	if s.FontChoice != "galmuri9" && s.FontChoice != "neodgm" && s.FontChoice != "mulmaru" && s.FontChoice != "custom" {
 		s.FontChoice = "galmuri9"
 	}
 	if s.FontChoice == "custom" && s.CustomFontPath == "" {

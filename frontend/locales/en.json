@@ -138,6 +138,7 @@
   "Handset font": "Handset font",
   "Bitmap font used to render in-game text. Galmuri is crisp; Dunggeunmo is softer.": "Bitmap font used to render in-game text. Galmuri is crisp; Dunggeunmo is softer.",
   "Galmuri (crisp)": "Galmuri (crisp)",
+  "Mulmaru (bold)": "Mulmaru (bold)",
   "Dunggeunmo (soft)": "Dunggeunmo (soft)",
   "Load custom font…": "Load custom font…",
   "Use your own BDF or TrueType/OpenType font for in-game text.": "Use your own BDF or TrueType/OpenType font for in-game text.",
