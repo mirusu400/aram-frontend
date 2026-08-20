@@ -114,19 +114,18 @@ func (u *shellUI) buildApplicationToolbar(shell *Shell) *widget.Container {
 		if graphic := design.retroIcon(icon); graphic != nil {
 			// Sprite skins draw the era-style icon toolbar instead of the
 			// text actions; the labels stay available through the menus.
-			// The theme's DefaultTextColor makes EbitenUI add an empty text
-			// widget before the graphic, offsetting the icon by half the
-			// row spacing (10px); the right padding cancels that shift so
-			// the icon sits centered.
 			button = widget.NewButton(
 				widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.MinSize(36, 32)),
 				widget.ButtonOpts.Image(design.Components.SubtleButton.Image),
 				widget.ButtonOpts.Graphic(graphic),
-				widget.ButtonOpts.TextPadding(&widget.Insets{Right: 10}),
 				widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
 					shell.dispatchCommand(commandID)
 				}),
 			)
+			// Blank per-widget theme: with the app theme's DefaultTextColor
+			// visible, EbitenUI inserts an empty text widget next to the
+			// graphic and the row spacing pushes the icon off center.
+			button.GetWidget().SetTheme(&widget.Theme{})
 		} else {
 			button = design.button(
 				label,
