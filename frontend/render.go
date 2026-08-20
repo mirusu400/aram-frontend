@@ -252,6 +252,21 @@ func (s *Shell) drawEmptyViewport(screen *ebiten.Image, viewport image.Rectangle
 	}
 }
 
+// centeredTextTop returns the y drawCenteredText needs so a single line sits
+// vertically centered in bounds. It measures the face's own line box instead
+// of assuming a text height, so swapping the type ramp — the pixel faces the
+// sprite skins use are far taller than the modern ones — cannot silently push
+// every label off center.
+func centeredTextTop(
+	face *text.Face,
+	bounds image.Rectangle,
+	nudge int,
+) int {
+	_, lineHeight := text.Measure(" ", *face, 0)
+	top := float64(bounds.Min.Y) + (float64(bounds.Dy())-lineHeight)/2
+	return int(top) - nudge
+}
+
 func drawCenteredText(
 	screen *ebiten.Image,
 	label string,

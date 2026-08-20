@@ -20,6 +20,13 @@ func applyRetroSkin(ds *ARAMDesignSystem, family string) {
 	ds.Theme = &widget.Theme{
 		DefaultFace:      ds.Type.Body,
 		DefaultTextColor: ds.Palette.Text,
+		// Applies to every text widget that does not set its own padding,
+		// including the ones EbitenUI builds inside buttons and lists.
+		TextTheme: &widget.TextParams{
+			Face:    ds.Type.Body,
+			Color:   ds.Palette.Text,
+			Padding: retroTextPadding(),
+		},
 	}
 }
 

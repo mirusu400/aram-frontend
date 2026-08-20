@@ -72,6 +72,13 @@ type ARAMTypography struct {
 	Strong  *text.Face
 	Heading *text.Face
 	Display *text.Face
+
+	// CenterNudge is how many pixels text must move up to look vertically
+	// centered in a box. A face's line box is its declared ascent plus
+	// descent, and fonts routinely declare more descent than any glyph uses,
+	// which leaves the ink sitting low when a widget centers that box. Zero
+	// for the modern faces; the pixel faces need a pixel back.
+	CenterNudge int
 }
 
 type ARAMButtonStyle struct {

@@ -274,7 +274,7 @@ func (s *Shell) drawTouchButton(screen *ebiten.Image, button touchButton, active
 			s.design.Type.Strong,
 			textColor,
 			bounds,
-			bounds.Min.Y+(bounds.Dy()-13)/2,
+			centeredTextTop(s.design.Type.Strong, bounds, s.design.Type.CenterNudge),
 		)
 		return
 	}

@@ -53,9 +53,18 @@ pixel font with full Hangul coverage (embedded under
 `frontend/assets/terrarum/`, SIL OFL 1.1 — its license ships next to the
 file). Sizes stay on the font's native pixel grid: 20px for captions, body,
 and strong text, 40px for headings and display text. The face has a single
-weight, matching how era handsets drew their shells. Dialog titles use the dedicated
-`OnTitle` palette role so the title ink matches each skin's gradient, and
-soft-key primaries use `OnWarm`.
+weight, matching how era handsets drew their shells. Dialog titles use the
+dedicated `OnTitle` palette role so the title ink matches each skin's
+gradient, and soft-key primaries use `OnWarm`.
+
+Two rules keep a swapped type ramp vertically centered. A `MultiFace` reports
+the largest ascent among its members and widgets center text by that line box,
+so the Noto fallback runs at 80% of the nominal size and the combined metrics
+stay the pixel font's own. `ARAMTypography.CenterNudge` then carries the pixel
+or two a face's ink sits below its line-box center; EbitenUI widgets get it as
+text padding on the theme (negative top, equal bottom, so preferred sizes are
+unchanged) and custom-drawn labels get it through `centeredTextTop`, which
+measures the face instead of assuming a text height.
 
 Sprite skins go beyond the nine-slice chrome: the application toolbar swaps
 its text actions for the pack's 16×16 pixel icons (inverted ink on pressed

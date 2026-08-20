@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"image"
 	"testing"
+
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
 // requiredRetroSlices lists every nine-slice tile retroComponents consumes.
@@ -127,5 +129,55 @@ func TestThemeFamilySettingNormalization(t *testing.T) {
 	if s.ThemeFamily != themeFamilyModern {
 		t.Fatalf("empty family normalized to %q, want %q",
 			s.ThemeFamily, themeFamilyModern)
+	}
+}
+
+// TestRetroTypographyLineBox pins the metric invariant the sprite skins rely
+// on: EbitenUI centers a label by its line box and places the baseline one
+// ascent below the top, and a MultiFace reports the largest ascent among its
+// members. A fallback face taller than the pixel font therefore pushes every
+// glyph down inside its widget, which is exactly what a naive same-size
+// fallback did.
+func TestRetroTypographyLineBox(t *testing.T) {
+	pixel, err := text.NewGoTextFaceSource(bytes.NewReader(terrarumSansOTF))
+	if err != nil {
+		t.Fatalf("load pixel font: %v", err)
+	}
+	typography := retroTypography()
+	if typography.CenterNudge != retroCenterNudge {
+		t.Errorf("CenterNudge = %d, want %d",
+			typography.CenterNudge, retroCenterNudge)
+	}
+	for _, tc := range []struct {
+		name string
+		face *text.Face
+		size float64
+	}{
+		{"Caption", typography.Caption, 20},
+		{"Body", typography.Body, 20},
+		{"Strong", typography.Strong, 20},
+		{"Heading", typography.Heading, 40},
+		{"Display", typography.Display, 40},
+	} {
+		var alone text.Face = &text.GoTextFace{Source: pixel, Size: tc.size}
+		want := alone.Metrics()
+		got := (*tc.face).Metrics()
+		if got.HAscent != want.HAscent || got.HDescent != want.HDescent {
+			t.Errorf("%s: line box is asc=%.2f desc=%.2f, want the pixel font's asc=%.2f desc=%.2f",
+				tc.name, got.HAscent, got.HDescent, want.HAscent, want.HDescent)
+		}
+	}
+}
+
+// TestRetroTextPaddingIsSizeNeutral keeps the vertical nudge from changing any
+// widget's preferred size, which sums the top and bottom insets.
+func TestRetroTextPaddingIsSizeNeutral(t *testing.T) {
+	p := retroTextPadding()
+	if p.Top+p.Bottom != 0 {
+		t.Errorf("padding top %d + bottom %d = %d, want 0",
+			p.Top, p.Bottom, p.Top+p.Bottom)
+	}
+	if p.Top >= 0 {
+		t.Errorf("padding top = %d, want a negative value that lifts text", p.Top)
 	}
 }
