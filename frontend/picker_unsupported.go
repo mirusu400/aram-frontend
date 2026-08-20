@@ -8,6 +8,9 @@ func NewPlatformPicker() Picker { return unsupportedPicker{} }
 func (unsupportedPicker) OpenFile() (string, error) {
 	return "", ErrPickerUnavailable
 }
+func (unsupportedPicker) OpenFontFile() (string, error) {
+	return "", ErrPickerUnavailable
+}
 func (unsupportedPicker) OpenFirmwareDirectory(string) (string, error) {
 	return "", ErrPickerUnavailable
 }

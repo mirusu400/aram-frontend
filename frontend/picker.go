@@ -10,6 +10,7 @@ var (
 
 type Picker interface {
 	OpenFile() (string, error)
+	OpenFontFile() (string, error)
 	OpenFirmwareDirectory(previous string) (string, error)
 	ChooseRecent([]string) (string, error)
 }
@@ -28,4 +29,8 @@ func wipiPackagePatterns() []string {
 
 func firmwareImagePatterns() []string {
 	return []string{"*.wbin", "*.wbt", "*.bin", "*.rom", "*.img", "*.mbn"}
+}
+
+func fontFilePatterns() []string {
+	return []string{"*.bdf", "*.ttf", "*.otf", "*.ttc"}
 }

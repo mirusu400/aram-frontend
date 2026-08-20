@@ -61,6 +61,35 @@ func (u *shellUI) settingsRows(shell *Shell) []*widget.Container {
 				action:      shell.cycleThemeMode,
 			},
 			{
+				label:       "Handset font",
+				description: "Bitmap font used to render in-game text. Galmuri is crisp; Dunggeunmo is softer.",
+				dropdown: &settingsDropdownModel{
+					count: len(shell.fontDropdownChoices()),
+					label: func(i int) string {
+						choices := shell.fontDropdownChoices()
+						if i < 0 || i >= len(choices) {
+							return ""
+						}
+						return shell.fontChoiceLabel(choices[i])
+					},
+					value: func() int {
+						return fontChoiceIndex(shell.fontDropdownChoices(), shell.settings.FontChoice)
+					},
+					apply: func(i int) {
+						choices := shell.fontDropdownChoices()
+						if i >= 0 && i < len(choices) {
+							shell.setFont(choices[i])
+						}
+					},
+				},
+			},
+			{
+				label:       "Load custom font…",
+				description: "Use your own BDF or TrueType/OpenType font for in-game text.",
+				value:       "",
+				action:      shell.loadCustomFont,
+			},
+			{
 				label:       "Control shape",
 				description: "Buttons, menus, cards, and dialogs use square corners.",
 				value:       "Square",

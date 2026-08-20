@@ -43,6 +43,10 @@ func (mobilePicker) OpenFile() (string, error) {
 	return "", requestNativeDocument(false)
 }
 
+func (mobilePicker) OpenFontFile() (string, error) {
+	return "", ErrPickerUnavailable
+}
+
 func (mobilePicker) OpenFirmwareDirectory(string) (string, error) {
 	return "", requestNativeDocument(true)
 }

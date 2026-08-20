@@ -17,6 +17,10 @@ func (deferredPicker) OpenFile() (string, error) {
 	return "", ErrPickerDeferred
 }
 
+func (deferredPicker) OpenFontFile() (string, error) {
+	return "", ErrPickerDeferred
+}
+
 func (deferredPicker) OpenFirmwareDirectory(string) (string, error) {
 	return "", ErrPickerDeferred
 }
@@ -26,6 +30,10 @@ func (deferredPicker) ChooseRecent([]string) (string, error) {
 }
 
 func (picker fixedPicker) OpenFile() (string, error) {
+	return picker.path, nil
+}
+
+func (picker fixedPicker) OpenFontFile() (string, error) {
 	return picker.path, nil
 }
 

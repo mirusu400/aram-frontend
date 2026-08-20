@@ -62,7 +62,7 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 	// purpose: rebuilding the panel on every slider tick would destroy the
 	// handle mid-drag. refreshSettingsSliders keeps their widgets in sync.
 	signature := fmt.Sprintf(
-		"settings|%s|%dx%d|%s|%s|%t|%t|%d|%s|%s|%t|%s|%s|%s|%s|%s|%s|%t|%s|%s|%s|%s",
+		"settings|%s|%dx%d|%s|%s|%t|%t|%d|%s|%s|%t|%s|%s|%s|%s|%s|%s|%t|%s|%s|%s|%s|%s|%s",
 		shell.settings.Language,
 		u.viewportWidth,
 		u.viewportHeight,
@@ -85,6 +85,8 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 		bindingCaptureSignature(shell.bindingCapture),
 		shell.settings.UpdateChannel,
 		shell.updateProgressSignature(),
+		shell.settings.FontChoice,
+		shell.settings.CustomFontPath,
 	)
 	if signature == u.panelSignature && u.panelWindow != nil {
 		u.refreshSettingsSliders()

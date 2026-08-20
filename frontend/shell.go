@@ -42,6 +42,7 @@ type Shell struct {
 	interfaceUI               *shellUI
 	menus                     []Menu
 	settings                  Settings
+	customFontData            []byte
 	state                     FrontendState
 	lastRunState              FrontendState
 	problem                   *FrontendProblem
@@ -170,6 +171,12 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 	if audio, ok := shell.backend.(AudioBackend); ok {
 		if err := audio.ConfigureAudio(shell.currentAudioSettings()); err != nil {
 			shell.appendLog(shell.tr("Audio settings: ") + err.Error())
+		}
+	}
+	shell.loadCustomFontAtStartup()
+	if font, ok := shell.backend.(FontBackend); ok {
+		if err := font.ConfigureFont(shell.currentFontSettings()); err != nil {
+			shell.appendLog(shell.tr("Handset font: ") + err.Error())
 		}
 	}
 	if applied, err := loadCustomGamepadMappings(); err != nil {

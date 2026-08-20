@@ -255,6 +255,23 @@ type AudioBackend interface {
 	ConfigureAudio(AudioSettings) error
 }
 
+// FontSettings selects the handset bitmap font the backend uses to render
+// in-game text that has no glyphs of its own. Name is a stable identifier
+// ("galmuri9", "neodgm", or "custom"); an empty or unknown name lets the backend
+// keep its default. When Data is non-empty it holds a user-supplied BDF or
+// TrueType/OpenType font file, which the backend builds and uses in place of a
+// named built-in.
+type FontSettings struct {
+	Name string
+	Data []byte
+}
+
+// FontBackend is implemented by backends that can switch the handset fallback
+// font. The selection takes effect the next time a title is opened.
+type FontBackend interface {
+	ConfigureFont(FontSettings) error
+}
+
 // AudioStreamBackend transfers guest-generated PCM to the host output owned by
 // the frontend. DrainAudio must return quickly and transfer ownership of PCM16
 // to the caller.

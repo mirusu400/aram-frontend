@@ -33,6 +33,17 @@ func (p *platformPicker) OpenFile() (string, error) {
 	return path, normalizePickerError(err)
 }
 
+func (p *platformPicker) OpenFontFile() (string, error) {
+	path, err := zenity.SelectFile(
+		zenity.Title(translate(p.language, "Choose a handset font")),
+		zenity.FileFilters{
+			{Name: translate(p.language, "Bitmap and outline fonts"), Patterns: fontFilePatterns()},
+			{Name: translate(p.language, "All files"), Patterns: []string{"*"}},
+		},
+	)
+	return path, normalizePickerError(err)
+}
+
 func (p *platformPicker) OpenFirmwareDirectory(previous string) (string, error) {
 	options := []zenity.Option{
 		zenity.Title(translate(p.language, "Select firmware directory")),
