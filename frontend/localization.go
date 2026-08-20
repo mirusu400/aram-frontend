@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 )
 
 type Language string
@@ -55,6 +56,34 @@ func languageFromLocale(locale string) Language {
 		return LanguageKorean
 	}
 	return LanguageEnglish
+}
+
+// hostLocale is a locale tag declared by a native host. Android starts Go
+// without the environment variables the desktop platforms expose, so its
+// binding hands the device language in before the shell loads settings; the
+// desktop builds leave this empty and read the OS directly.
+var hostLocale struct {
+	sync.RWMutex
+	tag string
+}
+
+// SetHostLocale records the device language for platforms Go cannot query.
+// It only affects the first-run default, so it has to be called before the
+// Shell is constructed; afterwards the saved language setting wins.
+func SetHostLocale(tag string) {
+	hostLocale.Lock()
+	hostLocale.tag = tag
+	hostLocale.Unlock()
+}
+
+func platformLocale() string {
+	hostLocale.RLock()
+	tag := hostLocale.tag
+	hostLocale.RUnlock()
+	if tag != "" {
+		return tag
+	}
+	return osLocale()
 }
 
 func systemLanguage() Language {

@@ -118,3 +118,38 @@ func TestKoreanCatalogTranslatesCoreSurfaces(t *testing.T) {
 		}
 	}
 }
+
+// TestHostLocaleDrivesFirstRunLanguage covers the platforms Go cannot ask for
+// a locale. Android starts the runtime without LANG or its relatives, so the
+// binding declares the device language instead; a saved setting still wins,
+// because the host value only feeds the first-run default.
+func TestHostLocaleDrivesFirstRunLanguage(t *testing.T) {
+	t.Cleanup(func() { SetHostLocale("") })
+
+	for _, tc := range []struct {
+		tag  string
+		want Language
+	}{
+		{"ko-KR", LanguageKorean},
+		{"ko", LanguageKorean},
+		{"en-US", LanguageEnglish},
+		{"ja-JP", LanguageEnglish},
+	} {
+		SetHostLocale(tc.tag)
+		if got := systemLanguage(); got != tc.want {
+			t.Errorf("host locale %q resolved to %q, want %q", tc.tag, got, tc.want)
+		}
+		if got := defaultSettings().Language; got != string(tc.want) {
+			t.Errorf("host locale %q gave a default of %q, want %q",
+				tc.tag, got, tc.want)
+		}
+	}
+
+	SetHostLocale("ko-KR")
+	saved := defaultSettings()
+	saved.Language = string(LanguageEnglish)
+	saved.normalize()
+	if saved.Language != string(LanguageEnglish) {
+		t.Errorf("a saved language was replaced by the host locale: %q", saved.Language)
+	}
+}

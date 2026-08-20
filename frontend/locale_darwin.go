@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func platformLocale() string {
+func osLocale() string {
 	if output, err := exec.Command(
 		"defaults",
 		"read",

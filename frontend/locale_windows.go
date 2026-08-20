@@ -7,7 +7,7 @@ import (
 	"unsafe"
 )
 
-func platformLocale() string {
+func osLocale() string {
 	const localeNameMaxLength = 85
 	buffer := make([]uint16, localeNameMaxLength)
 	kernel32 := syscall.NewLazyDLL("kernel32.dll")

@@ -6,6 +6,13 @@ Ebitengine supplies the framebuffer surface and shared keyboard, gamepad,
 touch, and audio abstractions. `frontend.Backend` supplies emulator state.
 `frontend.Picker` supplies host-specific file/document selection.
 
+The interface language defaults to the device language on first run and is a
+saved setting from then on. Windows reads `GetUserDefaultLocaleName` and macOS
+reads `AppleLanguages`, both in `locale_*.go`. Android exposes neither to Go,
+so its Activity passes the device tag through `Mobile.configureLocale` into
+`frontend.SetHostLocale` before the shell loads settings; a locale declared
+that way takes precedence over the environment.
+
 ## Desktop
 
 | Platform | Window/render | File selection | Packaging |
