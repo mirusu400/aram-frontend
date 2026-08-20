@@ -20,7 +20,7 @@ func (s *Shell) drawWorkspace(screen *ebiten.Image) {
 	contentTop := bounds.Min.Y + menuHeight + applicationToolbarHeight + 12
 	contentBottom := bounds.Max.Y - statusHeight - 12
 	if platformUsesTouchLayout() {
-		contentBottom -= touchDeckHeight(bounds.Dx(), bounds.Dy())
+		contentBottom -= s.touchDeckHeight(bounds.Dx(), bounds.Dy())
 	}
 	contentRight := bounds.Max.X - 12
 	if s.virtualKeypadVisible() {
@@ -61,7 +61,7 @@ func (s *Shell) drawWorkspace(screen *ebiten.Image) {
 func (s *Shell) drawImmersiveWorkspace(screen *ebiten.Image) {
 	bounds := screen.Bounds()
 	deckTop := bounds.Max.Y - statusBarHeight -
-		touchDeckHeight(bounds.Dx(), bounds.Dy())
+		s.touchDeckHeight(bounds.Dx(), bounds.Dy())
 	viewport := image.Rect(bounds.Min.X, bounds.Min.Y, bounds.Max.X, deckTop)
 	if viewport.Dx() < 32 || viewport.Dy() < 32 {
 		return

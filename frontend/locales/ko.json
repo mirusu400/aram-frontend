@@ -184,6 +184,7 @@
   "Keyboard profile": "키보드 프로필",
   "Apply the arrow-key or WASD preset, replacing custom keyboard bindings.": "사용자 키 설정을 덮어쓰고 방향키 또는 WASD 프리셋을 적용합니다.",
   "Virtual keypad": "가상 키패드",
+  "Add the number, star, and hash keys to the on-screen controls.": "숫자, 별표, 우물 정 키를 화면 컨트롤에 추가합니다.",
   "Show a clickable phone keypad to the right of the guest display.": "게스트 화면 오른쪽에 클릭 가능한 휴대폰 키패드를 표시합니다.",
   "Gamepad input": "게임패드 입력",
   "Accept input from standard-layout controllers.": "표준 레이아웃 컨트롤러의 입력을 받습니다.",

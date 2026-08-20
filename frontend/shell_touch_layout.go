@@ -9,10 +9,17 @@ import (
 
 // touchLayoutOptions resolves the persisted touch-control customization,
 // substituting the in-progress draft while the layout editor is open.
+// touchDeckHeight reserves the on-screen control deck for the current
+// options, which decides whether the numeric keypad is part of it.
+func (s *Shell) touchDeckHeight(width, height int) int {
+	return touchDeckHeightWithOptions(width, height, s.touchLayoutOptions())
+}
+
 func (s *Shell) touchLayoutOptions() touchLayoutOptions {
 	options := touchLayoutOptions{
 		Scale:      touchScaleFactor(s.settings.TouchControlScale),
 		Placements: s.settings.TouchLayout,
+		Keypad:     s.touchKeypadVisible(),
 	}
 	if s.touchLayoutEditing {
 		options.Placements = s.touchLayoutDraft

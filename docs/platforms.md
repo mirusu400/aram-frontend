@@ -46,7 +46,12 @@ and `Pause`/`Resume` feed the same automatic lifecycle-pause contract.
 
 The shared mobile layout provides large touch targets for persistent
 File/Emulation/View/Tools/Help navigation plus D-pad, OK, Back, Menu, and soft
-keys. Native hosts can dispatch the same stable command IDs and forward
+keys. Turning on `Virtual keypad` adds the numeric cluster — 1-9, 0, star, and
+hash — to the deck, which grows to hold four more rows; a handset has no
+keyboard, so those keys are otherwise unreachable. Every deck button, keypad
+keys included, is a placement slot: `Touch button layout` drags them into
+custom positions stored normalized in `touch_layout`, so a saved arrangement
+survives rotation and resizes. Native hosts can dispatch the same stable command IDs and forward
 inactive/active lifecycle changes. The lifecycle bridge resumes only a machine
 that it automatically paused; it never overrides a manual user pause.
 

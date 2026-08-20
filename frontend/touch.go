@@ -29,6 +29,10 @@ const (
 type touchLayoutOptions struct {
 	Scale      float64
 	Placements map[string]TouchPlacement
+	// Keypad adds the numeric cluster to the deck. Feature-phone titles ask
+	// for digits, star, and hash as often as they ask for a direction, and a
+	// touch layout has no keyboard to fall back on.
+	Keypad bool
 }
 
 func defaultTouchLayoutOptions() touchLayoutOptions {
@@ -43,16 +47,21 @@ func touchControlButtonsWithOptions(
 	width, height int,
 	options touchLayoutOptions,
 ) []touchButton {
-	deckHeight := touchDeckHeight(width, height)
+	deckHeight := touchDeckHeightWithOptions(width, height, options)
 	deckTop := height - statusBarHeight - deckHeight
 	margin := max(12, min(28, width/32))
 	gap := max(6, min(12, width/96))
 	// The D-pad and action clusters are both three columns wide. Cap the
 	// button size by the horizontal room left after margins, the center
 	// gap, and in-cluster gaps so the clusters can never overlap, and by
-	// the vertical room for three rows.
+	// the vertical room for the rows on show — three for the clusters, four
+	// more when the numeric keypad sits below them.
+	rows := 3
+	if options.Keypad {
+		rows = 7
+	}
 	horizontalFit := (width - margin*2 - touchDeckCenterGap - gap*4) / 6
-	verticalFit := (deckHeight - touchDeckPadding*2 - gap*2) / 3
+	verticalFit := (deckHeight - touchDeckPadding*2 - gap*(rows-1)) / rows
 	fit := max(40, min(88, min(horizontalFit, verticalFit)))
 	scale := options.Scale
 	if scale <= 0 {
@@ -67,7 +76,7 @@ func touchControlButtonsWithOptions(
 	// the clusters cannot collide; repositioned buttons take the full
 	// scaled size because the user controls where they sit.
 	buttonSize := min(scaled, fit)
-	gridHeight := buttonSize*3 + gap*2
+	gridHeight := buttonSize*rows + gap*(rows-1)
 	gridTop := deckTop + touchDeckPadding +
 		max(0, (deckHeight-touchDeckPadding*2-gridHeight)/2)
 	dpadX := margin + buttonSize
@@ -86,6 +95,10 @@ func touchControlButtonsWithOptions(
 		{ID: "back", Control: "back", Label: "BACK", Bounds: rectAt(actionX, actionY, buttonSize, buttonSize)},
 		{ID: "menu", Control: "menu", Label: "MENU", Bounds: rectAt(actionX+buttonSize+gap, actionY, buttonSize, buttonSize)},
 		{ID: "ok-action", Control: "ok", Label: "OK", Bounds: rectAt(actionX+buttonSize*2+gap*2, actionY, buttonSize, buttonSize)},
+	}
+	if options.Keypad {
+		buttons = append(buttons, numericTouchButtons(
+			width, gridTop+buttonSize*3+gap*3, buttonSize, gap)...)
 	}
 	for index := range buttons {
 		placement, ok := options.Placements[buttons[index].ID]
@@ -126,8 +139,21 @@ func normalizedTouchPlacement(x, y, width, height int) TouchPlacement {
 }
 
 func touchDeckHeight(width, height int) int {
+	return touchDeckHeightWithOptions(width, height, defaultTouchLayoutOptions())
+}
+
+// touchDeckHeightWithOptions reserves the deck. The numeric cluster needs four
+// more rows than the direction and action clusters alone, so enabling it takes
+// height from the guest viewport rather than crowding the existing buttons.
+func touchDeckHeightWithOptions(
+	width, height int,
+	options touchLayoutOptions,
+) int {
 	if width <= 0 || height <= 0 {
 		return 0
+	}
+	if options.Keypad {
+		return min(560, max(320, height*54/100))
 	}
 	return min(280, max(190, height*32/100))
 }
@@ -290,4 +316,38 @@ func (s *Shell) drawTouchButton(screen *ebiten.Image, button touchButton, active
 	textX := bounds.Min.X + (bounds.Dx()-len([]rune(label))*6)/2
 	textY := bounds.Min.Y + (bounds.Dy()-8)/2
 	ebitenutil.DebugPrintAt(screen, label, textX, textY)
+}
+
+// numericTouchKeys is the handset keypad in reading order: three columns of
+// digits and the star/zero/hash row that closes them.
+var numericTouchKeys = [4][3]struct{ id, label string }{
+	{{"num1", "1"}, {"num2", "2"}, {"num3", "3"}},
+	{{"num4", "4"}, {"num5", "5"}, {"num6", "6"}},
+	{{"num7", "7"}, {"num8", "8"}, {"num9", "9"}},
+	{{"star", "*"}, {"num0", "0"}, {"hash", "#"}},
+}
+
+// numericTouchButtons lays the keypad out as a centered 3x4 grid starting at
+// top. Every key is an ordinary deck button, so the layout editor can move it
+// and a saved placement overrides this default like any other.
+func numericTouchButtons(width, top, size, gap int) []touchButton {
+	gridWidth := size*3 + gap*2
+	left := max(0, (width-gridWidth)/2)
+	buttons := make([]touchButton, 0, 12)
+	for row, keys := range numericTouchKeys {
+		for column, key := range keys {
+			buttons = append(buttons, touchButton{
+				ID:      key.id,
+				Control: key.id,
+				Label:   key.label,
+				Bounds: rectAt(
+					left+column*(size+gap),
+					top+row*(size+gap),
+					size,
+					size,
+				),
+			})
+		}
+	}
+	return buttons
 }

@@ -219,7 +219,7 @@ func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 			},
 			{
 				label:       "Virtual keypad",
-				description: "Show a clickable phone keypad to the right of the guest display.",
+				description: virtualKeypadDescription(),
 				value:       onOff(shell.settings.ShowVirtualKeypad),
 				action:      shell.toggleVirtualKeypad,
 			},
@@ -481,4 +481,14 @@ func visibility(visible bool) widget.Visibility {
 		return widget.Visibility_Show
 	}
 	return widget.Visibility_Hide
+}
+
+// virtualKeypadDescription explains where the keypad goes, which differs by
+// platform: a rail beside the guest display on desktop, extra rows of the
+// on-screen deck on a touch layout.
+func virtualKeypadDescription() string {
+	if platformUsesTouchLayout() {
+		return "Add the number, star, and hash keys to the on-screen controls."
+	}
+	return "Show a clickable phone keypad to the right of the guest display."
 }
