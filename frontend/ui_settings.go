@@ -106,10 +106,7 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 
-	navWidth := settingsNavWidth
-	if u.viewportWidth < 600 {
-		navWidth = 112
-	}
+	navWidth := u.settingsNavRailWidth()
 	navigation := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(design.Components.NavRail),
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -160,10 +157,7 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 	}
 	contents.AddChild(navigation)
 
-	contentLeft := navWidth + design.Space.XL
-	if u.compact {
-		contentLeft = navWidth + design.Space.M
-	}
+	contentLeft := u.settingsContentLeft(design)
 	settingsContent := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
@@ -293,6 +287,7 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 			Padding:            &widget.Insets{Left: design.Space.L},
 		},
 	))
+	settingsWindowWidth, settingsWindowHeight := settingsWindowSize(design)
 	settingsWindow = widget.NewWindow(
 		widget.WindowOpts.Contents(contents),
 		widget.WindowOpts.TitleBar(titleBar, 42),
@@ -301,8 +296,8 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 		widget.WindowOpts.Location(centeredWindowRect(
 			u.viewportWidth,
 			u.viewportHeight,
-			700,
-			560,
+			settingsWindowWidth,
+			settingsWindowHeight,
 		)),
 	)
 	u.panelWindow = settingsWindow

@@ -76,6 +76,16 @@ selection bar, and the guest viewport is framed by the pack's LCD bezel with
 Every retro tile is 17×17 with an 8px fixed border and a 1px stretchable
 center, which keeps gradients from banding at any control size.
 
+The `Configure ARAM` panel derives its geometry from the active ramp rather
+than from the modern faces it was first drawn for
+(`frontend/ui_settings_metrics.go`): the dialog scales with the body line
+height, the action column is measured from the widest control label in the
+section, and each row's label and description wrap into what is left. Rows are
+stretched to the panel width, and EbitenUI's anchor layout sizes a row from
+its first child, so unwrapped copy silently widens the scroll content and
+carries the right-anchored control out of view — the state the pixel ramp
+first exposed.
+
 Persistent runtime metadata must not consume a sidebar beside the guest
 display. The user-enabled virtual keypad is the sole right-rail exception and
 reserves space rather than covering the guest image. Configuration belongs in

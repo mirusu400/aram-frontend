@@ -7,18 +7,25 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 )
 
-func (u *shellUI) buildSettingsRow(model settingsRowModel) *widget.Container {
+// buildSettingsRow renders one row. actionWidth is measured once per section
+// so every row reserves the same space for its control; the label and
+// description wrap inside what is left instead of stretching the row wider
+// than the panel, which used to push the control out of view entirely.
+func (u *shellUI) buildSettingsRow(
+	model settingsRowModel,
+	actionWidth int,
+) *widget.Container {
 	design := u.design
-	actionWidth := 126
 	sliderWidth := 150
 	if u.viewportWidth < 600 {
-		actionWidth = 92
 		sliderWidth = 110
 	}
 	const sliderValueWidth = 56
 	if model.slider != nil {
 		actionWidth = sliderWidth + design.Space.S + sliderValueWidth
 	}
+	copyWidth := u.settingsCopyWidth(design, actionWidth)
+	actionLabelWidth := actionWidth - 2*design.Space.S
 	row := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(design.Components.ControlGroup),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
@@ -46,18 +53,20 @@ func (u *shellUI) buildSettingsRow(model settingsRowModel) *widget.Container {
 			},
 		})),
 	)
-	copyBlock.AddChild(design.text(
+	copyBlock.AddChild(design.wrappedText(
 		u.owner.tr(model.label),
 		design.Type.Strong,
 		design.Palette.Text,
+		copyWidth,
 		nil,
 	))
 	if !u.compact {
 		copyBlock.AddChild(
-			design.text(
+			design.wrappedText(
 				u.owner.tr(model.description),
 				design.Type.Caption,
 				design.Palette.TextMuted,
+				copyWidth,
 				nil,
 			),
 		)
@@ -74,6 +83,11 @@ func (u *shellUI) buildSettingsRow(model settingsRowModel) *widget.Container {
 		entryLabel := func(entry any) string {
 			index, _ := entry.(int)
 			return dropdownModel.label(index)
+		}
+		// The closed button has only the column to work with; the open list
+		// gets the full entry width.
+		buttonLabel := func(entry any) string {
+			return fitTextToWidth(entryLabel(entry), design.Type.Strong, actionLabelWidth)
 		}
 		trackIdle := euiimage.NewNineSliceColor(design.Palette.Border)
 		trackHover := euiimage.NewNineSliceColor(design.Palette.BorderStrong)
@@ -145,7 +159,7 @@ func (u *shellUI) buildSettingsRow(model settingsRowModel) *widget.Container {
 				},
 				MinSize: &image.Point{X: actionWidth},
 			}),
-			widget.ListComboButtonOpts.EntryLabelFunc(entryLabel, entryLabel),
+			widget.ListComboButtonOpts.EntryLabelFunc(buttonLabel, entryLabel),
 			widget.ListComboButtonOpts.EntrySelectedHandler(
 				func(args *widget.ListComboButtonEntrySelectedEventArgs) {
 					index, ok := args.Entry.(int)
@@ -220,7 +234,7 @@ func (u *shellUI) buildSettingsRow(model settingsRowModel) *widget.Container {
 
 	if model.action == nil {
 		row.AddChild(design.text(
-			u.owner.tr(model.value),
+			fitTextToWidth(u.owner.tr(model.value), design.Type.Strong, actionLabelWidth),
 			design.Type.Strong,
 			design.Palette.TextMuted,
 			widget.AnchorLayoutData{
@@ -234,7 +248,7 @@ func (u *shellUI) buildSettingsRow(model settingsRowModel) *widget.Container {
 
 	action := model.action
 	valueButton := design.button(
-		u.owner.tr(model.value),
+		fitTextToWidth(u.owner.tr(model.value), design.Type.Strong, actionLabelWidth),
 		design.Components.SubtleButton,
 		design.Type.Strong,
 		actionWidth,

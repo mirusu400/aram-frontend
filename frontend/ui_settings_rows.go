@@ -49,6 +49,21 @@ type settingsDropdownBinding struct {
 }
 
 func (u *shellUI) settingsRows(shell *Shell) []*widget.Container {
+	rows := u.settingsRowModels(shell)
+	// One width for the whole section keeps the action column aligned down
+	// the page instead of stepping in and out row by row.
+	actionWidth := u.settingsActionWidth(shell, rows)
+	result := make([]*widget.Container, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, u.buildSettingsRow(row, actionWidth))
+	}
+	return result
+}
+
+// settingsRowModels describes the active section's rows. It is separate from
+// the widget construction so the panel can measure a section before laying it
+// out, and so tests can check that geometry without a running UI.
+func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 	var rows []settingsRowModel
 	profile := shell.controllerProfile()
 	switch u.settingsSection {
@@ -387,11 +402,7 @@ func (u *shellUI) settingsRows(shell *Shell) []*widget.Container {
 		}
 	}
 
-	result := make([]*widget.Container, 0, len(rows))
-	for _, row := range rows {
-		result = append(result, u.buildSettingsRow(row))
-	}
-	return result
+	return rows
 }
 
 func updateSettingsRowModels(shell *Shell) []settingsRowModel {

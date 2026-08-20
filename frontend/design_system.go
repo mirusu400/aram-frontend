@@ -576,6 +576,30 @@ func (d *ARAMDesignSystem) button(
 	)
 }
 
+// wrappedText is text() with a width budget: anything longer wraps onto more
+// lines instead of widening its container. Panels that stretch a row to the
+// panel width need this — an unwrapped label reports a preferred width larger
+// than the panel, which pushes whatever is anchored to the row's far edge out
+// of view.
+func (d *ARAMDesignSystem) wrappedText(
+	label string,
+	face *text.Face,
+	textColor color.Color,
+	maxWidth int,
+	layoutData interface{},
+) *widget.Text {
+	options := []widget.TextOpt{
+		widget.TextOpts.Text(label, face, textColor),
+	}
+	if maxWidth > 0 {
+		options = append(options, widget.TextOpts.MaxWidth(float64(maxWidth)))
+	}
+	if layoutData != nil {
+		options = append(options, widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(layoutData)))
+	}
+	return widget.NewText(options...)
+}
+
 func (d *ARAMDesignSystem) text(
 	label string,
 	face *text.Face,

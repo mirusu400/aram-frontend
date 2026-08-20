@@ -206,11 +206,14 @@ func scrollContainerByWheel(sc *widget.ScrollContainer, wheelY float64) {
 	sc.ScrollTop = top
 }
 
+// centeredWindowMargin is the gap a modal keeps from the viewport edge.
+const centeredWindowMargin = 18
+
 func centeredWindowRect(viewWidth, viewHeight, preferredWidth, preferredHeight int) image.Rectangle {
 	if viewWidth <= 0 || viewHeight <= 0 {
 		viewWidth, viewHeight = logicalWidth, logicalHeight
 	}
-	margin := 18
+	margin := centeredWindowMargin
 	width := min(preferredWidth, max(1, viewWidth-margin*2))
 	height := min(preferredHeight, max(1, viewHeight-margin*2))
 	x := max(0, (viewWidth-width)/2)
