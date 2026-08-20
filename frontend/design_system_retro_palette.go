@@ -17,6 +17,7 @@ type retroPaletteSpec struct {
 	textMuted     string
 	onAccent      string
 	onWarm        string
+	onTitle       string
 	lcdBg         string
 	lcdInk        string
 	accent        string
@@ -33,7 +34,7 @@ var retroPaletteSpecs = map[string]retroPaletteSpec{
 		canvas: "#F4F6FA", canvasRaised: "#C6CEDA", surface: "#E7EBF1",
 		surfaceHover: "#D4DCE8", border: "#5A6B80", borderStrong: "#2C3A4E",
 		text: "#1B2430", textMuted: "#67748A", onAccent: "#FFFFFF",
-		onWarm: "#4A3506", lcdBg: "#C7D6A8", lcdInk: "#3E4B28",
+		onTitle: "#FFFFFF", onWarm: "#4A3506", lcdBg: "#C7D6A8", lcdInk: "#3E4B28",
 		accent: "#2F7FD1", accentHover: "#5AA1E8", accentPressed: "#1B5FA8",
 		accentSoft: "#8FC4F5",
 	},
@@ -41,7 +42,7 @@ var retroPaletteSpecs = map[string]retroPaletteSpec{
 		canvas: "#12161B", canvasRaised: "#171C23", surface: "#242A33",
 		surfaceHover: "#3E4652", border: "#252C36", borderStrong: "#545D6A",
 		text: "#E6EAF0", textMuted: "#8C97A6", onAccent: "#FFFFFF",
-		onWarm: "#2A1C02", lcdBg: "#1E2A16", lcdInk: "#9BD24E",
+		onTitle: "#EAF1F8", onWarm: "#2A1C02", lcdBg: "#1E2A16", lcdInk: "#9BD24E",
 		accent: "#256CB4", accentHover: "#3D8DDA", accentPressed: "#17507F",
 		accentSoft: "#0E3A61",
 	},
@@ -49,7 +50,7 @@ var retroPaletteSpecs = map[string]retroPaletteSpec{
 		canvas: "#FFFBF3", canvasRaised: "#EFD8BC", surface: "#FFF3E2",
 		surfaceHover: "#FFE9CB", border: "#9C7A54", borderStrong: "#5A3A1C",
 		text: "#3E2711", textMuted: "#8E6B45", onAccent: "#FFFFFF",
-		onWarm: "#1E3A08", lcdBg: "#F6E8C4", lcdInk: "#6B4A12",
+		onTitle: "#4A2A08", onWarm: "#1E3A08", lcdBg: "#F6E8C4", lcdInk: "#6B4A12",
 		accent: "#F4741B", accentHover: "#FF9E42", accentPressed: "#CC530A",
 		accentSoft: "#FFCE96",
 	},
@@ -57,7 +58,7 @@ var retroPaletteSpecs = map[string]retroPaletteSpec{
 		canvas: "#181008", canvasRaised: "#1D160E", surface: "#2E2318",
 		surfaceHover: "#4E3C2E", border: "#43301F", borderStrong: "#8A6E57",
 		text: "#F6E6D2", textMuted: "#B2937A", onAccent: "#2A1403",
-		onWarm: "#EDF8DC", lcdBg: "#2C2008", lcdInk: "#FFB428",
+		onTitle: "#FFD9A8", onWarm: "#EDF8DC", lcdBg: "#2C2008", lcdInk: "#FFB428",
 		accent: "#D06E12", accentHover: "#F5942E", accentPressed: "#9C4E07",
 		accentSoft: "#6E3604",
 	},
@@ -65,7 +66,7 @@ var retroPaletteSpecs = map[string]retroPaletteSpec{
 		canvas: "#CFDCB2", canvasRaised: "#A9BA88", surface: "#C2D1A2",
 		surfaceHover: "#B8C89A", border: "#5E6B40", borderStrong: "#2A3418",
 		text: "#212A12", textMuted: "#5E6B40", onAccent: "#CFDCB2",
-		onWarm: "#CFDCB2", lcdBg: "#C7D6A8", lcdInk: "#2A3418",
+		onTitle: "#CFDCB2", onWarm: "#CFDCB2", lcdBg: "#C7D6A8", lcdInk: "#2A3418",
 		accent: "#2A3418", accentHover: "#43502A", accentPressed: "#212A12",
 		accentSoft: "#9CAD7B",
 	},
@@ -73,7 +74,7 @@ var retroPaletteSpecs = map[string]retroPaletteSpec{
 		canvas: "#081019", canvasRaised: "#0A1420", surface: "#101E2C",
 		surfaceHover: "#11202E", border: "#2E5C78", borderStrong: "#5FB4E0",
 		text: "#9FDCFA", textMuted: "#4E88A8", onAccent: "#06131E",
-		onWarm: "#BFE8FF", lcdBg: "#08131E", lcdInk: "#5FD0FF",
+		onTitle: "#9FDCFA", onWarm: "#BFE8FF", lcdBg: "#08131E", lcdInk: "#5FD0FF",
 		accent: "#4FA8DC", accentHover: "#6FC4F2", accentPressed: "#3B87B4",
 		accentSoft: "#1C3D54",
 	},
@@ -81,7 +82,7 @@ var retroPaletteSpecs = map[string]retroPaletteSpec{
 		canvas: "#F7FAFD", canvasRaised: "#C8D3DF", surface: "#EAF0F6",
 		surfaceHover: "#DAE3EE", border: "#AFBAC6", borderStrong: "#6E7C8C",
 		text: "#16212E", textMuted: "#6B7A8C", onAccent: "#FFFFFF",
-		onWarm: "#08351A", lcdBg: "#111A24", lcdInk: "#8FD4FF",
+		onTitle: "#FFFFFF", onWarm: "#08351A", lcdBg: "#111A24", lcdInk: "#8FD4FF",
 		accent: "#1E97E8", accentHover: "#63C0F8", accentPressed: "#0B6FB4",
 		accentSoft: "#AEE2FF",
 	},
@@ -89,7 +90,7 @@ var retroPaletteSpecs = map[string]retroPaletteSpec{
 		canvas: "#080C10", canvasRaised: "#0B1016", surface: "#161D25",
 		surfaceHover: "#252E36", border: "#1E2831", borderStrong: "#5A6874",
 		text: "#E8F2F8", textMuted: "#7C8B99", onAccent: "#032430",
-		onWarm: "#04240F", lcdBg: "#04070A", lcdInk: "#6FE0FF",
+		onTitle: "#BFE8FA", onWarm: "#04240F", lcdBg: "#04070A", lcdInk: "#6FE0FF",
 		accent: "#16A3E0", accentHover: "#4FC6F5", accentPressed: "#0A76A8",
 		accentSoft: "#123B52",
 	},
@@ -97,7 +98,7 @@ var retroPaletteSpecs = map[string]retroPaletteSpec{
 		canvas: "#F6F7FA", canvasRaised: "#E7EAEF", surface: "#FFFFFF",
 		surfaceHover: "#F6F7F9", border: "#E9A0BE", borderStrong: "#D6165F",
 		text: "#1A1A20", textMuted: "#7A7A88", onAccent: "#FFFFFF",
-		onWarm: "#FFFFFF", lcdBg: "#0E0E14", lcdInk: "#FF6BA8",
+		onTitle: "#FFFFFF", onWarm: "#FFFFFF", lcdBg: "#0E0E14", lcdInk: "#FF6BA8",
 		accent: "#E5106B", accentHover: "#FF4E97", accentPressed: "#B60B53",
 		accentSoft: "#FF9CC6",
 	},
@@ -105,7 +106,7 @@ var retroPaletteSpecs = map[string]retroPaletteSpec{
 		canvas: "#040406", canvasRaised: "#070709", surface: "#0C0C12",
 		surfaceHover: "#191921", border: "#6E1440", borderStrong: "#FF2E8A",
 		text: "#F4E9EF", textMuted: "#9A7A8C", onAccent: "#1A0009",
-		onWarm: "#00212A", lcdBg: "#030305", lcdInk: "#FF4E9E",
+		onTitle: "#FF7FB8", onWarm: "#00212A", lcdBg: "#030305", lcdInk: "#FF4E9E",
 		accent: "#FF1478", accentHover: "#FF4E9E", accentPressed: "#C40D5C",
 		accentSoft: "#2A0A1C",
 	},
@@ -131,6 +132,7 @@ func retroPalette(theme string, base ARAMPalette) ARAMPalette {
 	p.TextDisabled = mixNRGBA(p.TextMuted, p.Surface, 0.45)
 	p.OnAccent = hexNRGBA(spec.onAccent)
 	p.OnWarm = hexNRGBA(spec.onWarm)
+	p.OnTitle = hexNRGBA(spec.onTitle)
 	p.GuestSurface = hexNRGBA(spec.lcdBg)
 	p.GuestInk = hexNRGBA(spec.lcdInk)
 	p.Accent = hexNRGBA(spec.accent)

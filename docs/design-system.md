@@ -44,9 +44,18 @@ Each family ships a light and a dark variant selected by the existing theme
 mode, so the skin choice and the light/dark toggle stay independent settings
 (`theme_family` and `theme_mode`). `newARAMDesignSystem` resolves both into
 one design system: the retro path swaps `ARAMPalette` and `ARAMComponents`
-for sprite-backed equivalents (`design_system_retro*.go`) while typography,
-spacing, and the token contract stay unchanged. Switching either setting
+for sprite-backed equivalents (`design_system_retro*.go`) while spacing
+and the token contract stay unchanged. Switching either setting
 rebuilds the design system and shell UI at runtime; no restart is required.
+
+Sprite skins also swap the whole type ramp onto **Terrarum Sans Bitmap**, a
+pixel font with full Hangul coverage (embedded under
+`frontend/assets/terrarum/`, SIL OFL 1.1 — its license ships next to the
+file). Sizes stay on the font's native pixel grid: 20px for captions, body,
+and strong text, 40px for headings and display text. The face has a single
+weight, matching how era handsets drew their shells. Dialog titles use the dedicated
+`OnTitle` palette role so the title ink matches each skin's gradient, and
+soft-key primaries use `OnWarm`.
 
 Sprite skins go beyond the nine-slice chrome: the application toolbar swaps
 its text actions for the pack's 16×16 pixel icons (inverted ink on pressed

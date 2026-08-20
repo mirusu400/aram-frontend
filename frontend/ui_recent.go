@@ -224,7 +224,7 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 	titleBar.AddChild(design.text(
 		shell.tr("Open Recent"),
 		design.Type.Heading,
-		design.Palette.Text,
+		design.Palette.OnTitle,
 		widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionCenter,

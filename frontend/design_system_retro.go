@@ -7,15 +7,16 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 )
 
-// applyRetroSkin swaps the palette and component images of a freshly built
-// modern design system for the sprite-backed retro skin. Typography, spacing
-// and radius tokens are shared: the sprites carry their own shape, so radius
-// stays a layout-only concern.
+// applyRetroSkin swaps the palette, component images, and type ramp of a
+// freshly built modern design system for the sprite-backed retro skin.
+// Spacing and radius tokens are shared: the sprites carry their own shape,
+// so radius stays a layout-only concern.
 func applyRetroSkin(ds *ARAMDesignSystem, family string) {
 	theme := retroThemeID(family, ds.Mode)
 	ds.Family = family
 	ds.Palette = retroPalette(theme, ds.Palette)
 	ds.Components = retroComponents(theme, ds.Palette)
+	ds.Type = retroTypography()
 	ds.Theme = &widget.Theme{
 		DefaultFace:      ds.Type.Body,
 		DefaultTextColor: ds.Palette.Text,

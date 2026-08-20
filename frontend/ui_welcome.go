@@ -160,7 +160,7 @@ func (u *shellUI) syncWelcomePanel(shell *Shell) {
 	titleBar.AddChild(design.text(
 		shell.tr("Welcome to ARAM"),
 		design.Type.Heading,
-		design.Palette.Text,
+		design.Palette.OnTitle,
 		widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionCenter,
