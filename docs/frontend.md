@@ -185,6 +185,20 @@ All desktop entry paths converge on `OpenRequest`. Ebitengine drop handles are
 copied to an application-private cache before opening, retain the original
 display name and extension, and are removed when the input closes.
 
+## Guest presentation
+
+`VideoBackend` publishes an immutable guest-native frame with a sequence that
+only changes when the pixels change. The shell uploads a frame once per
+sequence into a persistent texture that is rebuilt only when the guest changes
+resolution, so a running title neither re-uploads an unchanged screen nor
+allocates a texture per frame. A backend that hands over tightly packed RGBA is
+uploaded without an intermediate copy.
+
+Guest audio is drained from `AudioStreamBackend` on every tick, including ticks
+where a frame batch is still executing. A title heavy enough to keep a batch
+pending across ticks is exactly the one whose host queue would otherwise
+underrun.
+
 ## Observable state and errors
 
 The shell exposes empty, selecting, inspecting, loading, ready, running,

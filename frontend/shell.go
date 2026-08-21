@@ -69,6 +69,7 @@ type Shell struct {
 	logs                      []string
 	frame                     VideoFrame
 	frameImage                *ebiten.Image
+	frameScratch              *image.RGBA
 	audioOutput               *audioOutput
 	controlState              map[string]bool
 	directionPressOrder       []string

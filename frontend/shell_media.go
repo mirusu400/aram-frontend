@@ -1,6 +1,8 @@
 package frontend
 
 import (
+	"image"
+	"image/draw"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -34,13 +36,22 @@ func (s *Shell) releaseCurrentInput() error {
 	s.clearMeasuredSpeed()
 	s.frame = VideoFrame{}
 	s.frameImage = nil
+	s.frameScratch = nil
 	s.state = FrontendEmpty
 	setPlatformWindowTitle(s.tr("ARAM - Archived Runtime for ARM Mobiles"))
 	return nil
 }
 
+// updateAudio moves guest PCM into the host queue once per tick.
+//
+// It deliberately runs while a frame batch is still in flight. Skipping the
+// drain until the batch landed meant a title heavy enough to keep a batch
+// pending across ticks - exactly the title whose audio is already fragile -
+// stopped being drained at all, so the host queue underran and the sound
+// broke up. Draining is safe mid-batch because the backend serializes its own
+// audio buffer.
 func (s *Shell) updateAudio() {
-	if s.loading || s.input == nil || s.frameRunPending {
+	if s.loading || s.input == nil {
 		return
 	}
 	backend, ok := s.backend.(AudioStreamBackend)
@@ -146,5 +157,46 @@ func (s *Shell) updateVideo() {
 		return
 	}
 	s.frame = frame
-	s.frameImage = ebiten.NewImageFromImage(frame.Image)
+	s.uploadGuestFrame(frame.Image)
+}
+
+// uploadGuestFrame publishes guest pixels into a persistent GPU image.
+//
+// Building a fresh ebiten.Image per frame allocated and then discarded a
+// texture sixty times a second, which is pure churn: the guest screen keeps
+// its size for the whole run. The texture is now reused and only rebuilt when
+// the guest actually changes resolution.
+func (s *Shell) uploadGuestFrame(source image.Image) {
+	bounds := source.Bounds()
+	width, height := bounds.Dx(), bounds.Dy()
+	if s.frameImage == nil ||
+		s.frameImage.Bounds().Dx() != width ||
+		s.frameImage.Bounds().Dy() != height {
+		s.frameImage = ebiten.NewImage(width, height)
+	}
+	s.frameImage.WritePixels(guestFramePixels(source, &s.frameScratch))
+}
+
+// guestFramePixels returns the frame as tightly packed premultiplied RGBA.
+//
+// Backends hand over an *image.RGBA whose rows are already contiguous, so the
+// common path uploads the backend's own buffer with no copy at all. Any other
+// image type is converted through a scratch buffer that is reused across
+// frames rather than reallocated.
+func guestFramePixels(source image.Image, scratch **image.RGBA) []byte {
+	bounds := source.Bounds()
+	width, height := bounds.Dx(), bounds.Dy()
+	stride := width * 4
+	if rgba, ok := source.(*image.RGBA); ok &&
+		rgba.Stride == stride &&
+		len(rgba.Pix) == stride*height {
+		return rgba.Pix
+	}
+	if *scratch == nil ||
+		(*scratch).Bounds().Dx() != width ||
+		(*scratch).Bounds().Dy() != height {
+		*scratch = image.NewRGBA(image.Rect(0, 0, width, height))
+	}
+	draw.Draw(*scratch, (*scratch).Bounds(), source, bounds.Min, draw.Src)
+	return (*scratch).Pix
 }
