@@ -110,6 +110,16 @@ Android, nothing elsewhere). A build with no way to read power shows no meter
 rather than an invented full one. Both glyphs are repainted per reading, since
 the pack ships one ink per icon.
 
+Every reading in the bar is drawn with a lifted ink under a dark palette. The
+muted and disabled inks a dark theme carries sit close to the bar's own
+surface, which reads as unlit rather than quiet, so `statusBarInk` pulls them
+toward the palette's full text ink; a light palette keeps the inks it was
+designed with, and the accent and fault inks are already vivid enough to be
+left alone. The bar must also be asked to lay itself out again whenever a
+reading changes: EbitenUI caches a container's layout, and the indicator
+cluster is anchored from the trailing row's preferred width, so a stale layout
+left the cluster drawn on top of the text it follows.
+
 A compact panel stacks each settings row instead: the label takes the full
 width and the control sits under it. At a phone's logical width a nav rail
 plus a control leaves the label almost nothing, which is how a slider ended up

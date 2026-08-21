@@ -21,6 +21,7 @@ type shellUI struct {
 	toolbarButtons       map[string]*widget.Button
 	toolbarTitle         *widget.Text
 	buildStampText       *widget.Text
+	statusBar            *widget.Container
 	statusText           *widget.Text
 	statusMeta           *widget.Text
 	statusSignal         *widget.Graphic
@@ -111,16 +112,16 @@ func (u *shellUI) sync(shell *Shell) {
 		button.GetWidget().SetVisibility(visibility(visible))
 	}
 	statusLimit := max(24, min(92, (width-32)/7))
-	u.statusText.Label = shorten(shell.status, statusLimit)
+	u.setStatusLabel(u.statusText, shorten(shell.status, statusLimit))
 	// Show the achieved speed (e.g. "1x (98%)") rather than only the requested
 	// setting, so a title running below handset speed is visible in the
 	// always-on status bar without opening settings, which pauses the guest.
-	u.statusMeta.Label = fmt.Sprintf(
+	u.setStatusLabel(u.statusMeta, fmt.Sprintf(
 		"%s  •  %s  •  %s",
 		strings.ToUpper(shell.tr(stateValueLabel(string(shell.backend.State())))),
 		shell.speedSettingValue(),
 		strings.ToUpper(shell.tr(settingValueLabel(shell.settings.Filter))),
-	)
+	))
 	if shell.input == nil {
 		u.toolbarTitle.Label = shell.tr("No title loaded")
 	} else {
@@ -309,6 +310,24 @@ func (u *shellUI) closePanel() {
 	}
 }
 
+// setStatusLabel writes a status-bar label and asks the bar to lay itself out
+// again when the text actually changed.
+//
+// EbitenUI caches a container's layout until something requests otherwise, and
+// a plain assignment to Text.Label is not that. The trailing indicator cluster
+// is anchored to the bar's right edge from its own preferred width, so a stale
+// layout left the cluster sitting on top of the meta text as the reading grew,
+// or pushed it past the edge of the bar entirely.
+func (u *shellUI) setStatusLabel(target *widget.Text, label string) {
+	if target == nil || target.Label == label {
+		return
+	}
+	target.Label = label
+	if u.statusBar != nil {
+		u.statusBar.RequestRelayout()
+	}
+}
+
 // syncStatusIndicators updates the handset indicator cluster at the right end
 // of the status bar. Both readings are real or absent: the signal glyph is
 // inked from what the guest machine is actually doing, and the charge meter
@@ -325,11 +344,11 @@ func (u *shellUI) syncStatusIndicators(shell *Shell, width int) {
 		case activityRunning:
 			ink = palette.Accent
 		case activityPaused:
-			ink = palette.TextMuted
+			ink = statusBarInk(palette, palette.TextMuted)
 		case activityFaulted:
 			ink = palette.Fault
 		default:
-			ink = palette.TextDisabled
+			ink = statusBarInk(palette, palette.TextDisabled)
 		}
 		if icon := u.design.retroIndicatorIcon("signal", ink); icon != nil {
 			u.statusSignal.Image = icon
@@ -339,7 +358,7 @@ func (u *shellUI) syncStatusIndicators(shell *Shell, width int) {
 	battery := shell.hostBattery()
 	show := room && battery.Present
 	if u.statusBattery != nil {
-		ink := palette.TextMuted
+		ink := statusBarInk(palette, palette.TextMuted)
 		switch {
 		case battery.Charging:
 			ink = palette.Accent
@@ -352,9 +371,9 @@ func (u *shellUI) syncStatusIndicators(shell *Shell, width int) {
 		u.statusBattery.GetWidget().SetVisibility(visibility(show))
 	}
 	if show {
-		u.statusBatteryText.Label = fmt.Sprintf("%d%%", battery.Percent)
+		u.setStatusLabel(u.statusBatteryText, fmt.Sprintf("%d%%", battery.Percent))
 	} else {
-		u.statusBatteryText.Label = ""
+		u.setStatusLabel(u.statusBatteryText, "")
 	}
 	u.statusBatteryText.GetWidget().SetVisibility(visibility(show))
 }

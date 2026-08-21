@@ -206,7 +206,7 @@ func (u *shellUI) buildStatusBar() *widget.Container {
 	u.statusText = design.text(
 		"",
 		design.Type.Caption,
-		design.Palette.TextMuted,
+		statusBarInk(design.Palette, design.Palette.TextMuted),
 		widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionCenter,
@@ -232,7 +232,7 @@ func (u *shellUI) buildStatusBar() *widget.Container {
 	u.statusMeta = design.text(
 		"",
 		design.Type.Caption,
-		design.Palette.TextDisabled,
+		statusBarInk(design.Palette, design.Palette.TextDisabled),
 		centered,
 	)
 	trailing.AddChild(u.statusMeta)
@@ -256,11 +256,12 @@ func (u *shellUI) buildStatusBar() *widget.Container {
 	u.statusBatteryText = design.text(
 		"",
 		design.Type.Caption,
-		design.Palette.TextMuted,
+		statusBarInk(design.Palette, design.Palette.TextMuted),
 		centered,
 	)
 	trailing.AddChild(u.statusBatteryText)
 	bar.AddChild(u.statusText, trailing)
+	u.statusBar = bar
 	return bar
 }
 
