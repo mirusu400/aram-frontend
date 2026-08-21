@@ -186,6 +186,11 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 			shell.appendLog(shell.tr("Handset font: ") + err.Error())
 		}
 	}
+	if selector, ok := shell.backend.(CPUBackendSelector); ok {
+		if err := selector.ConfigureCPU(shell.currentCPUSettings()); err != nil {
+			shell.appendLog(shell.tr("CPU core: ") + err.Error())
+		}
+	}
 	if applied, err := loadCustomGamepadMappings(); err != nil {
 		shell.appendLog(shell.tr("Controller database: ") + err.Error())
 	} else if applied {

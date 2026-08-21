@@ -395,6 +395,29 @@ func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 				},
 			},
 			{
+				label:       "CPU core",
+				description: "Backend that runs the guest. Precise is the accurate interpreter; a faster core appears when available. Takes effect the next time a title is opened.",
+				dropdown: &settingsDropdownModel{
+					count: len(shell.cpuDropdownChoices()),
+					label: func(i int) string {
+						choices := shell.cpuDropdownChoices()
+						if i < 0 || i >= len(choices) {
+							return ""
+						}
+						return shell.cpuChoiceLabel(choices[i])
+					},
+					value: func() int {
+						return fontChoiceIndex(shell.cpuDropdownChoices(), shell.settings.CPUChoice)
+					},
+					apply: func(i int) {
+						choices := shell.cpuDropdownChoices()
+						if i >= 0 && i < len(choices) {
+							shell.setCPU(choices[i])
+						}
+					},
+				},
+			},
+			{
 				label:       "Backend",
 				description: "Integration currently connected to the frontend.",
 				value:       shorten(shell.backendName(), 24),

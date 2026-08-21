@@ -33,6 +33,7 @@ type Settings struct {
 	StateSlot         int                          `json:"state_slot"`
 	FontChoice        string                       `json:"font_choice"`
 	CustomFontPath    string                       `json:"custom_font_path,omitempty"`
+	CPUChoice         string                       `json:"cpu_choice"`
 	Speed             float64                      `json:"speed"`
 	Muted             bool                         `json:"muted"`
 	Volume            int                          `json:"volume"`
@@ -95,6 +96,7 @@ func defaultSettings() Settings {
 		Filter:           "nearest",
 		StateSlot:        0,
 		FontChoice:       "galmuri9",
+		CPUChoice:        "precise",
 		Speed:            1,
 		Volume:           100,
 		AudioLatencyMS:   60,
@@ -149,6 +151,9 @@ func (s *Settings) normalize() {
 	}
 	if s.FontChoice == "custom" && s.CustomFontPath == "" {
 		s.FontChoice = "galmuri9"
+	}
+	if s.CPUChoice == "" {
+		s.CPUChoice = "precise"
 	}
 	if s.TouchDeckRatio != 0 {
 		s.TouchDeckRatio = clampInt(s.TouchDeckRatio, touchDeckRatioMin, touchDeckRatioMax)

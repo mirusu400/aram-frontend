@@ -272,6 +272,22 @@ type FontBackend interface {
 	ConfigureFont(FontSettings) error
 }
 
+// CPUSettings selects which CPU backend (core) executes the guest. Name is a
+// stable identifier such as "precise"; an empty or unknown name keeps the
+// backend's default core.
+type CPUSettings struct {
+	Name string
+}
+
+// CPUBackendSelector is implemented by backends that can switch the CPU core.
+// AvailableCPUBackends lists the selectable core names for the settings UI, and
+// ConfigureCPU records the choice, which takes effect the next time a title is
+// opened.
+type CPUBackendSelector interface {
+	ConfigureCPU(CPUSettings) error
+	AvailableCPUBackends() []string
+}
+
 // AudioStreamBackend transfers guest-generated PCM to the host output owned by
 // the frontend. DrainAudio must return quickly and transfer ownership of PCM16
 // to the caller.
