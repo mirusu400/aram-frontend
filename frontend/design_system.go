@@ -220,7 +220,7 @@ func newModernARAMDesignSystem(mode string) *ARAMDesignSystem {
 			Image:     buttonImages(menuIdle, menuHover, menuPressed, menuPressed, commandDisabled),
 			Text:      buttonTextColors(palette.TextMuted, palette.Text, palette.Text, palette.TextDisabled),
 			Padding:   widget.Insets{Left: 8, Right: 8},
-			MinHeight: 28,
+			MinHeight: menuRowHeight,
 		},
 		CommandButton: ARAMButtonStyle{
 			Image:     buttonImages(commandIdle, commandHover, commandPressed, commandPressed, commandDisabled),
@@ -241,8 +241,10 @@ func newModernARAMDesignSystem(mode string) *ARAMDesignSystem {
 			MinHeight: 36,
 		},
 		TouchButton: ARAMButtonStyle{
-			Image:     buttonImages(touchIdle, touchHover, touchPressed, touchPressed, commandDisabled),
-			Text:      buttonTextColors(palette.TextMuted, palette.Text, palette.OnAccent, palette.TextDisabled),
+			Image: buttonImages(touchIdle, touchHover, touchPressed, touchPressed, commandDisabled),
+			// Full ink at rest: a key legend is read mid-game, so it does not
+			// get the muted role the way a secondary label does.
+			Text:      buttonTextColors(palette.Text, palette.Text, palette.OnAccent, palette.TextDisabled),
 			Padding:   widget.Insets{Left: 10, Right: 10},
 			MinHeight: 44,
 		},

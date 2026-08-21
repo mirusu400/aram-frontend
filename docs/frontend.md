@@ -96,7 +96,12 @@ Additional SDL-compatible mappings can be placed at
 `ARAM/gamecontrollerdb.txt` beside `settings.json` and reloaded without
 restarting. The optional virtual keypad reserves a responsive rail to the
 right of the guest display and exposes direction, soft, action, menu, and
-phone-number controls to mouse or touch input.
+phone-number controls to mouse or touch input. Direction keys carry an arrow
+rather than a localized word, on the keypad and on the touch deck alike.
+
+The status bar ends with a machine-state signal glyph and, where the host
+reports one, the battery charge. Neither is decorative: a platform that
+exposes no battery draws no meter.
 
 On touch layouts, the menu bar, toolbar, and status bar disappear when a
 title enters the running state so the guest screen can fill everything above

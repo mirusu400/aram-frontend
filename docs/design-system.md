@@ -76,6 +76,40 @@ selection bar, and the guest viewport is framed by the pack's LCD bezel with
 Every retro tile is 17×17 with an 8px fixed border and a 1px stretchable
 center, which keeps gradients from banding at any control size.
 
+Deck and keypad keys are the one control drawn from a doubled tile
+(`retroScaledNineSlice`). The bevel lives entirely in the fixed border, so on a
+key several times the tile's own size an 8px border reads as a hairline around
+a flat slab; doubling it doubles the gloss band and the drop shadow with it.
+Doubling is the ceiling — a doubled tile needs 34px before its center stretches,
+which is the smallest key the deck draws.
+
+Key legends take the key's own ink roles rather than the muted body-text role:
+`TouchButton.Text.Idle` is the full ink, and only the skins whose pressed face
+fills solid with the accent — the flat and neon styles — invert the legend on
+press. The gel skin backs a pale legend with a 1px dark offset copy, because
+its highlight covers the top half of the key at nearly the legend's own
+brightness.
+
+Direction keys carry a rasterized arrow instead of a word
+(`frontend/ui_pictogram.go`). A localized label is both too long for a key and
+too slow to read mid-game, and the pack's own 5-way pad draws triangles. The
+arrow is stepped from whole pixels rather than scaled from a sprite, so it
+stays on the pixel grid beside the pixel font at any key size.
+
+The chrome bars are sized to the tallest control they seat: a text row for the
+menu bar and an icon button for the toolbar. The custom-drawn workspace lays
+itself out against those constants instead of measuring the EbitenUI bars, so a
+control taller than its bar would grow the bar over the guest viewport —
+`TestChromeBarsFitInsideTheHeightsTheWorkspaceAssumes` holds every skin to it.
+
+The status bar closes with the era's indicator cluster: a signal glyph inked
+from what the guest machine is doing, and a charge meter that appears only
+where the platform reports a battery (`frontend/battery_*.go` — Win32
+`GetSystemPowerStatus` on Windows, the kernel power-supply class on Linux and
+Android, nothing elsewhere). A build with no way to read power shows no meter
+rather than an invented full one. Both glyphs are repainted per reading, since
+the pack ships one ink per icon.
+
 A compact panel stacks each settings row instead: the label takes the full
 width and the control sits under it. At a phone's logical width a nav rail
 plus a control leaves the label almost nothing, which is how a slider ended up

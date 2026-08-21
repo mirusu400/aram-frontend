@@ -2,6 +2,7 @@ package frontend
 
 import (
 	"fmt"
+	"image/color"
 	"strings"
 
 	"github.com/ebitenui/ebitenui"
@@ -22,6 +23,9 @@ type shellUI struct {
 	buildStampText       *widget.Text
 	statusText           *widget.Text
 	statusMeta           *widget.Text
+	statusSignal         *widget.Graphic
+	statusBattery        *widget.Graphic
+	statusBatteryText    *widget.Text
 	panelWindow          *widget.Window
 	panelSignature       string
 	panelDropdowns       map[string]*widget.ListComboButton
@@ -95,6 +99,7 @@ func (u *shellUI) sync(shell *Shell) {
 		u.buildStampText.GetWidget().SetVisibility(visibility(width >= 700))
 	}
 	u.statusMeta.GetWidget().SetVisibility(visibility(width >= 700))
+	u.syncStatusIndicators(shell, width)
 	for id, button := range u.toolbarButtons {
 		visible := true
 		if width < 620 && (id == "emu.stop" || id == "emu.reset") {
@@ -302,4 +307,54 @@ func (u *shellUI) closePanel() {
 	if window != nil {
 		window.Close()
 	}
+}
+
+// syncStatusIndicators updates the handset indicator cluster at the right end
+// of the status bar. Both readings are real or absent: the signal glyph is
+// inked from what the guest machine is actually doing, and the charge meter
+// only appears where the platform reports one, so a build with no way to read
+// power shows nothing rather than a full battery it invented.
+func (u *shellUI) syncStatusIndicators(shell *Shell, width int) {
+	// The cluster is the first thing to go when the bar runs out of room; the
+	// status text it sits beside carries the words that cannot be inferred.
+	room := width >= 520
+	palette := u.design.Palette
+	if u.statusSignal != nil {
+		var ink color.Color
+		switch shell.machineActivity() {
+		case activityRunning:
+			ink = palette.Accent
+		case activityPaused:
+			ink = palette.TextMuted
+		case activityFaulted:
+			ink = palette.Fault
+		default:
+			ink = palette.TextDisabled
+		}
+		if icon := u.design.retroIndicatorIcon("signal", ink); icon != nil {
+			u.statusSignal.Image = icon
+		}
+		u.statusSignal.GetWidget().SetVisibility(visibility(room))
+	}
+	battery := shell.hostBattery()
+	show := room && battery.Present
+	if u.statusBattery != nil {
+		ink := palette.TextMuted
+		switch {
+		case battery.Charging:
+			ink = palette.Accent
+		case battery.Percent <= batteryLow:
+			ink = palette.Fault
+		}
+		if icon := u.design.retroIndicatorIcon("battery", ink); icon != nil {
+			u.statusBattery.Image = icon
+		}
+		u.statusBattery.GetWidget().SetVisibility(visibility(show))
+	}
+	if show {
+		u.statusBatteryText.Label = fmt.Sprintf("%d%%", battery.Percent)
+	} else {
+		u.statusBatteryText.Label = ""
+	}
+	u.statusBatteryText.GetWidget().SetVisibility(visibility(show))
 }

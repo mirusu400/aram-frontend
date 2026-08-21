@@ -72,6 +72,8 @@ type Shell struct {
 	audioOutput               *audioOutput
 	controlState              map[string]bool
 	directionPressOrder       []string
+	battery                   batteryReading
+	batteryPolledAt           time.Time
 	bindingCapture            *bindingCapture
 	gamepadMappingsLoaded     bool
 	touchControls             map[ebiten.TouchID]string

@@ -444,6 +444,10 @@ func TestARAMRoundedRectHitModel(t *testing.T) {
 func TestAppearanceSwitchRebuildsRoundedCoolDesign(t *testing.T) {
 	shell := NewShell(NullBackend{}, nil, "")
 	shell.settings.ThemeMode = "light"
+	// Pinned, not inherited: the shell loads the developer's saved settings,
+	// so a machine left on a sprite skin would otherwise run this against a
+	// palette that never claimed to be cool-tinted.
+	shell.settings.ThemeFamily = themeFamilyModern
 	shell.syncDesignSystem()
 	lightUI := shell.interfaceUI
 	if shell.design.Mode != "light" {

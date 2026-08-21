@@ -7,10 +7,21 @@ import (
 )
 
 const (
-	menuBarHeight            = 36
-	applicationToolbarHeight = 48
+	// The bars are sized to the tallest control they seat and no more. A
+	// desktop shell spends its vertical budget on the guest screen, so the
+	// menu row is a text row's height and the toolbar an icon button's, the
+	// way an ordinary desktop application draws them, rather than the
+	// touch-sized rows a handset needs.
+	menuBarHeight            = 24
+	applicationToolbarHeight = 30
 	statusBarHeight          = 28
 	settingsNavWidth         = 168
+	// menuRowHeight and toolbarButtonHeight are what those bars actually
+	// seat; a control taller than its bar would grow the bar past the
+	// constant the custom-drawn workspace lays itself out against.
+	menuRowHeight       = 22
+	toolbarButtonHeight = 26
+	toolbarButtonWidth  = 28
 )
 
 func (u *shellUI) buildTopBar(shell *Shell) *widget.Container {
@@ -31,11 +42,7 @@ func (u *shellUI) buildTopBar(shell *Shell) *widget.Container {
 	menuRow := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Padding(&widget.Insets{
-				Left:   design.Space.M,
-				Top:    design.Space.XS,
-				Bottom: design.Space.XS,
-			}),
+			widget.RowLayoutOpts.Padding(&widget.Insets{Left: design.Space.M}),
 			widget.RowLayoutOpts.Spacing(design.Space.XS),
 		)),
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
@@ -97,8 +104,8 @@ func (u *shellUI) buildApplicationToolbar(shell *Shell) *widget.Container {
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
 			widget.RowLayoutOpts.Padding(&widget.Insets{
 				Left:   design.Space.M,
-				Top:    design.Space.S,
-				Bottom: design.Space.S,
+				Top:    design.Space.XXS,
+				Bottom: design.Space.XXS,
 			}),
 			widget.RowLayoutOpts.Spacing(design.Space.XS),
 		)),
@@ -115,7 +122,8 @@ func (u *shellUI) buildApplicationToolbar(shell *Shell) *widget.Container {
 			// Sprite skins draw the era-style icon toolbar instead of the
 			// text actions; the labels stay available through the menus.
 			button = widget.NewButton(
-				widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.MinSize(36, 32)),
+				widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.MinSize(
+					toolbarButtonWidth, toolbarButtonHeight)),
 				widget.ButtonOpts.Image(design.Components.SubtleButton.Image),
 				widget.ButtonOpts.Graphic(graphic),
 				widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
@@ -127,12 +135,17 @@ func (u *shellUI) buildApplicationToolbar(shell *Shell) *widget.Container {
 			// graphic and the row spacing pushes the icon off center.
 			button.GetWidget().SetTheme(&widget.Theme{})
 		} else {
+			// The toolbar row is shorter than a standalone subtle button, so
+			// it lowers that style's own floor rather than letting the floor
+			// push the bar past the height the workspace lays out against.
+			style := design.Components.SubtleButton
+			style.MinHeight = toolbarButtonHeight
 			button = design.button(
 				label,
-				design.Components.SubtleButton,
+				style,
 				design.Type.Strong,
 				width,
-				32,
+				toolbarButtonHeight,
 				widget.TextPositionCenter,
 				func() { shell.dispatchCommand(commandID) },
 			)
@@ -148,7 +161,7 @@ func (u *shellUI) buildApplicationToolbar(shell *Shell) *widget.Container {
 				widget.WidgetOpts.LayoutData(widget.RowLayoutData{
 					Position: widget.RowLayoutPositionCenter,
 				}),
-				widget.WidgetOpts.MinSize(1, 22),
+				widget.WidgetOpts.MinSize(1, toolbarButtonHeight-8),
 			),
 		))
 	}
@@ -200,17 +213,54 @@ func (u *shellUI) buildStatusBar() *widget.Container {
 			Padding:            &widget.Insets{Left: design.Space.L},
 		},
 	)
+	// The trailing group is the handset indicator cluster the design calls
+	// for: machine state, then charge, at the right edge. It is a row rather
+	// than separate anchored children so the icons keep their spacing when
+	// the meta text changes width.
+	trailing := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+			widget.RowLayoutOpts.Spacing(design.Space.S),
+		)),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+			HorizontalPosition: widget.AnchorLayoutPositionEnd,
+			VerticalPosition:   widget.AnchorLayoutPositionCenter,
+			Padding:            &widget.Insets{Right: design.Space.L},
+		})),
+	)
+	centered := widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
 	u.statusMeta = design.text(
 		"",
 		design.Type.Caption,
 		design.Palette.TextDisabled,
-		widget.AnchorLayoutData{
-			HorizontalPosition: widget.AnchorLayoutPositionEnd,
-			VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			Padding:            &widget.Insets{Right: design.Space.L},
-		},
+		centered,
 	)
-	bar.AddChild(u.statusText, u.statusMeta)
+	trailing.AddChild(u.statusMeta)
+	// Sprite skins only: the modern family draws no pixel icons, so it shows
+	// the same readings as text rather than borrowing glyphs from a skin it
+	// is not wearing.
+	if graphic := design.retroIcon("signal"); graphic != nil {
+		u.statusSignal = widget.NewGraphic(
+			widget.GraphicOpts.Image(graphic.Idle),
+			widget.GraphicOpts.WidgetOpts(widget.WidgetOpts.LayoutData(centered)),
+		)
+		trailing.AddChild(u.statusSignal)
+	}
+	if graphic := design.retroIcon("battery"); graphic != nil {
+		u.statusBattery = widget.NewGraphic(
+			widget.GraphicOpts.Image(graphic.Idle),
+			widget.GraphicOpts.WidgetOpts(widget.WidgetOpts.LayoutData(centered)),
+		)
+		trailing.AddChild(u.statusBattery)
+	}
+	u.statusBatteryText = design.text(
+		"",
+		design.Type.Caption,
+		design.Palette.TextMuted,
+		centered,
+	)
+	trailing.AddChild(u.statusBatteryText)
+	bar.AddChild(u.statusText, trailing)
 	return bar
 }
 

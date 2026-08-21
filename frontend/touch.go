@@ -201,9 +201,9 @@ func touchChromeToggleBounds(width int, hidden bool) image.Rectangle {
 	}
 	return rectAt(
 		width-8-76,
-		menuBarHeight+(applicationToolbarHeight-32)/2,
+		menuBarHeight+(applicationToolbarHeight-toolbarButtonHeight)/2,
 		76,
-		32,
+		toolbarButtonHeight,
 	)
 }
 
@@ -317,23 +317,32 @@ func (s *Shell) drawTouchButton(screen *ebiten.Image, button touchButton, active
 	bounds := button.Bounds
 	label := s.tr(button.Label)
 	if s.design != nil {
-		surface := s.design.Components.TouchButton.Image.Idle
-		textColor := s.design.Palette.TextMuted
+		key := s.design.Components.TouchButton
+		surface := key.Image.Idle
+		// The key's own ink roles, not the muted body text role: a legend has
+		// to stay readable against the key face it sits on, and a pressed face
+		// filled with the accent needs a different ink from an idle one.
+		textColor := key.Text.Idle
 		if active {
-			surface = s.design.Components.TouchButton.Image.Pressed
-			textColor = s.design.Palette.Text
+			surface = key.Image.Pressed
+			textColor = key.Text.Pressed
 		}
 		surface.Draw(screen, bounds.Dx(), bounds.Dy(), func(options *ebiten.DrawImageOptions) {
 			options.GeoM.Translate(float64(bounds.Min.X), float64(bounds.Min.Y))
 		})
-		drawCenteredText(
-			screen,
-			label,
-			s.design.Type.Strong,
-			textColor,
-			bounds,
-			centeredTextTop(s.design.Type.Strong, bounds, s.design.Type.CenterNudge),
-		)
+		if direction := directionGlyphFor(button.Control); direction != "" {
+			drawDirectionGlyph(screen, bounds, direction, textColor)
+			return
+		}
+		face := s.design.Type.Strong
+		top := centeredTextTop(face, bounds, s.design.Type.CenterNudge)
+		if shadow, ok := retroKeyLegendShadow(s.design.Family, s.design.Palette); ok {
+			drawCenteredText(
+				screen, label, face, shadow,
+				bounds.Add(image.Pt(1, 1)), top+1,
+			)
+		}
+		drawCenteredText(screen, label, face, textColor, bounds, top)
 		return
 	}
 	palette := defaultARAMPalette()
