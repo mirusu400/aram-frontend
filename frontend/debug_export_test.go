@@ -302,3 +302,36 @@ func sortedMapKeys(values map[string][]byte) []string {
 	slices.Sort(keys)
 	return keys
 }
+
+// TestDebugBundleIncludesCPUCore checks that the selected CPU core (precise /
+// jit / native) is captured in the snapshot and surfaces in the exported
+// manifest, so a debug bundle records which core the run used - important now
+// that a native JIT core is selectable and behaves differently from the
+// interpreter.
+func TestDebugBundleIncludesCPUCore(t *testing.T) {
+	config := t.TempDir()
+	t.Setenv("APPDATA", config)
+	t.Setenv("XDG_CONFIG_HOME", config)
+	t.Setenv("HOME", config)
+
+	settings := defaultSettings()
+	settings.CPUChoice = "native"
+	shell := &Shell{backend: NullBackend{}, settings: settings}
+
+	snapshot := shell.captureDebugBundleSnapshot(time.Now().UTC())
+	if snapshot.Settings.CPU != "native" {
+		t.Fatalf("snapshot CPU = %q, want native", snapshot.Settings.CPU)
+	}
+
+	path, _, err := collectDebugBundle(snapshot, shell.backend)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest debugBundleManifest
+	if err := json.Unmarshal(readDebugZIP(t, path)["manifest.json"], &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if manifest.Session.Settings.CPU != "native" {
+		t.Fatalf("manifest CPU = %q, want native", manifest.Session.Settings.CPU)
+	}
+}

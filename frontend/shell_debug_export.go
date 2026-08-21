@@ -56,6 +56,7 @@ func (s *Shell) captureDebugBundleSnapshot(createdAt time.Time) debugBundleSnaps
 		Problem:       problem,
 		Settings: debugSettingsReport{
 			Language:       s.settings.Language,
+			CPU:            s.settings.CPUChoice,
 			Speed:          s.settings.Speed,
 			StateSlot:      s.settings.StateSlot,
 			Theme:          s.settings.ThemeMode,

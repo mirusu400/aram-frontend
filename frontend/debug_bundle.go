@@ -84,6 +84,7 @@ type debugProblemReport struct {
 
 type debugSettingsReport struct {
 	Language       string  `json:"language"`
+	CPU            string  `json:"cpu"`
 	Speed          float64 `json:"speed"`
 	StateSlot      int     `json:"state_slot"`
 	Theme          string  `json:"theme"`
