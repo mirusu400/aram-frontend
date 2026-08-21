@@ -35,9 +35,11 @@ func (s *Shell) cpuChoiceLabel(name string) string {
 	switch name {
 	case "", "precise", "portable-interpreter":
 		return s.tr("Precise (interpreter)")
+	case "jit":
+		return s.tr("JIT recompiler (experimental)")
 	default:
 		if title := strings.TrimSpace(name); title != "" {
-			return s.trf("Fast: %s", title)
+			return s.trf("Core: %s", title)
 		}
 		return s.tr("Precise (interpreter)")
 	}
