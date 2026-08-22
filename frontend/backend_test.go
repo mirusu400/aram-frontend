@@ -295,7 +295,7 @@ func TestHostLifecycleOnlyResumesAutomaticPause(t *testing.T) {
 	}
 	shell := NewShell(backend, nil, "")
 	shell.input = &InputInfo{DisplayName: "synthetic.dat"}
-	shell.hostActive = false
+	shell.SetHostActive(false)
 	shell.syncHostLifecycle()
 	if request := waitCommandRequest(t, backend.requests); request.Command != CommandPauseResume {
 		t.Fatalf("pause request = %#v", request)
@@ -306,7 +306,7 @@ func TestHostLifecycleOnlyResumesAutomaticPause(t *testing.T) {
 		t.Fatalf("automatic pause: hostPaused=%t state=%s", shell.hostPaused, backend.State())
 	}
 
-	shell.hostActive = true
+	shell.SetHostActive(true)
 	shell.syncHostLifecycle()
 	if request := waitCommandRequest(t, backend.requests); request.Command != CommandPauseResume {
 		t.Fatalf("resume request = %#v", request)
@@ -319,7 +319,7 @@ func TestHostLifecycleOnlyResumesAutomaticPause(t *testing.T) {
 	backend.state = StatePaused
 	backend.mu.Unlock()
 	shell.hostPaused = false
-	shell.hostActive = false
+	shell.SetHostActive(false)
 	delete(shell.busyCommands, CommandPauseResume)
 	shell.syncHostLifecycle()
 	select {
@@ -448,5 +448,40 @@ func waitFrameCompletion(t *testing.T, shell *Shell) {
 	}
 	if shell.frameRunPending {
 		t.Fatal("timed out waiting for scheduled frame completion")
+	}
+}
+
+// Opening a title hands the screen to the platform document picker, which
+// backgrounds the app. ebitenmobile suspends the game loop there, so nothing
+// consumed lifecycle events until the app returned - and a pause plus its
+// audio focus loss filled the queue, so the resume behind them was dropped.
+// The shell stayed convinced the app was in the background, refused to issue
+// frames, and paused every title the moment it started.
+func TestHostLifecycleSurvivesASuspendedGameLoop(t *testing.T) {
+	backend := &lifecycleBackend{
+		state:    StateRunning,
+		requests: make(chan CommandRequest, 4),
+	}
+	shell := NewShell(backend, nil, "")
+	shell.input = &InputInfo{DisplayName: "synthetic.dat"}
+
+	shell.SetHostActive(false) // the picker takes over
+	shell.SetHostActive(false) // audio focus follows it out
+	shell.SetHostActive(true)  // the app comes back
+	shell.SetHostActive(true)  // audio focus follows it back
+
+	// The first tick after the app is resumed.
+	shell.consumeResults()
+	shell.syncHostLifecycle()
+	if !shell.hostActive {
+		t.Fatal("the shell stayed inactive after the host came back")
+	}
+	if shell.hostPaused {
+		t.Fatal("the returning app paused the machine")
+	}
+	select {
+	case request := <-backend.requests:
+		t.Fatalf("lifecycle paused a running machine: %#v", request)
+	default:
 	}
 }

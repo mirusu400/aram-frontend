@@ -147,6 +147,7 @@ func (s *Shell) syncBackendState() {
 }
 
 func (s *Shell) syncHostLifecycle() {
+	s.hostActive = s.hostActiveRequest.Load()
 	state := s.backend.State()
 	if !s.hostActive &&
 		!s.hostPaused &&
