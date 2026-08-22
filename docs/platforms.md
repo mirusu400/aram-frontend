@@ -44,6 +44,16 @@ The generated binding exposes `mobile.SetHost`. The native Activity implements
 `OpenDocument`, `OpenFirmware`, or `DocumentSelectionCanceled`. `AudioFocus`
 and `Pause`/`Resume` feed the same automatic lifecycle-pause contract.
 
+Text entry crosses the same bridge. Ebitengine raises no soft keyboard for its
+own surface and `exp/textinput` has no mobile backend, so a tap on a form
+field - the issue report form above all - would otherwise be unanswerable on a
+handset. The frontend calls `RequestTextInput(requestID, label, hint, text)`,
+the Activity presents a native single-line editor where the system IME handles
+Hangul composition and the clipboard, and it answers exactly once with
+`SubmitTextInput` or `CancelTextInput`. Line breaks in the answer are folded to
+spaces because the field renders one line, matching desktop. A build with no
+host attached, which is every desktop build, keeps editing the field in place.
+
 The shared mobile layout provides large touch targets for persistent
 File/Emulation/View/Tools/Help navigation plus D-pad, OK, Back, Menu, and soft
 keys. Turning on `Virtual keypad` adds the numeric cluster — 1-9, 0, star, and

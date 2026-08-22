@@ -26,6 +26,7 @@ type imeTextInput struct {
 
 	design      *ARAMDesignSystem
 	face        *text.Face
+	label       string
 	placeholder string
 	changed     func(string)
 
@@ -38,16 +39,18 @@ type imeTextInput struct {
 	dragging bool
 	focused  bool
 
-	scrollOffset int
-	caretOffset  int
-	blink        int
-	lastText     string
+	scrollOffset  int
+	caretOffset   int
+	blink         int
+	lastText      string
+	nativeRequest int64
 
 	tabOrder int
 	focusMap map[widget.FocusDirection]widget.Focuser
 }
 
 type imeTextInputConfig struct {
+	Label       string
 	Placeholder string
 	Text        string
 	Disabled    bool
@@ -72,6 +75,7 @@ func newIMETextInput(
 	field := &imeTextInput{
 		design:      design,
 		face:        face,
+		label:       config.Label,
 		placeholder: config.Placeholder,
 		changed:     config.Changed,
 		padding:     widget.Insets{Left: design.Space.S, Right: design.Space.S},
@@ -165,17 +169,33 @@ func (t *imeTextInput) GetText() string {
 	return t.field.Text()
 }
 
+// SetText replaces the value without reporting a change, which is how the
+// owner pushes its own state in.
 func (t *imeTextInput) SetText(value string) {
+	t.setTextValue(value)
+	t.lastText = value
+}
+
+// setTextValue replaces the value and leaves the change to be reported, which
+// is what an edit by the user - local or in a native editor - is.
+func (t *imeTextInput) setTextValue(value string) {
 	t.field.SetTextAndSelection(value, len(value), len(value))
 	t.caret = len(value)
 	t.anchor = t.caret
-	t.lastText = value
 }
 
 /** Update **/
 
 func (t *imeTextInput) Update(updObj *widget.UpdateObject) {
 	t.widget.Update(updObj)
+	if t.nativeRequest != 0 {
+		// The platform editor owns the text until it answers; local pointer
+		// and key handling would fight it.
+		t.applyNativeEdit()
+		t.notifyChanged()
+		t.blink++
+		return
+	}
 	if t.focused && !t.field.IsFocused() {
 		// Another field took the single global text input session.
 		t.focused = false
@@ -203,6 +223,10 @@ func (t *imeTextInput) updatePointer() {
 			)
 		switch {
 		case inside:
+			if t.startNativeEdit() {
+				t.Focus(false)
+				return
+			}
 			t.Focus(true)
 			index := t.byteIndexAtCursor(x)
 			t.caret, t.anchor = index, index
@@ -446,7 +470,8 @@ func (t *imeTextInput) renderContent(screen *ebiten.Image) {
 		)
 	}
 
-	if t.focused && t.blink%(imeBlinkInterval*2) < imeBlinkInterval {
+	editing := t.focused || t.nativeRequest != 0
+	if editing && t.blink%(imeBlinkInterval*2) < imeBlinkInterval {
 		caretColor := palette.Accent
 		if t.widget.Disabled {
 			caretColor = palette.TextDisabled

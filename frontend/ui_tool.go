@@ -55,6 +55,9 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 		return
 	}
 
+	// A field waiting for the platform editor outlives this rebuild, which a
+	// soft keyboard triggers by resizing the window.
+	previousInputs := u.panelTextInputs
 	u.closePanel()
 	u.panelSignature = signature
 	u.panelDropdowns = make(map[string]*widget.ListComboButton)
@@ -145,6 +148,7 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 			continue
 		}
 		input := newIMETextInput(design, imeTextInputConfig{
+			Label:       shell.tr(field.Label),
 			Placeholder: shell.tr(field.Placeholder),
 			Text:        panel.FieldValues[field.ID],
 			Disabled:    panel.Busy,
@@ -157,6 +161,7 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 				panel.FieldValues[field.ID] = value
 			},
 		})
+		input.adoptNativeEdit(previousInputs[field.ID])
 		u.panelTextInputs[field.ID] = input
 		fieldBlock.AddChild(input)
 		form.AddChild(fieldBlock)
