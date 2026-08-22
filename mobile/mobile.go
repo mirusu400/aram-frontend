@@ -16,9 +16,13 @@ var game = frontend.NewShell(
 
 // Host is implemented by the generated Android/iOS application layer. The
 // native host owns SAF/UIDocumentPicker presentation and later calls
-// OpenDocument, OpenFirmware, or DocumentSelectionCanceled.
+// OpenDocument, OpenFirmware, or DocumentSelectionCanceled. It also owns text
+// entry, because no mobile platform raises its keyboard for an Ebitengine
+// window; the host presents its own editor and answers with SubmitTextInput
+// or CancelTextInput.
 type Host interface {
 	RequestDocument(firmware bool)
+	RequestTextInput(requestID int64, label, hint, text string)
 }
 
 func init() {
@@ -27,6 +31,18 @@ func init() {
 
 func SetHost(host Host) {
 	frontend.SetNativePickerHost(host)
+	frontend.SetNativeTextInputHost(host)
+}
+
+// SubmitTextInput reports the text the native editor accepted for the field
+// identified by requestID.
+func SubmitTextInput(requestID int64, text string) {
+	frontend.SubmitNativeTextInput(requestID, text)
+}
+
+// CancelTextInput reports that the native editor was dismissed unchanged.
+func CancelTextInput(requestID int64) {
+	frontend.CancelNativeTextInput(requestID)
 }
 
 // OpenDocument is called by the Android/iOS host after its native document
