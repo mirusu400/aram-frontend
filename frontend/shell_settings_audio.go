@@ -11,9 +11,11 @@ func (s *Shell) applyAudioSettings() {
 			return
 		}
 	}
+	s.audioMu.Lock()
 	if s.audioOutput != nil {
 		s.audioOutput.configure(settings)
 	}
+	s.audioMu.Unlock()
 	s.setStatus(s.trf(
 		"Audio: muted=%s volume=%d latency=%dms device=%s",
 		s.tr(onOff(s.settings.Muted)),
@@ -29,7 +31,33 @@ func (s *Shell) currentAudioSettings() AudioSettings {
 		Volume:   s.settings.Volume,
 		Latency:  time.Duration(s.settings.AudioLatencyMS) * time.Millisecond,
 		DeviceID: s.settings.AudioDeviceID,
+		MixMode:  s.settings.AudioMixMode,
+		Soften:   s.settings.AudioSoften,
 	}
+}
+
+// toggleAudioSoften turns the output-softening low-pass on or off. It is a pure
+// playback filter (does not change the emulated audio), so it applies live.
+func (s *Shell) toggleAudioSoften() {
+	s.settings.AudioSoften = !s.settings.AudioSoften
+	s.applyAudioSettings()
+}
+
+// toggleAudioMixMode switches between the faithful device policy (effects can
+// silence the music, as on the handset) and the mixing policy (effects layer
+// over a continuous background track). The change is baked into the core at
+// creation, so it applies the next time a title is opened.
+func (s *Shell) toggleAudioMixMode() {
+	s.settings.AudioMixMode = !s.settings.AudioMixMode
+	s.applyAudioSettings()
+}
+
+// audioMixModeLabel names the active audio policy for the settings row.
+func (s *Shell) audioMixModeLabel() string {
+	if s.settings.AudioMixMode {
+		return s.tr("Mixed")
+	}
+	return s.tr("Faithful")
 }
 
 func (s *Shell) toggleMuted() {

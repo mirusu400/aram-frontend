@@ -68,6 +68,7 @@ func (s *Shell) captureDebugBundleSnapshot(createdAt time.Time) debugBundleSnaps
 			Muted:          s.settings.Muted,
 			Volume:         s.settings.Volume,
 			AudioLatencyMS: s.settings.AudioLatencyMS,
+			AudioMixMode:   s.settings.AudioMixMode,
 		},
 		Build:        build,
 		FrontendLogs: logs,

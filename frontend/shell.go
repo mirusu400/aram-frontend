@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -71,6 +72,8 @@ type Shell struct {
 	frameImage                *ebiten.Image
 	frameScratch              *image.RGBA
 	audioOutput               *audioOutput
+	audioMu                   sync.Mutex
+	audioPumpStarted          bool
 	controlState              map[string]bool
 	directionPressOrder       []string
 	battery                   batteryReading

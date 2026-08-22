@@ -175,6 +175,18 @@ func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 				action:      shell.toggleMuted,
 			},
 			{
+				label:       "Effect / music mixing",
+				description: "Mixed layers effects over continuous music; Faithful matches the handset.",
+				value:       shell.audioMixModeLabel(),
+				action:      shell.toggleAudioMixMode,
+			},
+			{
+				label:       "Soften audio",
+				description: "Gentle low-pass that eases the harsh FM synth top end. Playback only.",
+				value:       onOff(shell.settings.AudioSoften),
+				action:      shell.toggleAudioSoften,
+			},
+			{
 				label:       "Volume",
 				description: "Output volume in five-percent steps.",
 				slider: &settingsSliderModel{
