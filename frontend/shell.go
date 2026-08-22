@@ -5,6 +5,7 @@ import (
 	"image"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -37,31 +38,40 @@ type frameRunResult struct {
 }
 
 type Shell struct {
-	backend                   Backend
-	picker                    Picker
-	design                    *ARAMDesignSystem
-	interfaceUI               *shellUI
-	menus                     []Menu
-	settings                  Settings
-	customFontData            []byte
-	state                     FrontendState
-	lastRunState              FrontendState
-	problem                   *FrontendProblem
-	activeMenu                int
-	focusMode                 bool
-	touchChromeHidden         bool
-	touchChromeSyncState      FrontendState
-	fillGuestViewport         bool
-	uiPointerSuppressed       bool
-	status                    string
-	input                     *InputInfo
-	selectedPath              string
-	temporaryPath             string
-	dialogOpen                bool
-	loading                   bool
-	quitting                  bool
-	hostActive                bool
-	hostPaused                bool
+	backend              Backend
+	picker               Picker
+	design               *ARAMDesignSystem
+	interfaceUI          *shellUI
+	menus                []Menu
+	settings             Settings
+	customFontData       []byte
+	state                FrontendState
+	lastRunState         FrontendState
+	problem              *FrontendProblem
+	activeMenu           int
+	focusMode            bool
+	touchChromeHidden    bool
+	touchChromeSyncState FrontendState
+	fillGuestViewport    bool
+	uiPointerSuppressed  bool
+	status               string
+	input                *InputInfo
+	selectedPath         string
+	temporaryPath        string
+	dialogOpen           bool
+	loading              bool
+	quitting             bool
+	hostActive           bool
+	hostPaused           bool
+	// hostActiveRequest is the newest activity the native host reported.
+	// Lifecycle is state, not a stream of events: ebitenmobile suspends the
+	// game loop while the app is in the background, so nothing drains a queue
+	// there. A queue also filled up - a lifecycle pause and its audio focus
+	// loss are two events - and silently dropped the resume that followed,
+	// which left the shell convinced the app was still backgrounded. Every
+	// title then paused the moment it started, and the document picker put
+	// the app in the background before every single open.
+	hostActiveRequest         atomic.Bool
 	preDialogState            FrontendState
 	panel                     *Panel
 	settingsSection           string
@@ -110,7 +120,6 @@ type Shell struct {
 	externalOpen              chan OpenRequest
 	externalCommands          chan string
 	externalSelectionCanceled chan struct{}
-	hostLifecycle             chan bool
 	dropResults               chan dropResult
 	artifactResults           chan artifactResult
 	issueReportResults        chan issueReportResult
@@ -163,7 +172,6 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		externalOpen:              make(chan OpenRequest, 2),
 		externalCommands:          make(chan string, 4),
 		externalSelectionCanceled: make(chan struct{}, 1),
-		hostLifecycle:             make(chan bool, 2),
 		dropResults:               make(chan dropResult, 2),
 		artifactResults:           make(chan artifactResult, 4),
 		issueReportResults:        make(chan issueReportResult, 2),
@@ -171,6 +179,7 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		toolResults:               make(chan toolResult, 2),
 		updateResults:             make(chan updateResult, 4),
 	}
+	shell.hostActiveRequest.Store(true)
 	setPlatformWindowTitle(shell.tr("ARAM - Archived Runtime for ARM Mobiles"))
 	if shell.shouldOpenWelcome() {
 		shell.openWelcome()
@@ -230,10 +239,7 @@ func (s *Shell) DispatchExternalCommand(commandID string) {
 // SetHostActive is the Android/iOS lifecycle bridge. It only resumes a
 // machine that was automatically paused by a prior inactive transition.
 func (s *Shell) SetHostActive(active bool) {
-	select {
-	case s.hostLifecycle <- active:
-	default:
-	}
+	s.hostActiveRequest.Store(active)
 }
 
 // CancelExternalDocumentSelection lets a native picker restore the shell

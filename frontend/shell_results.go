@@ -16,8 +16,6 @@ func (s *Shell) consumeResults() {
 			s.dialogOpen = false
 			s.state = s.preDialogState
 			s.setStatus(s.tr("Selection canceled"))
-		case active := <-s.hostLifecycle:
-			s.hostActive = active
 		case stage := <-s.openStageResults:
 			switch stage {
 			case OpenStageInspecting:
