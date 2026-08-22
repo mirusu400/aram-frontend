@@ -39,6 +39,8 @@ type Settings struct {
 	Volume            int                          `json:"volume"`
 	AudioLatencyMS    int                          `json:"audio_latency_ms"`
 	AudioDeviceID     string                       `json:"audio_device_id,omitempty"`
+	AudioMixMode      bool                         `json:"audio_mix_mode"`
+	AudioSoften       bool                         `json:"audio_soften"`
 	KeyboardProfile   string                       `json:"keyboard_profile"`
 	KeyboardBindings  map[string]string            `json:"keyboard_bindings,omitempty"`
 	GamepadEnabled    bool                         `json:"gamepad_enabled"`
@@ -96,7 +98,7 @@ func defaultSettings() Settings {
 		Filter:           "nearest",
 		StateSlot:        0,
 		FontChoice:       "galmuri9",
-		CPUChoice:        "precise",
+		CPUChoice:        "jit",
 		Speed:            1,
 		Volume:           100,
 		AudioLatencyMS:   60,
@@ -153,7 +155,7 @@ func (s *Settings) normalize() {
 		s.FontChoice = "galmuri9"
 	}
 	if s.CPUChoice == "" {
-		s.CPUChoice = "precise"
+		s.CPUChoice = "jit"
 	}
 	if s.TouchDeckRatio != 0 {
 		s.TouchDeckRatio = clampInt(s.TouchDeckRatio, touchDeckRatioMin, touchDeckRatioMax)

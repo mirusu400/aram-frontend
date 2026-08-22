@@ -128,6 +128,34 @@ type audioOutput struct {
 	prebufferWait  time.Duration
 	lastEnqueue    time.Time
 	started        bool
+	softenEnabled  bool
+	lp             [2]float64 // per-channel one-pole low-pass state
+}
+
+// softenCoefficient is the one-pole low-pass factor applied when Soften is on:
+// y += a*(x-y). ~0.5 puts the corner near 5 kHz at 44.1 kHz, rounding off the
+// FM synth's harsh top without muffling the melody.
+const softenCoefficient = 0.5
+
+// soften applies the low-pass in place per channel when enabled. The chunk is a
+// fresh copy handed over by the backend, so mutating it is safe; the filter
+// state persists across chunks to stay continuous.
+func (o *audioOutput) soften(chunk *AudioChunk) {
+	if !o.softenEnabled || len(chunk.PCM16) == 0 {
+		return
+	}
+	channels := chunk.Channels
+	if channels < 1 {
+		channels = 1
+	}
+	for c := 0; c < channels && c < len(o.lp); c++ {
+		y := o.lp[c]
+		for i := c; i < len(chunk.PCM16); i += channels {
+			y += softenCoefficient * (float64(chunk.PCM16[i]) - y)
+			chunk.PCM16[i] = int16(y)
+		}
+		o.lp[c] = y
+	}
 }
 
 func newAudioOutput(settings AudioSettings) (*audioOutput, error) {
@@ -161,11 +189,22 @@ func (o *audioOutput) configure(settings AudioSettings) {
 		latency = 250 * time.Millisecond
 	}
 	o.queue.setMaxBytes(audioQueueBytes(latency))
-	o.prebufferBytes = int(
-		int64(hostAudioSampleRate*4) * int64(latency) / int64(time.Second),
-	)
+	// The queue's steady-state fill sits at the prebuffer level, so that is the
+	// real stall tolerance: if the emulation goroutine stalls (a heavy "flash"
+	// frame) for longer than this, the queue underruns and the sound stutters.
+	// Buffer twice the requested latency so a spike up to ~2x latency is
+	// absorbed, with a floor so a low latency setting still tolerates a frame or
+	// two. audioQueueBytes keeps the ceiling above this.
+	prebuffer := 2 * latency
+	if prebuffer < 150*time.Millisecond {
+		prebuffer = 150 * time.Millisecond
+	}
+	o.prebufferBytes = alignStereoFrame(int(
+		int64(hostAudioSampleRate*4) * int64(prebuffer) / int64(time.Second),
+	))
 	o.prebufferWait = latency
 	o.player.SetBufferSize(latency)
+	o.softenEnabled = settings.Soften
 	volume := float64(settings.Volume) / 100
 	if volume < 0 {
 		volume = 0
@@ -180,6 +219,7 @@ func (o *audioOutput) configure(settings AudioSettings) {
 }
 
 func (o *audioOutput) enqueue(chunk AudioChunk) error {
+	o.soften(&chunk)
 	encoded, err := encodeHostPCM(chunk)
 	if err != nil {
 		return err
@@ -242,11 +282,15 @@ func audioQueueBytes(latency time.Duration) int {
 	// Keep enough producer headroom for scheduling jitter, but never enough to
 	// let stale sound trail the video for a noticeable amount of time.
 	queueDuration := latency * 3
-	if queueDuration < 120*time.Millisecond {
-		queueDuration = 120 * time.Millisecond
+	// The ceiling must stay above the prebuffer level (2x latency, floored at
+	// 100ms) so the queue can actually hold the steady-state buffer without
+	// immediately dropping it as overrun. The floor gives a heavy-frame spike
+	// room to be absorbed; the cap keeps stale sound from trailing the video.
+	if queueDuration < 220*time.Millisecond {
+		queueDuration = 220 * time.Millisecond
 	}
-	if queueDuration > 500*time.Millisecond {
-		queueDuration = 500 * time.Millisecond
+	if queueDuration > 700*time.Millisecond {
+		queueDuration = 700 * time.Millisecond
 	}
 	return int(int64(hostAudioSampleRate*4) * int64(queueDuration) / int64(time.Second))
 }

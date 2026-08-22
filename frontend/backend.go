@@ -130,6 +130,14 @@ type AudioSettings struct {
 	Volume   int
 	Latency  time.Duration
 	DeviceID string
+	// MixMode selects the enhanced audio policy where sound effects mix over a
+	// looping track instead of the title being able to silence it. False keeps
+	// the faithful device behaviour. It is baked into the next machine created.
+	MixMode bool
+	// Soften applies a gentle output low-pass that tames the harsh top end of
+	// the guest's FM (Yamaha MA-3) synthesis. It is a pure playback filter, not
+	// a change to the emulated audio, so it takes effect immediately.
+	Soften bool
 }
 
 type AudioDevice struct {

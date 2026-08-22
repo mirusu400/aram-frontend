@@ -20,9 +20,11 @@ func (s *Shell) releaseCurrentInput() error {
 	if err := s.backend.Close(); err != nil {
 		return err
 	}
+	s.audioMu.Lock()
 	if s.audioOutput != nil {
 		s.audioOutput.flush()
 	}
+	s.audioMu.Unlock()
 	if s.temporaryPath != "" {
 		removeTemporaryDrop(s.temporaryPath)
 		s.temporaryPath = ""
@@ -54,8 +56,24 @@ func (s *Shell) updateAudio() {
 	if s.loading || s.input == nil {
 		return
 	}
+	s.drainAudioOnce(true)
+}
+
+// drainAudioOnce moves produced guest PCM into the output queue once. It is the
+// shared body of the main-thread Update drain (allowCreate=true, which may build
+// the output because that needs the host audio context) and the audio pump
+// goroutine (allowCreate=false, which only feeds an output that already exists).
+// audioMu serialises the drain+enqueue so the two callers can never interleave a
+// chunk out of order, and so a stalled or jittery 60Hz video tick can no longer
+// starve the queue: the pump keeps feeding on its own fine cadence.
+func (s *Shell) drainAudioOnce(allowCreate bool) {
 	backend, ok := s.backend.(AudioStreamBackend)
 	if !ok {
+		return
+	}
+	s.audioMu.Lock()
+	defer s.audioMu.Unlock()
+	if s.audioOutput == nil && !allowCreate {
 		return
 	}
 	chunk := backend.DrainAudio()
@@ -72,11 +90,33 @@ func (s *Shell) updateAudio() {
 			return
 		}
 		s.audioOutput = output
+		s.startAudioPumpLocked()
 	}
-	if err := s.audioOutput.enqueue(chunk); err != nil {
+	if err := s.audioOutput.enqueue(chunk); err != nil && allowCreate {
+		// Only the main-thread caller touches s.logs; the pump goroutine must
+		// not. A rare encode error still surfaces on the next Update tick.
 		s.appendLog(s.tr("Audio stream: ") + err.Error())
 	}
 	s.audioOutput.startIfReady(time.Now())
+}
+
+// startAudioPumpLocked launches the audio pump goroutine the first time an
+// output exists. The pump feeds produced PCM into the queue every few
+// milliseconds, decoupled from the 60Hz Update loop, so a stalled or jittery
+// video tick cannot starve the sound. It idles harmlessly (DrainAudio returns
+// nothing) whenever no title is running. Caller holds audioMu.
+func (s *Shell) startAudioPumpLocked() {
+	if s.audioPumpStarted {
+		return
+	}
+	s.audioPumpStarted = true
+	go func() {
+		ticker := time.NewTicker(4 * time.Millisecond)
+		defer ticker.Stop()
+		for range ticker.C {
+			s.drainAudioOnce(false)
+		}
+	}()
 }
 
 func (s *Shell) closeAudio() error {

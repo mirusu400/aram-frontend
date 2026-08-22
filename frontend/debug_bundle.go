@@ -96,6 +96,7 @@ type debugSettingsReport struct {
 	Muted          bool    `json:"muted"`
 	Volume         int     `json:"volume"`
 	AudioLatencyMS int     `json:"audio_latency_ms"`
+	AudioMixMode   bool    `json:"audio_mix_mode"`
 }
 
 type debugFileReport struct {

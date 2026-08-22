@@ -75,10 +75,10 @@ func TestPCMQueueDropsOldestStereoFrames(t *testing.T) {
 func TestAudioQueueBytesBoundsLatency(t *testing.T) {
 	low := audioQueueBytes(20 * time.Millisecond)
 	high := audioQueueBytes(250 * time.Millisecond)
-	if low != hostAudioSampleRate*4*120/1000 {
+	if low != hostAudioSampleRate*4*220/1000 {
 		t.Fatalf("low-latency queue = %d", low)
 	}
-	if high != hostAudioSampleRate*4/2 {
+	if high != hostAudioSampleRate*4*700/1000 {
 		t.Fatalf("high-latency queue = %d", high)
 	}
 }
