@@ -242,3 +242,31 @@ func TestCycleSpeedAdvancesThroughPresets(t *testing.T) {
 		}
 	}
 }
+
+// TestSettingsDefaultCPUIsFastestAvailable pins the CPU default to the
+// backend-resolved "fastest" rather than a named core, and migrates the older
+// "jit" default forward. Naming a core in the stored settings is what made the
+// choice wrong on platforms that do not have it and stale once a faster core
+// landed; "fastest" is resolved by the backend at open time and always exists.
+func TestSettingsDefaultCPUIsFastestAvailable(t *testing.T) {
+	if got := defaultSettings().CPUChoice; got != "fastest" {
+		t.Fatalf("default CPUChoice = %q, want %q", got, "fastest")
+	}
+	for _, stored := range []string{"", "jit"} {
+		s := defaultSettings()
+		s.CPUChoice = stored
+		s.normalize()
+		if s.CPUChoice != "fastest" {
+			t.Fatalf("stored CPUChoice %q normalized to %q, want %q", stored, s.CPUChoice, "fastest")
+		}
+	}
+	// An explicit choice of a specific core is preserved.
+	for _, stored := range []string{"precise", "native"} {
+		s := defaultSettings()
+		s.CPUChoice = stored
+		s.normalize()
+		if s.CPUChoice != stored {
+			t.Fatalf("explicit CPUChoice %q was rewritten to %q", stored, s.CPUChoice)
+		}
+	}
+}

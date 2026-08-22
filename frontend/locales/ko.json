@@ -152,6 +152,7 @@
   "Backend that runs the guest. Precise is the accurate interpreter; a faster core appears when available. Takes effect the next time a title is opened.": "게스트를 실행하는 백엔드. 정밀은 정확한 인터프리터이며, 사용 가능해지면 더 빠른 코어가 나타납니다. 다음 타이틀 실행 시 적용됩니다.",
   "Precise (interpreter)": "정밀 (인터프리터)",
   "Core: %s": "코어: %s",
+  "Fastest available": "가장 빠른 코어 (자동)",
   "JIT recompiler (experimental)": "JIT 재컴파일러 (실험적)",
   "CPU core: %s (restart title to apply)": "CPU 코어: %s (적용하려면 타이틀 재시작)",
   "CPU core: ": "CPU 코어: ",

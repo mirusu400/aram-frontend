@@ -7,10 +7,12 @@ import "strings"
 // interpreter until a fast/native core registers), always including the current
 // selection so a saved choice stays visible.
 func (s *Shell) cpuDropdownChoices() []string {
-	choices := []string{"precise"}
+	// "fastest" is not a core the backend registers; it is a request for the
+	// best one this build has, so it is offered first and always available.
+	choices := []string{"fastest", "precise"}
 	if selector, ok := s.backend.(CPUBackendSelector); ok {
 		if available := selector.AvailableCPUBackends(); len(available) > 0 {
-			choices = available
+			choices = append([]string{"fastest"}, available...)
 		}
 	}
 	current := s.settings.CPUChoice
@@ -33,6 +35,8 @@ func (s *Shell) cpuDropdownChoices() []string {
 // cpuChoiceLabel returns the localized display label for a CPU backend name.
 func (s *Shell) cpuChoiceLabel(name string) string {
 	switch name {
+	case "fastest":
+		return s.tr("Fastest available")
 	case "", "precise", "portable-interpreter":
 		return s.tr("Precise (interpreter)")
 	case "jit":
@@ -48,7 +52,7 @@ func (s *Shell) cpuChoiceLabel(name string) string {
 func (s *Shell) currentCPUSettings() CPUSettings {
 	name := s.settings.CPUChoice
 	if name == "" {
-		name = "precise"
+		name = "fastest"
 	}
 	return CPUSettings{Name: name}
 }
@@ -56,7 +60,7 @@ func (s *Shell) currentCPUSettings() CPUSettings {
 // setCPU selects a CPU backend by identifier and applies it.
 func (s *Shell) setCPU(name string) {
 	if name == "" {
-		name = "precise"
+		name = "fastest"
 	}
 	s.settings.CPUChoice = name
 	s.applyCPUSettings()
