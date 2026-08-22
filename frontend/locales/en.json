@@ -152,6 +152,7 @@
   "Backend that runs the guest. Precise is the accurate interpreter; a faster core appears when available. Takes effect the next time a title is opened.": "Backend that runs the guest. Precise is the accurate interpreter; a faster core appears when available. Takes effect the next time a title is opened.",
   "Precise (interpreter)": "Precise (interpreter)",
   "Core: %s": "Core: %s",
+  "Fastest available": "Fastest available",
   "JIT recompiler (experimental)": "JIT recompiler (experimental)",
   "CPU core: %s (restart title to apply)": "CPU core: %s (restart title to apply)",
   "CPU core: ": "CPU core: ",

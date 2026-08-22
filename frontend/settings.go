@@ -98,7 +98,7 @@ func defaultSettings() Settings {
 		Filter:           "nearest",
 		StateSlot:        0,
 		FontChoice:       "galmuri9",
-		CPUChoice:        "jit",
+		CPUChoice:        "fastest",
 		Speed:            1,
 		Volume:           100,
 		AudioLatencyMS:   60,
@@ -154,8 +154,13 @@ func (s *Settings) normalize() {
 	if s.FontChoice == "custom" && s.CustomFontPath == "" {
 		s.FontChoice = "galmuri9"
 	}
-	if s.CPUChoice == "" {
-		s.CPUChoice = "jit"
+	// "fastest" asks the backend for the best core this build provides instead
+	// of naming one, so the stored setting stays correct across platforms and
+	// as faster cores land. Settings written before that existed carry the old
+	// default, "jit", which is now the slower of the two recompilers on every
+	// measured workload; move them forward rather than leaving them behind.
+	if s.CPUChoice == "" || s.CPUChoice == "jit" {
+		s.CPUChoice = "fastest"
 	}
 	if s.TouchDeckRatio != 0 {
 		s.TouchDeckRatio = clampInt(s.TouchDeckRatio, touchDeckRatioMin, touchDeckRatioMax)
