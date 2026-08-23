@@ -387,6 +387,10 @@ func TestShellContinuouslySchedulesOneRunningFrameAtATime(t *testing.T) {
 	}
 	shell := NewShell(backend, nil, "")
 	shell.input = &InputInfo{DisplayName: "synthetic.dat"}
+	// NewShell loads the machine's saved settings, so the emulation speed a
+	// developer happens to have chosen would otherwise decide how many quanta
+	// one tick issues and this test would fail for them and nobody else.
+	shell.settings.Speed = 1
 	// Pacing is driven from the clock, so the test advances it by a whole
 	// quantum whenever it expects another frame to be issued.
 	clock := time.Now()
