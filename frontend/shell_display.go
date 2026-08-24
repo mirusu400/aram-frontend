@@ -1,7 +1,5 @@
 package frontend
 
-import "math"
-
 func (s *Shell) toggleFullscreen() {
 	s.setStatus(s.tr(togglePlatformFullscreen()))
 }
@@ -73,20 +71,6 @@ func (s *Shell) setStateSlot(slot int) {
 	s.settings.StateSlot = slot
 	_ = s.settings.save()
 	s.setStatus(s.trf("State slot: %d", s.settings.StateSlot))
-}
-
-var speedPresets = []float64{0.5, 1, 2, 4}
-
-// speedPresetIndex returns the preset closest to speed, so values saved by
-// older builds still land on a valid slider position.
-func speedPresetIndex(speed float64) int {
-	best := 0
-	for index, preset := range speedPresets {
-		if math.Abs(preset-speed) < math.Abs(speedPresets[best]-speed) {
-			best = index
-		}
-	}
-	return best
 }
 
 func (s *Shell) cycleSpeed() {
