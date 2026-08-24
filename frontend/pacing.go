@@ -162,11 +162,18 @@ func (s *Shell) MeasuredSpeed() float64 {
 	return s.measuredSpeed
 }
 
+// scheduleRunningFrame hands the backend the guest time real time has earned.
+// A panel that captures host input also stops the guest: settings, the issue
+// report form and every other modal panel used to leave the title running
+// behind them, so a machine kept playing - and kept taking damage - while its
+// controls went to the panel. Panels that opted into guest input (a cheat
+// toggled mid-fight) keep the title running exactly as before.
 func (s *Shell) scheduleRunningFrame() {
 	if !s.hostActive ||
 		s.hostPaused ||
 		s.loading ||
 		s.dialogOpen ||
+		!s.guestInputAllowed() ||
 		s.problem != nil ||
 		s.input == nil ||
 		len(s.busyCommands) != 0 ||
