@@ -111,6 +111,12 @@ hamburger toggle floating at the top-right restores the chrome, and a HIDE
 button at the right end of the toolbar strips it again. Open panels, the
 touch layout editor, and focus mode always present their own full surface.
 
+A panel that captures host input also pauses the running title: `Configure
+ARAM`, `Help > Report an Issue...`, and every other modal panel hold the guest
+still while they are open, and it resumes where it stopped once the panel is
+closed. A panel that keeps host input on the guest - a cheat toggled during
+play - leaves the title running.
+
 ## Updates
 
 `Help > Check for Updates...` opens the `Updates` category in `Configure ARAM`.

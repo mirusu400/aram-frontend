@@ -214,3 +214,54 @@ func TestMeasuredSpeedSurvivesPacingReset(t *testing.T) {
 		t.Fatalf("clear left readout at %g, want 0", got)
 	}
 }
+
+// TestAnOpenPanelPausesTheGuest covers the settings and issue-report panels:
+// their host input goes to the panel, so the title behind them must not keep
+// running and taking hits while the user reads or types. A panel that opted
+// into guest input keeps the machine running.
+func TestAnOpenPanelPausesTheGuest(t *testing.T) {
+	backend := &schedulingBackend{
+		started: make(chan struct{}, 2),
+		release: make(chan struct{}, 2),
+		state:   StateRunning,
+	}
+	shell := NewShell(backend, nil, "")
+	shell.input = &InputInfo{DisplayName: "synthetic.dat"}
+	shell.settings.Speed = 1
+	clock := time.Now()
+	shell.nowFunc = func() time.Time { return clock }
+	advance := func() { clock = clock.Add(shell.frameQuantum()) }
+
+	frameCalls := func() int {
+		backend.mu.Lock()
+		defer backend.mu.Unlock()
+		return backend.calls
+	}
+
+	for _, panel := range []*Panel{
+		{Kind: "settings", Title: "Configure ARAM"},
+		{Kind: "issue-report", Title: "Report an issue"},
+	} {
+		shell.panel = panel
+		advance()
+		shell.scheduleRunningFrame()
+		if calls := frameCalls(); calls != 0 {
+			t.Fatalf("%s panel advanced the guest; calls = %d", panel.Kind, calls)
+		}
+	}
+
+	// A cheat panel that keeps host input on the guest keeps it running.
+	shell.panel.AllowGuestInput = true
+	advance()
+	shell.scheduleRunningFrame()
+	waitSignal(t, backend.started, "frame behind a guest-input panel")
+	backend.release <- struct{}{}
+	waitFrameCompletion(t, shell)
+
+	shell.panel = nil
+	advance()
+	shell.scheduleRunningFrame()
+	waitSignal(t, backend.started, "frame after the panel closed")
+	backend.release <- struct{}{}
+	waitFrameCompletion(t, shell)
+}
