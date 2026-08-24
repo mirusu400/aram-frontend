@@ -40,7 +40,7 @@ func TestSettingsNormalizeRepairsDisplayOptions(t *testing.T) {
 	settings.ScreenLayout = "broken"
 	settings.Filter = "broken"
 	settings.StateSlot = 99
-	settings.Speed = 3
+	settings.Speed = 3.7
 	settings.normalize()
 	if settings.Rotation != 0 ||
 		settings.Language != string(LanguageEnglish) ||
@@ -217,8 +217,8 @@ func TestSpeedPresetIndexPicksClosest(t *testing.T) {
 		speed float64
 		index int
 	}{
-		{0.5, 0}, {1, 1}, {2, 2}, {4, 3},
-		{0, 0}, {1.4, 1}, {3.9, 3}, {100, 3},
+		{0.5, 0}, {1, 1}, {1.5, 2}, {2, 3}, {2.5, 4}, {3, 5}, {4, 6},
+		{0, 0}, {1.4, 2}, {3.9, 6}, {100, 6},
 	}
 	for _, c := range cases {
 		if got := speedPresetIndex(c.speed); got != c.index {
@@ -234,7 +234,7 @@ func TestCycleSpeedAdvancesThroughPresets(t *testing.T) {
 	shell := &Shell{settings: defaultSettings()}
 	shell.settings.Speed = 1
 
-	expected := []float64{2, 4, 0.5, 1}
+	expected := []float64{1.5, 2, 2.5, 3, 4, 0.5, 1}
 	for _, want := range expected {
 		shell.cycleSpeed()
 		if shell.settings.Speed != want {

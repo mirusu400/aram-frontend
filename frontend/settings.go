@@ -2,12 +2,40 @@ package frontend
 
 import (
 	"encoding/json"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
 const recentFileLimit = 10
+
+// speedPresets are the emulation speeds the control offers, in slider order.
+var speedPresets = []float64{0.5, 1, 1.5, 2, 2.5, 3, 4}
+
+// speedPresetIndex returns the preset closest to speed, so values saved by
+// older builds still land on a valid slider position.
+func speedPresetIndex(speed float64) int {
+	best := 0
+	for index, preset := range speedPresets {
+		if math.Abs(preset-speed) < math.Abs(speedPresets[best]-speed) {
+			best = index
+		}
+	}
+	return best
+}
+
+// isSpeedPreset reports whether speed is one of the offered presets. Settings
+// written by another build can name a speed this build no longer offers, and
+// such a value must fall back to 1x rather than sit outside the slider.
+func isSpeedPreset(speed float64) bool {
+	for _, preset := range speedPresets {
+		if preset == speed {
+			return true
+		}
+	}
+	return false
+}
 
 type ControllerProfile struct {
 	KeyboardProfile  string            `json:"keyboard_profile"`
@@ -177,7 +205,7 @@ func (s *Settings) normalize() {
 	if s.StateSlot < 0 || s.StateSlot > 9 {
 		s.StateSlot = 0
 	}
-	if s.Speed != 0.5 && s.Speed != 1 && s.Speed != 2 && s.Speed != 4 {
+	if !isSpeedPreset(s.Speed) {
 		s.Speed = 1
 	}
 	if s.Volume < 0 || s.Volume > 100 {

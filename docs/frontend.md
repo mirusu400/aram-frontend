@@ -25,7 +25,7 @@ mobile hosts should include `application/zip` in their document picker.
 - Fast Forward
 - Load/Save State (`F9`/`F10`)
 - State Slot (0-9)
-- Speed (0.5x, 1x, 2x, 4x)
+- Speed (0.5x, 1x, 1.5x, 2x, 2.5x, 3x, 4x)
 - Rewind
 - Configure frontend settings
 
