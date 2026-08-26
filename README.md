@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/mirusu400/aram-frontend/actions/workflows/ci.yml/badge.svg)](https://github.com/mirusu400/aram-frontend/actions/workflows/ci.yml)
 
-Cross-platform product frontend for **ARAM — Archived Runtime for ARM
+Cross-platform product frontend for **ARAM, Archived Runtime for ARM
 Mobiles**.
 
 This repository owns:
@@ -23,8 +23,8 @@ tokens live in `frontend/design_system.go`; shell composition lives in
 `frontend/shell_ui.go`. See [`docs/design-system.md`](docs/design-system.md)
 before adding or restyling UI.
 
-It does not parse WIPI containers or emulate ARM. An injected `Backend`
-implementation connects it to
+Parsing WIPI containers and emulating ARM live in the core; an injected
+`Backend` implementation connects this frontend to
 [`aram-core`](https://github.com/mirusu400/aram-core). The integration and
 release plan live in [`aram-emu`](https://github.com/mirusu400/aram-emu).
 
@@ -38,8 +38,8 @@ go run ./cmd/aram
 ```
 
 The command in this repository is only a frontend preview. It intentionally
-uses a null backend, so it can exercise menus, layout, and file selection but
-cannot execute a game:
+uses a null backend, so it exercises menus, layout, and file selection while
+the core handles actual execution:
 
 ```powershell
 go run ./cmd/aram-frontend
@@ -58,8 +58,8 @@ format inspection and safe loading.
 below the platform configuration directory. The bundle contains a JSON
 manifest, redacted frontend logs, build/runtime metadata, input identity
 metadata, the current guest-native screenshot when available, and checked
-backend diagnostic files. It never copies the selected game or firmware bytes,
-guest memory, save data, or other proprietary media.
+backend diagnostic files. It excludes the selected game and firmware bytes,
+guest memory, save data, and other proprietary media.
 `Tools > Open Debug Bundle Folder` creates that directory when necessary and
 opens it in Explorer, Finder, or the desktop file manager.
 `Help > Report Issue` collects the situation, game title, carrier, and expected
@@ -75,7 +75,7 @@ another relay-authorized comment after closing the original panel or
 restarting ARAM. If the relay is unavailable, ARAM preserves the bundle, opens
 its folder, and falls back to a prefilled GitHub draft for manual submission.
 Uploaded attachments are publicly linked from the issue and expire after 30
-days; the selected game and firmware bytes are never included.
+days; the selected game and firmware bytes stay excluded.
 
 Desktop resizing uses the available window as the internal canvas: the guest
 viewport expands while menus, text, centered dialogs, and scrollable settings
@@ -102,8 +102,8 @@ digest, installs it into a content-addressed runtime directory, and relaunches
 ARAM. That archive already contains a mutually compatible `aram-core` and
 `aram-frontend`; downloading their standalone developer artifacts would not
 change the running Go executable. If no Stable release exists yet, ARAM keeps
-using the bundled build. The standalone Null-backend frontend preview does not
-perform product installation.
+using the bundled build. The standalone Null-backend frontend preview leaves
+product installation to the integrated build.
 
 - **Stable** selects the latest published GitHub Release.
 - **Nightly** selects the rolling `nightly` prerelease produced from the latest
@@ -140,8 +140,8 @@ requests and exposes completion, cancellation, lifecycle, and audio-focus
 entry points.
 
 Every push and pull request tests, vets, and builds the standalone frontend on
-Windows x64, Linux x64, and macOS arm64. Branch and pull-request builds do not
-upload GitHub Actions artifacts. Main and Stable release runs use the three
+Windows x64, Linux x64, and macOS arm64. Branch and pull-request builds skip
+GitHub Actions artifact uploads. Main and Stable release runs use the three
 desktop archives only as a temporary cross-job handoff, delete those workflow
 artifacts immediately after publishing, and keep the resulting files only on
 the GitHub Release. The Android AAR and iOS XCFramework are build gates and are
