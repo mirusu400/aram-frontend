@@ -80,7 +80,7 @@ func TestCopyFirstDroppedFileUsesPrivateCacheCopy(t *testing.T) {
 		"sample.dat": &fstest.MapFile{Data: []byte("synthetic input")},
 	}
 	results := make(chan dropResult, 1)
-	copyFirstDroppedFile(files, results)
+	readFirstDroppedFile(files, results)
 	result := <-results
 	if result.err != nil {
 		t.Fatal(result.err)
@@ -111,7 +111,7 @@ func TestCopyFirstDroppedFileUsesPrivateCacheCopy(t *testing.T) {
 
 func TestCopyDroppedFileRejectsEmptyDrop(t *testing.T) {
 	results := make(chan dropResult, 1)
-	copyFirstDroppedFile(fstest.MapFS{}, results)
+	readFirstDroppedFile(fstest.MapFS{}, results)
 	if result := <-results; result.err == nil {
 		t.Fatal("empty drop succeeded")
 	}

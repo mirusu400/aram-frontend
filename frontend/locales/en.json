@@ -339,7 +339,7 @@
   "Controller database: no mapping file at %s": "Controller database: no mapping file at %s",
   "Controller profile: open an identified title first": "Controller profile: open an identified title first",
   "Controller settings: ": "Controller settings: ",
-  "Copying dropped input into the ARAM cache...": "Copying dropped input into the ARAM cache...",
+  "Reading dropped input...": "Reading dropped input...",
   "Core state: %s": "Core state: %s",
   "Custom controller database loaded": "Custom controller database loaded",
   "Custom controller database reloaded": "Custom controller database reloaded",

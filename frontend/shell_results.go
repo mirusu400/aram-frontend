@@ -66,6 +66,13 @@ func (s *Shell) consumeResults() {
 				s.setStatus(s.tr("Drop: ") + result.err.Error())
 				continue
 			}
+			if result.data != nil {
+				s.openRequest(OpenRequest{
+					Data:        result.data,
+					DisplayName: result.displayName,
+				})
+				continue
+			}
 			s.openRequest(OpenRequest{
 				Path:        result.path,
 				DisplayName: result.displayName,

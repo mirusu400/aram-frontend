@@ -339,7 +339,7 @@
   "Controller database: no mapping file at %s": "컨트롤러 데이터베이스: %s에 매핑 파일이 없습니다",
   "Controller profile: open an identified title first": "컨트롤러 프로필: 먼저 식별 가능한 게임을 여세요",
   "Controller settings: ": "컨트롤러 설정: ",
-  "Copying dropped input into the ARAM cache...": "끌어놓은 입력을 ARAM 캐시에 복사하는 중...",
+  "Reading dropped input...": "끌어놓은 입력을 읽는 중...",
   "Core state: %s": "코어 상태: %s",
   "Custom controller database loaded": "사용자 컨트롤러 데이터베이스를 불러왔습니다",
   "Custom controller database reloaded": "사용자 컨트롤러 데이터베이스를 다시 불러왔습니다",
