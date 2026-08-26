@@ -3,7 +3,6 @@ package frontend
 import (
 	"encoding/json"
 	"math"
-	"os"
 	"path/filepath"
 	"strings"
 )
@@ -118,7 +117,7 @@ func touchScaleFactor(percent int) float64 {
 func defaultSettings() Settings {
 	return Settings{
 		Language:         string(systemLanguage()),
-		ThemeMode:        "light",
+		ThemeMode:        systemThemeMode(),
 		ThemeFamily:      themeFamilyModern,
 		IntegerScaling:   true,
 		PreserveAspect:   true,
@@ -142,11 +141,9 @@ func defaultSettings() Settings {
 
 func loadSettings() Settings {
 	settings := defaultSettings()
-	path, err := settingsPath()
-	if err != nil {
-		return settings
-	}
-	data, err := os.ReadFile(path)
+	// readSettingsBlob is the platform storage seam: a settings.json file on
+	// hosts with a filesystem, browser localStorage on the web/wasm build.
+	data, err := readSettingsBlob()
 	if err != nil || json.Unmarshal(data, &settings) != nil {
 		return settings
 	}
@@ -314,24 +311,9 @@ func (s *Settings) addRecent(path string) {
 }
 
 func (s Settings) save() error {
-	path, err := settingsPath()
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
-	}
 	data, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, append(data, '\n'), 0o600)
-}
-
-func settingsPath() (string, error) {
-	root, err := os.UserConfigDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(root, "ARAM", "settings.json"), nil
+	return writeSettingsBlob(append(data, '\n'))
 }

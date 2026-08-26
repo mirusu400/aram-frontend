@@ -227,6 +227,18 @@ func (s *Shell) OpenExternalDocument(path, displayName string, firmware bool) {
 	}
 }
 
+// OpenExternalBytes is the entry point for a host that hands the shell input
+// bytes instead of a filesystem path - the web/wasm picker, which reads a
+// browser File into memory. It mirrors OpenExternalDocument but carries the
+// data in-band (OpenRequest.Data) so a backend can load without a filesystem.
+func (s *Shell) OpenExternalBytes(displayName string, data []byte, firmware bool) {
+	request := OpenRequest{DisplayName: displayName, Data: data, Firmware: firmware}
+	select {
+	case s.externalOpen <- request:
+	default:
+	}
+}
+
 // DispatchExternalCommand lets a native host invoke the same stable command
 // IDs used by desktop menus without mutating Shell state from another thread.
 func (s *Shell) DispatchExternalCommand(commandID string) {
