@@ -434,18 +434,25 @@ func TestShellContinuouslySchedulesOneRunningFrameAtATime(t *testing.T) {
 	}
 }
 
+// frameTestTimeout bounds the frame-scheduling helpers. A frame is issued on a
+// goroutine, so these wait for real wall-clock time rather than the mocked
+// pacing clock. One second was too tight under a loaded CI runner (the goroutine
+// could starve past it), making the scheduling tests flaky; the assertions are
+// unchanged, the budget is just generous enough that only a real hang trips it.
+const frameTestTimeout = 10 * time.Second
+
 func waitSignal(t *testing.T, signal <-chan struct{}, label string) {
 	t.Helper()
 	select {
 	case <-signal:
-	case <-time.After(time.Second):
+	case <-time.After(frameTestTimeout):
 		t.Fatalf("timed out waiting for %s", label)
 	}
 }
 
 func waitFrameCompletion(t *testing.T, shell *Shell) {
 	t.Helper()
-	deadline := time.Now().Add(time.Second)
+	deadline := time.Now().Add(frameTestTimeout)
 	for shell.frameRunPending && time.Now().Before(deadline) {
 		shell.consumeResults()
 		time.Sleep(time.Millisecond)
