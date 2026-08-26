@@ -11,8 +11,15 @@ func isPreviewBackend(backend Backend) bool {
 	}
 }
 
+// welcomeSupported reports whether this platform shows the first-run Welcome
+// channel picker. It is a var so tests can exercise the web path (where the
+// picker is suppressed) on any host, mirroring how BuildVersion is overridden.
+var welcomeSupported = platformSupportsWelcome
+
 func (s *Shell) shouldOpenWelcome() bool {
-	return !s.settings.WelcomeCompleted && !isPreviewBackend(s.backend)
+	return !s.settings.WelcomeCompleted &&
+		!isPreviewBackend(s.backend) &&
+		welcomeSupported()
 }
 
 // welcomeInstallsProduct reports whether choosing a channel on Welcome

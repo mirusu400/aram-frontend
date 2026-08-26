@@ -92,6 +92,21 @@ func TestFirstIntegratedLaunchOpensWelcomeModal(t *testing.T) {
 	}
 }
 
+func TestWebLaunchSkipsWelcomeModal(t *testing.T) {
+	isolateSettings(t)
+	if !platformSupportsWelcome() {
+		t.Fatal("non-web host must present the Welcome channel picker")
+	}
+	previous := welcomeSupported
+	welcomeSupported = func() bool { return false }
+	t.Cleanup(func() { welcomeSupported = previous })
+
+	shell := NewShell(integratedWelcomeBackend{}, nil, "")
+	if shell.panel != nil {
+		t.Fatalf("web launch opened a panel = %#v", shell.panel)
+	}
+}
+
 func TestWelcomeChannelSelectionPersistsAndDoesNotDownloadCoreTools(t *testing.T) {
 	isolateSettings(t)
 	downloader := &fakeUpdateDownloader{
