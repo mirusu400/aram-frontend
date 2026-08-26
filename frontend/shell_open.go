@@ -177,6 +177,6 @@ func (s *Shell) handleDroppedFiles() {
 		return
 	}
 	s.state = FrontendInspecting
-	s.setStatus(s.tr("Copying dropped input into the ARAM cache..."))
-	go copyFirstDroppedFile(files, s.dropResults)
+	s.setStatus(s.tr("Reading dropped input..."))
+	go readFirstDroppedFile(files, s.dropResults)
 }

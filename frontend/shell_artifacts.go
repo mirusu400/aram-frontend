@@ -15,6 +15,7 @@ type artifactResult struct {
 
 type dropResult struct {
 	path        string
+	data        []byte
 	displayName string
 	err         error
 }
