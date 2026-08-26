@@ -29,6 +29,13 @@ type OpenRequest struct {
 	DisplayName string
 	Firmware    bool
 	Temporary   bool
+	// Data carries the input bytes in-band for a host that has no readable
+	// filesystem path for the selection - the web/wasm build, whose picker
+	// reads a browser File into memory rather than a disk path. When Data is
+	// non-empty an adapter loads from it and ignores Path; DisplayName still
+	// names the input for the UI. Desktop and mobile leave Data nil and pass a
+	// Path (or a native-host cache handle).
+	Data []byte
 }
 
 type InputInfo struct {
