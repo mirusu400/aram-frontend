@@ -1,13 +1,18 @@
 package frontend
 
 type Command struct {
-	ID           string
-	Label        string
-	Shortcut     string
-	Backend      BackendCommand
-	Enabled      func(*Shell) bool
-	Action       func(*Shell)
-	DynamicLabel func(*Shell) string
+	ID       string
+	Label    string
+	Shortcut string
+	Backend  BackendCommand
+	Enabled  func(*Shell) bool
+	// DisabledReason explains an Enabled that reports false. A command whose
+	// unavailability is a property of the backend rather than of transient
+	// shell state needs to say which, so the menu is not simply greyed out
+	// with no account of itself.
+	DisabledReason string
+	Action         func(*Shell)
+	DynamicLabel   func(*Shell) string
 }
 
 func (c Command) DisplayLabel(shell *Shell) string {
@@ -19,6 +24,9 @@ func (c Command) DisplayLabel(shell *Shell) string {
 
 func (c Command) Availability(shell *Shell) Capability {
 	if c.Enabled != nil && !c.Enabled(shell) {
+		if c.DisabledReason != "" {
+			return Capability{Reason: shell.tr(c.DisabledReason)}
+		}
 		return Capability{Reason: shell.tr("This command is not available in the current frontend state")}
 	}
 	if c.Backend != "" {
@@ -54,12 +62,22 @@ func defaultMenus() []Menu {
 	hasInput := func(shell *Shell) bool { return shell.input != nil }
 	hasRecent := func(shell *Shell) bool { return len(shell.settings.RecentFiles) > 0 }
 	hasFrame := func(shell *Shell) bool { return shell.currentFrame().Image != nil }
+	hasFirmware := func(shell *Shell) bool {
+		backend, ok := shell.backend.(FirmwareBackend)
+		return ok && backend.SupportsFirmware()
+	}
 	return []Menu{
 		{
 			Label: "File",
 			Commands: []Command{
 				{ID: "file.open", Label: "Open File...", Shortcut: "Ctrl+O", Action: (*Shell).chooseFile},
-				{ID: "file.open_firmware", Label: "Open Firmware Directory...", Action: (*Shell).chooseFirmwareDirectory},
+				{
+					ID:             "file.open_firmware",
+					Label:          "Open Firmware Directory...",
+					Enabled:        hasFirmware,
+					DisabledReason: "This build does not run whole-phone firmware",
+					Action:         (*Shell).chooseFirmwareDirectory,
+				},
 				{ID: "file.recent", Label: "Open Recent...", Enabled: hasRecent, Action: (*Shell).chooseRecent},
 				{ID: "file.close", Label: "Close Title", Enabled: hasInput, Action: (*Shell).closeInput},
 				{ID: "file.exit", Label: "Exit", Action: func(shell *Shell) { shell.quitting = true }},
