@@ -236,6 +236,14 @@ type OpenProgressBackend interface {
 	OpenWithProgress(context.Context, OpenRequest, func(OpenStage)) (InputInfo, error)
 }
 
+// FirmwareBackend is implemented by a backend that can open a whole-phone
+// firmware directory. A backend that only runs application titles leaves it
+// unimplemented, and the frontend disables its firmware command rather than
+// offering a menu entry whose only outcome is an error.
+type FirmwareBackend interface {
+	SupportsFirmware() bool
+}
+
 // CapabilityBackend supplies the reason shown when a persistent command is
 // disabled. Backends that do not implement it fall back to Supports.
 type CapabilityBackend interface {
