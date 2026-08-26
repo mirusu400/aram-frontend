@@ -387,6 +387,13 @@ func TestShellContinuouslySchedulesOneRunningFrameAtATime(t *testing.T) {
 	}
 	shell := NewShell(backend, nil, "")
 	shell.input = &InputInfo{DisplayName: "synthetic.dat"}
+	// A fresh environment (a CI runner with no saved settings) has
+	// WelcomeCompleted false, so NewShell opens the Welcome panel. A modal panel
+	// that does not allow guest input blocks frame scheduling, so the first frame
+	// would never be issued and this test would time out - it only passed on a
+	// developer machine whose settings had already completed Welcome. Clear the
+	// panel so the test exercises a plainly running title.
+	shell.panel = nil
 	// NewShell loads the machine's saved settings, so the emulation speed a
 	// developer happens to have chosen would otherwise decide how many quanta
 	// one tick issues and this test would fail for them and nobody else.
@@ -434,25 +441,18 @@ func TestShellContinuouslySchedulesOneRunningFrameAtATime(t *testing.T) {
 	}
 }
 
-// frameTestTimeout bounds the frame-scheduling helpers. A frame is issued on a
-// goroutine, so these wait for real wall-clock time rather than the mocked
-// pacing clock. One second was too tight under a loaded CI runner (the goroutine
-// could starve past it), making the scheduling tests flaky; the assertions are
-// unchanged, the budget is just generous enough that only a real hang trips it.
-const frameTestTimeout = 10 * time.Second
-
 func waitSignal(t *testing.T, signal <-chan struct{}, label string) {
 	t.Helper()
 	select {
 	case <-signal:
-	case <-time.After(frameTestTimeout):
+	case <-time.After(time.Second):
 		t.Fatalf("timed out waiting for %s", label)
 	}
 }
 
 func waitFrameCompletion(t *testing.T, shell *Shell) {
 	t.Helper()
-	deadline := time.Now().Add(frameTestTimeout)
+	deadline := time.Now().Add(time.Second)
 	for shell.frameRunPending && time.Now().Before(deadline) {
 		shell.consumeResults()
 		time.Sleep(time.Millisecond)
