@@ -329,6 +329,22 @@ type AudioDeviceBackend interface {
 	AudioDevices() []AudioDevice
 }
 
+// HapticsState is the guest's current vibration request. Level is 0-100 motor
+// strength; Duration is the time remaining before it stops. A zero Level means
+// no vibration is active.
+type HapticsState struct {
+	Level    uint8
+	Duration time.Duration
+}
+
+// HapticsBackend publishes the guest's vibration request so the frontend can
+// actuate a real gamepad rumble motor or phone vibrator. It is optional; a
+// backend that cannot report vibration simply does not implement it, and the
+// frontend then drives no haptics.
+type HapticsBackend interface {
+	Haptics() HapticsState
+}
+
 // ToolBackend provides read-only tool data. Memory mutation and debugger
 // control remain backend operations and never leak guest memory into the UI.
 type ToolBackend interface {

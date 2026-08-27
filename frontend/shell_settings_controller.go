@@ -21,6 +21,17 @@ func (s *Shell) toggleVirtualKeypad() {
 	))
 }
 
+func (s *Shell) toggleVibration() {
+	s.settings.VibrationEnabled = !s.settings.VibrationEnabled
+	if !s.settings.VibrationEnabled {
+		s.stopHapticsIfActive()
+	}
+	s.saveControllerSettings(s.trf(
+		"Vibration: %s",
+		s.tr(onOff(s.settings.VibrationEnabled)),
+	))
+}
+
 func (s *Shell) toggleGamepadEnabled() {
 	s.updateControllerProfile(func(profile *ControllerProfile) {
 		profile.GamepadEnabled = !profile.GamepadEnabled

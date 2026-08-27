@@ -265,6 +265,12 @@ func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 				action:      shell.cycleGamepadDeadzone,
 			},
 			{
+				label:       "Vibration",
+				description: "Rumble a connected gamepad and vibrate the phone when a title requests it.",
+				value:       onOff(shell.settings.VibrationEnabled),
+				action:      shell.toggleVibration,
+			},
+			{
 				label:       "Connected gamepads",
 				description: "Detected devices and standard-layout support.",
 				value:       gamepadConnectionLabel(shell.language()),
