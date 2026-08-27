@@ -33,4 +33,4 @@ require (
 // not clear preedit text, and a character arriving between sessions is lost.
 // Drop this replace once an upstream release contains all fixes. Branch:
 // mirusu400/ebiten aram-ime-fix.
-replace github.com/hajimehoshi/ebiten/v2 => github.com/mirusu400/ebiten/v2 v2.9.10-0.20260801111254-3858a8d6e077
+replace github.com/hajimehoshi/ebiten/v2 => github.com/mirusu400/ebiten/v2 v2.9.10-0.20260827092955-56bdfdb20320

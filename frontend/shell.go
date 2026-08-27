@@ -97,6 +97,7 @@ type Shell struct {
 	batteryPolledAt           time.Time
 	bindingCapture            *bindingCapture
 	gamepadMappingsLoaded     bool
+	hapticActive              bool
 	touchControls             map[ebiten.TouchID]string
 	touchLayoutEditing        bool
 	touchLayoutDraft          map[string]TouchPlacement
@@ -280,6 +281,7 @@ func (s *Shell) Update() error {
 	s.syncHostLifecycle()
 	s.updateVideo()
 	s.updateAudio()
+	s.updateHaptics()
 	s.handleDroppedFiles()
 	if !s.handleBindingCapture() {
 		s.handleShortcuts()
