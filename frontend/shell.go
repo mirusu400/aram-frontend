@@ -33,8 +33,12 @@ type commandResult struct {
 }
 
 type frameRunResult struct {
-	generation uint64
-	err        error
+	generation      uint64
+	completedQuanta int
+	guestAdvanced   time.Duration
+	startedAt       time.Time
+	completedAt     time.Time
+	err             error
 }
 
 type Shell struct {
@@ -81,9 +85,12 @@ type Shell struct {
 	frame                     VideoFrame
 	frameImage                *ebiten.Image
 	frameScratch              *image.RGBA
+	latestVideoGuestNS        atomic.Int64
+	latestVideoGeneration     atomic.Uint64
 	audioOutput               *audioOutput
 	audioMu                   sync.Mutex
 	audioPumpStarted          bool
+	audioSuspended            bool
 	controlState              map[string]bool
 	directionPressOrder       []string
 	battery                   batteryReading
@@ -104,7 +111,7 @@ type Shell struct {
 	frameGeneration           uint64
 	frameAccumulator          time.Duration
 	lastFramePacingAt         time.Time
-	pacingQuantaIssued        int
+	pacingGuestAdvanced       time.Duration
 	pacingSampleStartedAt     time.Time
 	measuredSpeed             float64
 	nowFunc                   func() time.Time

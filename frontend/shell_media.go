@@ -21,6 +21,7 @@ func (s *Shell) releaseCurrentInput() error {
 		return err
 	}
 	s.audioMu.Lock()
+	s.audioSuspended = true
 	if s.audioOutput != nil {
 		s.audioOutput.flush()
 	}
@@ -73,6 +74,9 @@ func (s *Shell) drainAudioOnce(allowCreate bool) {
 	}
 	s.audioMu.Lock()
 	defer s.audioMu.Unlock()
+	if s.audioSuspended {
+		return
+	}
 	if s.audioOutput == nil && !allowCreate {
 		return
 	}
@@ -92,7 +96,11 @@ func (s *Shell) drainAudioOnce(allowCreate bool) {
 		s.audioOutput = output
 		s.startAudioPumpLocked()
 	}
-	if err := s.audioOutput.enqueue(chunk); err != nil && allowCreate {
+	if err := s.audioOutput.enqueue(
+		chunk,
+		s.latestVideoGuestNS.Load(),
+		s.latestVideoGeneration.Load(),
+	); err != nil && allowCreate {
 		// Only the main-thread caller touches s.logs; the pump goroutine must
 		// not. A rare encode error still surfaces on the next Update tick.
 		s.appendLog(s.tr("Audio stream: ") + err.Error())
@@ -120,12 +128,69 @@ func (s *Shell) startAudioPumpLocked() {
 }
 
 func (s *Shell) closeAudio() error {
+	s.audioMu.Lock()
+	defer s.audioMu.Unlock()
+	s.audioSuspended = true
 	if s.audioOutput == nil {
 		return nil
 	}
 	err := s.audioOutput.close()
 	s.audioOutput = nil
 	return err
+}
+
+func isAudioDiscontinuityCommand(command BackendCommand) bool {
+	switch command {
+	case CommandStart,
+		CommandPauseResume,
+		CommandStop,
+		CommandReset,
+		CommandFastForward,
+		CommandLoadState,
+		CommandRewind:
+		return true
+	default:
+		return false
+	}
+}
+
+// beginAudioDiscontinuity blocks both audio drainers and clears host-owned
+// PCM before a lifecycle or timeline command can move guest time elsewhere.
+func (s *Shell) beginAudioDiscontinuity() {
+	s.audioMu.Lock()
+	defer s.audioMu.Unlock()
+	s.audioSuspended = true
+	if s.audioOutput != nil {
+		s.audioOutput.flush()
+	}
+}
+
+// finishAudioDiscontinuity clears any PCM that raced with the command and only
+// resumes draining when the resulting machine state is actually running.
+func (s *Shell) finishAudioDiscontinuity(state BackendState) {
+	s.audioMu.Lock()
+	defer s.audioMu.Unlock()
+	if s.audioOutput != nil {
+		s.audioOutput.flush()
+	}
+	s.audioSuspended = state != StateRunning
+}
+
+func (s *Shell) flushAudioDiscontinuity() {
+	s.audioMu.Lock()
+	defer s.audioMu.Unlock()
+	if s.audioOutput != nil {
+		s.audioOutput.flush()
+	}
+}
+
+func (s *Shell) audioQueueTelemetry() AudioQueueTelemetry {
+	s.audioMu.Lock()
+	defer s.audioMu.Unlock()
+	if s.audioOutput == nil {
+		return AudioQueueTelemetry{}
+	}
+	return s.audioOutput.telemetry()
 }
 
 func (s *Shell) syncBackendState() {
@@ -194,6 +259,8 @@ func (s *Shell) updateVideo() {
 	if bounds.Dx() <= 0 || bounds.Dy() <= 0 {
 		return
 	}
+	s.latestVideoGuestNS.Store(frame.GuestNS)
+	s.latestVideoGeneration.Store(frame.Generation)
 	if s.frameImage != nil && frame.Sequence == s.frame.Sequence {
 		return
 	}
