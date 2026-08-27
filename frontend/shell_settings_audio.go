@@ -70,7 +70,7 @@ func (s *Shell) toggleMuted() {
 
 func (s *Shell) cycleVolume() {
 	volume := s.settings.Volume + 5
-	if volume > 100 {
+	if volume > 200 {
 		volume = 0
 	}
 	s.setVolume(volume)
@@ -79,8 +79,8 @@ func (s *Shell) cycleVolume() {
 func (s *Shell) setVolume(volume int) {
 	if volume < 0 {
 		volume = 0
-	} else if volume > 100 {
-		volume = 100
+	} else if volume > 200 {
+		volume = 200
 	}
 	s.settings.Volume = volume
 	s.applyAudioSettings()
