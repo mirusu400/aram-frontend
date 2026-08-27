@@ -228,10 +228,54 @@ func TestKeyboardBindingsIncludePhoneNumberControls(t *testing.T) {
 	}
 }
 
+func TestGamepadBindingCaptureSupportsNumberControls(t *testing.T) {
+	profile := defaultSettings().globalControllerProfile()
+
+	// Numbers have no default gamepad button; they start Unassigned.
+	ids := bindingIDs(gamepadBindingsForProfile(profile))
+	if ids["num1"] != "" {
+		t.Fatalf("num1 should start unassigned, got %q", ids["num1"])
+	}
+
+	// A spare button binds a number without stealing anything.
+	if swapped := assignGamepadBinding(&profile, "num1", "trigger-left"); swapped != "" {
+		t.Fatalf("binding num1 to a spare button swapped %q", swapped)
+	}
+	if profile.GamepadLayout != "custom" {
+		t.Fatalf("gamepad layout = %q, want custom", profile.GamepadLayout)
+	}
+	ids = bindingIDs(gamepadBindingsForProfile(profile))
+	if ids["num1"] != "trigger-left" {
+		t.Fatalf("num1 binding = %q, want trigger-left", ids["num1"])
+	}
+
+	// Binding a number to a button a base control holds steals it, leaving the
+	// base control Unassigned rather than snapping it back to its default.
+	if swapped := assignGamepadBinding(&profile, "num2", "face-south"); swapped != "ok" {
+		t.Fatalf("stealing face-south swapped %q, want ok", swapped)
+	}
+	profile.normalize()
+	ids = bindingIDs(gamepadBindingsForProfile(profile))
+	if ids["num2"] != "face-south" {
+		t.Fatalf("num2 binding = %q, want face-south", ids["num2"])
+	}
+	if ids["ok"] != "" {
+		t.Fatalf("stolen ok binding = %q, want unassigned", ids["ok"])
+	}
+}
+
 func bindingButtons(bindings []gamepadBinding) map[string]ebiten.StandardGamepadButton {
 	result := make(map[string]ebiten.StandardGamepadButton, len(bindings))
 	for _, binding := range bindings {
 		result[binding.Control] = binding.Button
+	}
+	return result
+}
+
+func bindingIDs(bindings []gamepadBinding) map[string]string {
+	result := make(map[string]string, len(bindings))
+	for _, binding := range bindings {
+		result[binding.Control] = binding.ID
 	}
 	return result
 }

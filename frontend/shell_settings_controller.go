@@ -164,6 +164,9 @@ func (s *Shell) controllerProfileScopeLabel() string {
 func (s *Shell) gamepadBindingLabel(control string) string {
 	for _, binding := range gamepadBindingsForProfile(s.controllerProfile()) {
 		if binding.Control == control {
+			if binding.Label == "" {
+				return "Unassigned"
+			}
 			return binding.Label
 		}
 	}
