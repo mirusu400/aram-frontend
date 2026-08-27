@@ -238,12 +238,15 @@ func (o *audioOutput) configure(settings AudioSettings) {
 	o.prebufferWait = latency
 	o.player.SetBufferSize(latency)
 	o.softenEnabled = settings.Soften
+	// Volume can exceed 100% for boosted output. oto multiplies samples by the
+	// gain and the driver clips anything past full scale, so amplified audio may
+	// distort but never panics.
 	volume := float64(settings.Volume) / 100
 	if volume < 0 {
 		volume = 0
 	}
-	if volume > 1 {
-		volume = 1
+	if volume > 2 {
+		volume = 2
 	}
 	if settings.Muted {
 		volume = 0

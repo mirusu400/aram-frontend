@@ -186,9 +186,13 @@ func TestSliderSettingSettersClamp(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", temporary)
 	shell := &Shell{settings: defaultSettings()}
 
-	shell.setVolume(140)
-	if shell.settings.Volume != 100 {
-		t.Fatalf("setVolume(140) = %d, want clamped to 100", shell.settings.Volume)
+	shell.setVolume(150)
+	if shell.settings.Volume != 150 {
+		t.Fatalf("setVolume(150) = %d, want 150", shell.settings.Volume)
+	}
+	shell.setVolume(240)
+	if shell.settings.Volume != 200 {
+		t.Fatalf("setVolume(240) = %d, want clamped to 200", shell.settings.Volume)
 	}
 	shell.setVolume(-10)
 	if shell.settings.Volume != 0 {

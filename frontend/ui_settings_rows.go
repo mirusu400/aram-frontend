@@ -191,7 +191,7 @@ func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 				description: "Output volume in five-percent steps.",
 				slider: &settingsSliderModel{
 					min:    0,
-					max:    20,
+					max:    40,
 					value:  func() int { return (shell.settings.Volume + 2) / 5 },
 					format: func(v int) string { return fmt.Sprintf("%d%%", v*5) },
 					apply:  func(v int) { shell.setVolume(v * 5) },

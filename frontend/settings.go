@@ -207,7 +207,7 @@ func (s *Settings) normalize() {
 	if !isSpeedPreset(s.Speed) {
 		s.Speed = 1
 	}
-	if s.Volume < 0 || s.Volume > 100 {
+	if s.Volume < 0 || s.Volume > 200 {
 		s.Volume = 100
 	}
 	if s.AudioLatencyMS < 20 || s.AudioLatencyMS > 250 {
