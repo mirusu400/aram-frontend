@@ -317,6 +317,12 @@ func (o *audioOutput) synchronizeChunk(
 			o.trimChunkPrefix(chunk, dropFrames)
 			o.staleFrames += uint64(dropFrames)
 			frames -= dropFrames
+			// This gap is one we just made on purpose. The audio already
+			// queued in front of it is contiguous - only as late - so move the
+			// cursor with the trim, or the sample-continuity check below reads
+			// the trim as the producer skipping forward and flushes a healthy
+			// queue: a 5 ms trim would cost the whole buffer and a restart.
+			o.nextSample = max(o.nextSample, chunk.StartSample)
 		}
 	}
 	if frames == 0 {

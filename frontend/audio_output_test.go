@@ -266,3 +266,59 @@ func TestAudioOutputFlushesWhenGenerationChanges(t *testing.T) {
 		t.Fatalf("output generation = %d, want 9", output.generation)
 	}
 }
+
+// A stale prefix trim is a gap the output makes on purpose. The audio already
+// queued in front of it is contiguous, only as late, so the trim must not be
+// mistaken for the producer skipping forward: that flushed the whole buffer and
+// restarted playback, turning a 5 ms trim into a latency-sized dropout.
+func TestTrimmingAStalePrefixKeepsTheHealthyQueue(t *testing.T) {
+	const latency = 60 * time.Millisecond
+	output := &audioOutput{
+		queue:          newPCMQueue(audioQueueBytes(latency)),
+		prebufferBytes: audioPrebufferBytes(latency),
+		prebufferWait:  latency,
+	}
+	frames := func(duration time.Duration) []int16 {
+		count := int(int64(hostAudioSampleRate) * int64(duration) / int64(time.Second))
+		return make([]int16, count*2)
+	}
+	sample := func(at time.Duration) uint64 {
+		return uint64(int64(hostAudioSampleRate) * int64(at) / int64(time.Second))
+	}
+
+	// Steady state: a latency-sized buffer of guest audio contiguous to 200 ms.
+	if err := output.enqueue(AudioChunk{
+		SampleRate:   hostAudioSampleRate,
+		Channels:     2,
+		PCM16:        frames(60 * time.Millisecond),
+		StartGuestNS: int64(140 * time.Millisecond),
+		StartSample:  sample(140 * time.Millisecond),
+		Generation:   4,
+	}, int64(200*time.Millisecond), 4); err != nil {
+		t.Fatal(err)
+	}
+	healthy := output.queue.availableBytes()
+	if healthy == 0 {
+		t.Fatal("steady-state chunk was not queued")
+	}
+	// The first chunk established the generation, which resets playback.
+	output.started = true
+
+	// The producer hiccups: only a 5 ms prefix of the next chunk is stale.
+	if err := output.enqueue(AudioChunk{
+		SampleRate:   hostAudioSampleRate,
+		Channels:     2,
+		PCM16:        frames(20 * time.Millisecond),
+		StartGuestNS: int64(200 * time.Millisecond),
+		StartSample:  sample(200 * time.Millisecond),
+		Generation:   4,
+	}, int64(265*time.Millisecond), 4); err != nil {
+		t.Fatal(err)
+	}
+	if got := output.queue.availableBytes(); got < healthy {
+		t.Fatalf("a 5 ms stale trim dropped the queue: %d bytes left of %d", got, healthy)
+	}
+	if !output.started {
+		t.Fatal("a 5 ms stale trim restarted playback")
+	}
+}
