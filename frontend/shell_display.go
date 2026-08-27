@@ -78,6 +78,10 @@ func (s *Shell) cycleSpeed() {
 }
 
 func (s *Shell) setSpeed(speed float64) {
+	if speed != s.settings.Speed {
+		s.flushAudioDiscontinuity()
+		s.resetFramePacing()
+	}
 	s.settings.Speed = speed
 	_ = s.settings.save()
 	s.setStatus(s.trf("Emulation speed: %gx", s.settings.Speed))

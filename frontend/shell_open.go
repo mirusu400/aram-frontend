@@ -154,6 +154,9 @@ func (s *Shell) executeBackend(command BackendCommand) {
 		return
 	}
 	s.busyCommands[command] = true
+	if isAudioDiscontinuityCommand(command) {
+		s.beginAudioDiscontinuity()
+	}
 	s.setStatus(s.trf("%s...", s.backendCommandLabel(command)))
 	request := CommandRequest{
 		Command: command,

@@ -72,7 +72,7 @@ func (s *Shell) now() time.Time {
 func (s *Shell) resetFramePacing() {
 	s.frameAccumulator = 0
 	s.lastFramePacingAt = time.Time{}
-	s.pacingQuantaIssued = 0
+	s.pacingGuestAdvanced = 0
 	s.pacingSampleStartedAt = time.Time{}
 }
 
@@ -129,30 +129,29 @@ func (s *Shell) takeFrameQuanta(quantum time.Duration) int {
 	return owed
 }
 
-// recordPacingSample tracks how much guest time was actually issued against
-// real time, so the achieved speed can be shown and asserted rather than
-// assumed.
+// recordPacingSample tracks completed guest time against wall time. Recording
+// issued work made a slow backend look healthy while its batch was still
+// running; completion timestamps expose the actual achieved ratio.
 func (s *Shell) recordPacingSample(
-	now time.Time,
-	quanta int,
-	quantum time.Duration,
+	startedAt time.Time,
+	completedAt time.Time,
+	guestAdvanced time.Duration,
 ) {
-	if quanta <= 0 {
+	if guestAdvanced <= 0 || completedAt.Before(startedAt) {
 		return
 	}
 	if s.pacingSampleStartedAt.IsZero() {
-		s.pacingSampleStartedAt = now
-		s.pacingQuantaIssued = 0
+		s.pacingSampleStartedAt = startedAt
+		s.pacingGuestAdvanced = 0
 	}
-	s.pacingQuantaIssued += quanta
-	elapsed := now.Sub(s.pacingSampleStartedAt)
+	s.pacingGuestAdvanced += guestAdvanced
+	elapsed := completedAt.Sub(s.pacingSampleStartedAt)
 	if elapsed < framePacingSampleWindow {
 		return
 	}
-	advanced := time.Duration(s.pacingQuantaIssued) * quantum
-	s.measuredSpeed = float64(advanced) / float64(elapsed)
-	s.pacingSampleStartedAt = now
-	s.pacingQuantaIssued = 0
+	s.measuredSpeed = float64(s.pacingGuestAdvanced) / float64(elapsed)
+	s.pacingSampleStartedAt = completedAt
+	s.pacingGuestAdvanced = 0
 }
 
 // MeasuredSpeed reports the ratio of guest time to real time observed over the
@@ -196,19 +195,27 @@ func (s *Shell) scheduleRunningFrame() {
 	if owed == 0 {
 		return
 	}
-	s.recordPacingSample(now, owed, quantum)
 	generation := s.frameGeneration
+	startedAt := now
 	s.frameRunPending = true
 	go func() {
-		var err error
+		var (
+			completed int
+			err       error
+		)
 		for range owed {
 			if err = backend.RunFrame(context.Background()); err != nil {
 				break
 			}
+			completed++
 		}
 		s.frameRunResults <- frameRunResult{
-			generation: generation,
-			err:        err,
+			generation:      generation,
+			completedQuanta: completed,
+			guestAdvanced:   time.Duration(completed) * quantum,
+			startedAt:       startedAt,
+			completedAt:     s.now(),
+			err:             err,
 		}
 	}()
 }

@@ -120,8 +120,10 @@ type CommandRequest struct {
 }
 
 type VideoFrame struct {
-	Image    image.Image
-	Sequence uint64
+	Image      image.Image
+	Sequence   uint64
+	GuestNS    int64
+	Generation uint64
 }
 
 type InputEvent struct {
@@ -155,9 +157,12 @@ type AudioDevice struct {
 // AudioChunk is signed PCM16 produced by a backend. Samples are interleaved
 // when Channels is greater than one.
 type AudioChunk struct {
-	SampleRate int
-	Channels   int
-	PCM16      []int16
+	SampleRate   int
+	Channels     int
+	PCM16        []int16
+	StartGuestNS int64
+	StartSample  uint64
+	Generation   uint64
 }
 
 type ToolKind string

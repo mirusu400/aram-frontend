@@ -214,6 +214,11 @@ func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 				value:       shorten(shell.audioDeviceLabel(), 20),
 				action:      shell.cycleAudioDevice,
 			},
+			{
+				label:       "Buffer health",
+				description: "Current host fill and cumulative underrun / overrun events.",
+				value:       shell.audioQueueTelemetryLabel(),
+			},
 		}
 	case "Controls":
 		rows = []settingsRowModel{
