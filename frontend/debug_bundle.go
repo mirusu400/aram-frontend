@@ -35,6 +35,7 @@ type debugBundleSnapshot struct {
 	Settings      debugSettingsReport
 	Build         debugBuildReport
 	FrontendLogs  []string
+	Audio         AudioQueueTelemetry
 	Redactions    []string
 	Screenshot    *image.RGBA
 }
@@ -62,6 +63,7 @@ type debugSessionReport struct {
 	FrontendState FrontendState       `json:"frontend_state"`
 	Problem       *debugProblemReport `json:"problem,omitempty"`
 	Settings      debugSettingsReport `json:"settings"`
+	Audio         AudioQueueTelemetry `json:"audio"`
 }
 
 type debugInputReport struct {
@@ -193,6 +195,7 @@ func writeDebugBundle(
 			FrontendState: snapshot.FrontendState,
 			Problem:       debugProblem(snapshot.Problem),
 			Settings:      snapshot.Settings,
+			Audio:         snapshot.Audio,
 		},
 		Files: make([]debugFileReport, 0, len(files)),
 	}

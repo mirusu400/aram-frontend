@@ -31,6 +31,9 @@ func (s *Shell) consumeResults() {
 			s.consumeBackendResult(result)
 		case result := <-s.commandResults:
 			delete(s.busyCommands, result.command)
+			if isAudioDiscontinuityCommand(result.command) {
+				s.finishAudioDiscontinuity(s.backend.State())
+			}
 			if result.err != nil {
 				s.state = frontendStateForError(result.err)
 				s.setStatus(s.trf(
@@ -50,6 +53,11 @@ func (s *Shell) consumeResults() {
 				continue
 			}
 			s.frameRunPending = false
+			s.recordPacingSample(
+				result.startedAt,
+				result.completedAt,
+				result.guestAdvanced,
+			)
 			if result.err != nil {
 				s.state = frontendStateForError(result.err)
 				s.problem = &FrontendProblem{
@@ -163,6 +171,7 @@ func (s *Shell) consumeBackendResult(result backendResult) {
 	setPlatformWindowTitle("ARAM - " + result.info.DisplayName)
 
 	backendState := s.backend.State()
+	s.finishAudioDiscontinuity(backendState)
 	if (backendState == StateReady || backendState == StatePaused) &&
 		s.backend.Supports(CommandStart) {
 		s.executeBackend(CommandStart)

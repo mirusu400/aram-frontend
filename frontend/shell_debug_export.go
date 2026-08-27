@@ -72,6 +72,7 @@ func (s *Shell) captureDebugBundleSnapshot(createdAt time.Time) debugBundleSnaps
 		},
 		Build:        build,
 		FrontendLogs: logs,
+		Audio:        s.audioQueueTelemetry(),
 		Redactions:   redactions,
 		Screenshot:   screenshot,
 	}

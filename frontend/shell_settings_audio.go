@@ -1,6 +1,9 @@
 package frontend
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 func (s *Shell) applyAudioSettings() {
 	_ = s.settings.save()
@@ -141,4 +144,19 @@ func (s *Shell) audioDeviceLabel() string {
 		}
 	}
 	return "System default"
+}
+
+func (s *Shell) audioQueueTelemetryLabel() string {
+	telemetry := s.audioQueueTelemetry()
+	if telemetry.CapacityFrames == 0 {
+		return s.tr("Idle")
+	}
+	fillMS := telemetry.FillFrames * 1000 / hostAudioSampleRate
+	return fmt.Sprintf(
+		"%d ms | U%d / O%d / D%d",
+		fillMS,
+		telemetry.Underruns,
+		telemetry.Overruns,
+		telemetry.StaleFrames,
+	)
 }

@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/color"
 	"testing"
+	"time"
 )
 
 type videoBackend struct {
@@ -92,6 +93,26 @@ func TestGuestFrameUploadIgnoresRepeatedSequences(t *testing.T) {
 	shell.updateVideo()
 	if shell.frame.Image != published {
 		t.Fatal("an unchanged sequence republished the guest frame")
+	}
+}
+
+func TestVideoUpdatePublishesGuestTimelineAnchor(t *testing.T) {
+	temporary := t.TempDir()
+	t.Setenv("APPDATA", temporary)
+	t.Setenv("XDG_CONFIG_HOME", temporary)
+	backend := &videoBackend{frame: VideoFrame{
+		Image:      guestFrame(24, 32, 0x10),
+		Sequence:   2,
+		GuestNS:    int64(750 * time.Millisecond),
+		Generation: 5,
+	}}
+	shell := NewShell(backend, nil, "")
+	shell.updateVideo()
+	if got := shell.latestVideoGuestNS.Load(); got != int64(750*time.Millisecond) {
+		t.Fatalf("video guest anchor = %d", got)
+	}
+	if got := shell.latestVideoGeneration.Load(); got != 5 {
+		t.Fatalf("video generation = %d", got)
 	}
 }
 

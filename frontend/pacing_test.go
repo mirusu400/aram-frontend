@@ -177,10 +177,15 @@ func TestMeasuredSpeedReportsTheAchievedRatio(t *testing.T) {
 		t.Fatal("speed was reported before a sample window completed")
 	}
 	for elapsed := time.Duration(0); elapsed < 2*framePacingSampleWindow; elapsed += quantum {
+		startedAt := shell.now()
 		advance(quantum)
 		shell.accumulateFramePacing(shell.now(), quantum)
 		if owed := shell.takeFrameQuanta(quantum); owed > 0 {
-			shell.recordPacingSample(shell.now(), owed, quantum)
+			shell.recordPacingSample(
+				startedAt,
+				shell.now(),
+				time.Duration(owed)*quantum,
+			)
 		}
 	}
 	if speed := shell.MeasuredSpeed(); speed < 0.95 || speed > 1.05 {
@@ -195,10 +200,15 @@ func TestMeasuredSpeedSurvivesPacingReset(t *testing.T) {
 	const quantum = ktfQuantum
 	shell, advance := newPacingShell(quantum)
 	for elapsed := time.Duration(0); elapsed < 2*framePacingSampleWindow; elapsed += quantum {
+		startedAt := shell.now()
 		advance(quantum)
 		shell.accumulateFramePacing(shell.now(), quantum)
 		if owed := shell.takeFrameQuanta(quantum); owed > 0 {
-			shell.recordPacingSample(shell.now(), owed, quantum)
+			shell.recordPacingSample(
+				startedAt,
+				shell.now(),
+				time.Duration(owed)*quantum,
+			)
 		}
 	}
 	measured := shell.MeasuredSpeed()
@@ -212,6 +222,50 @@ func TestMeasuredSpeedSurvivesPacingReset(t *testing.T) {
 	shell.clearMeasuredSpeed()
 	if got := shell.MeasuredSpeed(); got != 0 {
 		t.Fatalf("clear left readout at %g, want 0", got)
+	}
+}
+
+func TestMeasuredSpeedUsesCompletedGuestTime(t *testing.T) {
+	shell := &Shell{}
+	startedAt := time.Unix(10, 0)
+	shell.recordPacingSample(
+		startedAt,
+		startedAt.Add(2*time.Second),
+		time.Second,
+	)
+	if got := shell.MeasuredSpeed(); got != 0.5 {
+		t.Fatalf("measured speed = %g, want 0.5", got)
+	}
+}
+
+// A batch that was merely issued has advanced no guest time yet. A backend
+// taking two seconds to finish one quantum must report its completed ratio,
+// not the requested 1x rate recorded before RunFrame returned.
+func TestScheduledFrameSpeedIsRecordedAfterCompletion(t *testing.T) {
+	backend := &schedulingBackend{
+		started: make(chan struct{}, 1),
+		release: make(chan struct{}, 1),
+		state:   StateRunning,
+	}
+	shell := NewShell(backend, nil, "")
+	shell.input = &InputInfo{DisplayName: "synthetic.dat"}
+	shell.panel = nil
+	shell.settings.Speed = 1
+	clock := time.Unix(20, 0)
+	shell.nowFunc = func() time.Time { return clock }
+
+	shell.scheduleRunningFrame()
+	waitSignal(t, backend.started, "slow frame")
+	if got := shell.MeasuredSpeed(); got != 0 {
+		t.Fatalf("issued frame reported speed %g before completion", got)
+	}
+	clock = clock.Add(2 * time.Second)
+	backend.release <- struct{}{}
+	waitFrameCompletion(t, shell)
+
+	want := float64(shell.frameQuantum()) / float64(2*time.Second)
+	if got := shell.MeasuredSpeed(); got != want {
+		t.Fatalf("completed-frame speed = %g, want %g", got, want)
 	}
 }
 

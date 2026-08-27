@@ -40,7 +40,17 @@ func TestWriteDebugBundleIncludesManifestLogsAndBackendArtifacts(t *testing.T) {
 			State:  FrontendGuestFaulted,
 			Reason: "synthetic fault",
 		},
-		Settings:     debugSettingsReport{Language: "en", Speed: 1, Volume: 80},
+		Settings: debugSettingsReport{Language: "en", Speed: 1, Volume: 80},
+		Audio: AudioQueueTelemetry{
+			Underruns:      2,
+			MissingSamples: 320,
+			Overruns:       1,
+			DroppedFrames:  64,
+			FillFrames:     128,
+			TargetFrames:   256,
+			CapacityFrames: 512,
+			Started:        true,
+		},
 		FrontendLogs: []string{"01:02:03  Loaded synthetic.dat", "01:02:04  synthetic fault"},
 		Screenshot: func() *image.RGBA {
 			frame := image.NewRGBA(image.Rect(0, 0, 2, 2))
@@ -94,7 +104,9 @@ func TestWriteDebugBundleIncludesManifestLogsAndBackendArtifacts(t *testing.T) {
 		manifest.Session.Input == nil ||
 		manifest.Session.Input.SHA256 != strings.Repeat("a", 64) ||
 		manifest.Session.Backend != "test-core" ||
-		manifest.Session.Problem == nil {
+		manifest.Session.Problem == nil ||
+		manifest.Session.Audio.MissingSamples != 320 ||
+		manifest.Session.Audio.FillFrames != 128 {
 		t.Fatalf("manifest = %+v", manifest)
 	}
 	if len(manifest.Files) != 4 {
