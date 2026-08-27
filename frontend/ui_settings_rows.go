@@ -331,7 +331,7 @@ func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 				u.panelSignature = ""
 			},
 		})
-		controls := controllerControlOrder
+		controls := gamepadControlOrder
 		if u.bindingDevice == bindingDeviceKeyboard {
 			controls = keyboardControlOrder
 		}

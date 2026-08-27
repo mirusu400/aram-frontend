@@ -45,7 +45,7 @@ func (s *Shell) beginKeyboardBindingCapture(control string) {
 }
 
 func (s *Shell) beginGamepadBindingCapture(control string) {
-	if !containsControl(controllerControlOrder, control) {
+	if !containsControl(gamepadControlOrder, control) {
 		return
 	}
 	blocked := make(map[capturedGamepadButton]bool)
@@ -216,19 +216,25 @@ func assignGamepadBinding(
 	control string,
 	buttonID string,
 ) string {
-	if profile == nil || !containsControl(controllerControlOrder, control) {
+	if profile == nil || !containsControl(gamepadControlOrder, control) {
 		return ""
 	}
 	if _, ok := gamepadButtonOptionByID(buttonID); !ok {
 		return ""
 	}
-	bindings := make(map[string]string, len(controllerControlOrder))
+	bindings := make(map[string]string, len(gamepadControlOrder))
 	for _, binding := range gamepadBindingsForProfile(*profile) {
-		bindings[binding.Control] = binding.ID
+		id := binding.ID
+		if id == "" {
+			// Materialize Unassigned as an explicit sentinel so a stolen control
+			// stays cleared instead of reverting to its layout default.
+			id = gamepadButtonUnassigned
+		}
+		bindings[binding.Control] = id
 	}
 	previousID := bindings[control]
 	swapped := ""
-	for _, other := range controllerControlOrder {
+	for _, other := range gamepadControlOrder {
 		if other == control || bindings[other] != buttonID {
 			continue
 		}

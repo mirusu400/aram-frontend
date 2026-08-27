@@ -20,6 +20,9 @@ func (s *Shell) gamepadActivityLabel() string {
 			continue
 		}
 		for _, binding := range gamepadBindingsForProfile(profile) {
+			if binding.ID == "" {
+				continue
+			}
 			if ebiten.IsStandardGamepadButtonPressed(id, binding.Button) && !seen[binding.Control] {
 				seen[binding.Control] = true
 				active = append(active, s.tr(controlDisplayName(binding.Control)))
@@ -183,6 +186,9 @@ func (s *Shell) collectGamepadState(state map[string]bool, profile ControllerPro
 			continue
 		}
 		for _, binding := range gamepadBindingsForProfile(profile) {
+			if binding.ID == "" {
+				continue
+			}
 			if ebiten.IsStandardGamepadButtonPressed(id, binding.Button) {
 				state[binding.Control] = true
 			}

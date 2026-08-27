@@ -56,11 +56,29 @@ var controllerControlOrder = []string{
 
 var directionControlOrder = []string{"up", "down", "left", "right"}
 
-var keyboardControlOrder = append(
-	append([]string(nil), controllerControlOrder...),
+var numberControlOrder = []string{
 	"num0", "num1", "num2", "num3", "num4",
 	"num5", "num6", "num7", "num8", "num9",
+}
+
+var keyboardControlOrder = append(
+	append([]string(nil), controllerControlOrder...),
+	numberControlOrder...,
 )
+
+// gamepadControlOrder extends the base controls with the phone number keys so a
+// gamepad button can be captured for a digit. Numbers have no default button
+// (a standard pad only has 17 buttons, 11 already spoken for), so they start
+// Unassigned and, once bound, steal the button from whatever held it.
+var gamepadControlOrder = append(
+	append([]string(nil), controllerControlOrder...),
+	numberControlOrder...,
+)
+
+// gamepadButtonUnassigned marks a control that was explicitly cleared (its
+// button stolen by another control). It is distinct from an absent entry, which
+// falls back to the layout default.
+const gamepadButtonUnassigned = "none"
 
 func keyboardBindings(profile string) []keyBinding {
 	directions := []keyBinding{
@@ -236,15 +254,19 @@ func defaultGamepadBindingIDs(layout string) map[string]string {
 
 func gamepadBindingsForProfile(profile ControllerProfile) []gamepadBinding {
 	defaults := defaultGamepadBindingIDs(profile.GamepadLayout)
-	bindings := make([]gamepadBinding, 0, len(controllerControlOrder))
-	for _, control := range controllerControlOrder {
+	bindings := make([]gamepadBinding, 0, len(gamepadControlOrder))
+	for _, control := range gamepadControlOrder {
 		id := defaults[control]
 		if configured := profile.GamepadBindings[control]; configured != "" {
 			id = configured
 		}
 		option, ok := gamepadButtonOptionByID(id)
 		if !ok {
-			option, _ = gamepadButtonOptionByID(defaults[control])
+			// Numbers with no default, and base controls explicitly cleared to
+			// "none", have no button. Leave the binding Unassigned rather than
+			// snapping back to a default (which would fire button 0).
+			bindings = append(bindings, gamepadBinding{Control: control})
+			continue
 		}
 		bindings = append(bindings, gamepadBinding{
 			Control: control,
@@ -278,13 +300,17 @@ func normalizeGamepadBindingIDs(bindings map[string]string) map[string]string {
 	if len(bindings) == 0 {
 		return nil
 	}
-	validControls := make(map[string]bool, len(controllerControlOrder))
-	for _, control := range controllerControlOrder {
+	validControls := make(map[string]bool, len(gamepadControlOrder))
+	for _, control := range gamepadControlOrder {
 		validControls[control] = true
 	}
 	result := make(map[string]string)
 	for control, id := range bindings {
 		if !validControls[control] {
+			continue
+		}
+		if id == gamepadButtonUnassigned {
+			result[control] = id
 			continue
 		}
 		if _, ok := gamepadButtonOptionByID(id); ok {
@@ -308,7 +334,7 @@ func controllerProfileSignature(profile ControllerProfile) string {
 	for _, control := range keyboardControlOrder {
 		parts = append(parts, "key:"+control+"="+profile.KeyboardBindings[control])
 	}
-	for _, control := range controllerControlOrder {
+	for _, control := range gamepadControlOrder {
 		parts = append(parts, control+"="+profile.GamepadBindings[control])
 	}
 	return strings.Join(parts, "|")
