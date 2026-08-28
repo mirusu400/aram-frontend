@@ -91,6 +91,7 @@ type Shell struct {
 	audioMu                   sync.Mutex
 	audioPumpStarted          bool
 	audioSuspended            bool
+	cpuProfile                cpuProfileState
 	controlState              map[string]bool
 	directionPressOrder       []string
 	battery                   batteryReading
@@ -190,6 +191,9 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		updateResults:             make(chan updateResult, 4),
 	}
 	shell.hostActiveRequest.Store(true)
+	if shell.settings.CPUProfile {
+		shell.settings.CPUProfile = shell.setCPUProfiling(true)
+	}
 	setPlatformWindowTitle(shell.tr("ARAM - Archived Runtime for ARM Mobiles"))
 	if shell.shouldOpenWelcome() {
 		shell.openWelcome()

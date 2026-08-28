@@ -3,6 +3,7 @@ package frontend
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"sync"
 	"time"
@@ -300,6 +301,30 @@ type audioOutput struct {
 	staleFrames    uint64
 	softenEnabled  bool
 	lp             [2]float64 // per-channel one-pole low-pass state
+	trace          *audioTrace
+	lastSample     time.Time
+}
+
+// traceEvent records one pipeline event, snapshotting the current queue
+// counters so the trace shows health at the moment of the event.
+func (o *audioOutput) traceEvent(kind, detail string) {
+	if o == nil || o.trace == nil {
+		return
+	}
+	o.trace.record(kind, detail, o.telemetry())
+}
+
+// maybeSample records a health snapshot at most once per second so a steady
+// problem (a queue underrunning with no control events) still leaves a trail.
+func (o *audioOutput) maybeSample(now time.Time) {
+	if o == nil || o.trace == nil {
+		return
+	}
+	if !o.lastSample.IsZero() && now.Sub(o.lastSample) < time.Second {
+		return
+	}
+	o.lastSample = now
+	o.traceEvent("sample", "")
 }
 
 // softenCoefficient is the one-pole low-pass factor applied when Soften is on:
@@ -344,6 +369,15 @@ func newAudioOutput(settings AudioSettings) (*audioOutput, error) {
 	}
 	output := &audioOutput{queue: queue, player: player}
 	output.configure(settings)
+	output.trace = newAudioTrace(fmt.Sprintf(
+		"host_rate=%dHz latency=%s soften=%t volume=%d muted=%t mix=%t",
+		hostAudioSampleRate,
+		normalizedAudioLatency(settings.Latency),
+		settings.Soften,
+		settings.Volume,
+		settings.Muted,
+		settings.MixMode,
+	))
 	return output, nil
 }
 
@@ -413,7 +447,9 @@ func (o *audioOutput) synchronizeChunk(
 		return true
 	}
 	if chunk.Generation != o.generation {
-		o.flush()
+		o.flushInternal(fmt.Sprintf(
+			"generation %d->%d", o.generation, chunk.Generation,
+		))
 		o.generation = chunk.Generation
 		o.nextSample = chunk.StartSample
 	}
@@ -429,6 +465,7 @@ func (o *audioOutput) synchronizeChunk(
 		if chunkEndNS <= targetGuestNS {
 			o.staleFrames += uint64(frames)
 			o.nextSample = max(o.nextSample, chunk.StartSample+uint64(frames))
+			o.traceEvent("stale", fmt.Sprintf("late-drop %d", frames))
 			return false
 		}
 		if chunk.StartGuestNS < targetGuestNS {
@@ -458,6 +495,7 @@ func (o *audioOutput) synchronizeChunk(
 		overlap := o.nextSample - chunk.StartSample
 		if overlap >= uint64(frames) {
 			o.staleFrames += uint64(frames)
+			o.traceEvent("stale", fmt.Sprintf("overlap-drop %d", frames))
 			return false
 		}
 		o.trimChunkPrefix(chunk, int(overlap))
@@ -490,6 +528,7 @@ func (o *audioOutput) bridgeGap(frames uint64, sampleRate int) {
 		return
 	}
 	o.queue.enqueueSilence(int(hostFrames))
+	o.traceEvent("bridge", fmt.Sprintf("%d frames", hostFrames))
 }
 
 func (o *audioOutput) trimChunkPrefix(chunk *AudioChunk, frames int) {
@@ -530,9 +569,14 @@ func (o *audioOutput) start() {
 	}
 	o.started = true
 	o.player.Play()
+	o.traceEvent("start", "")
 }
 
 func (o *audioOutput) flush() {
+	o.flushInternal("external")
+}
+
+func (o *audioOutput) flushInternal(reason string) {
 	if o == nil || o.queue == nil {
 		return
 	}
@@ -545,6 +589,7 @@ func (o *audioOutput) flush() {
 	o.lp = [2]float64{}
 	o.generation = 0
 	o.nextSample = 0
+	o.traceEvent("flush", reason)
 }
 
 func (o *audioOutput) telemetry() AudioQueueTelemetry {
