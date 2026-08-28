@@ -180,3 +180,29 @@ func TestAudioDrainsWhileAFrameBatchIsStillPending(t *testing.T) {
 		t.Fatal("no guest audio reached the host queue")
 	}
 }
+
+// TestOneDrainTakesEveryPublishedChunk pins the pass rate against the publish
+// rate. A backend emits a chunk per service advance, and a title parked on
+// timers splits one presentation quantum into several, so a pass that took one
+// chunk consumed guest audio slower than the guest made it and the backend's
+// retention window quietly dropped the rest.
+func TestOneDrainTakesEveryPublishedChunk(t *testing.T) {
+	temporary := t.TempDir()
+	t.Setenv("APPDATA", temporary)
+	t.Setenv("XDG_CONFIG_HOME", temporary)
+	chunk := AudioChunk{
+		SampleRate: hostAudioSampleRate,
+		Channels:   2,
+		PCM16:      make([]int16, 512),
+	}
+	backend := &videoBackend{chunks: []AudioChunk{chunk, chunk, chunk, chunk}}
+	shell := NewShell(backend, nil, "")
+	shell.input = &InputInfo{DisplayName: "synthetic.dat"}
+	shell.audioOutput = &audioOutput{queue: newPCMQueue(64 * 1024)}
+
+	shell.updateAudio()
+
+	if got := shell.audioOutput.queue.availableBytes(); got != 4*512*2 {
+		t.Fatalf("queued %d bytes from four chunks, want %d", got, 4*512*2)
+	}
+}

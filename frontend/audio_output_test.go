@@ -31,7 +31,7 @@ func TestEncodeHostPCMConvertsMonoAndSampleRate(t *testing.T) {
 func TestPCMQueuePadsUnderrunWithSilence(t *testing.T) {
 	queue := newPCMQueue(32)
 	queue.enqueue([]byte{1, 2, 3, 4})
-	destination := make([]byte, 8)
+	destination := make([]byte, 12)
 	count, err := queue.Read(destination)
 	if err != nil {
 		t.Fatalf("Read: %v", err)
@@ -39,16 +39,53 @@ func TestPCMQueuePadsUnderrunWithSilence(t *testing.T) {
 	if count != len(destination) {
 		t.Fatalf("Read count = %d, want %d", count, len(destination))
 	}
-	want := []byte{1, 2, 3, 4, 0, 0, 0, 0}
+	want := []byte{1, 2, 3, 4}
 	for index := range want {
 		if destination[index] != want[index] {
 			t.Fatalf("byte %d = %d, want %d", index, destination[index], want[index])
 		}
 	}
-	telemetry := queue.telemetry()
-	if telemetry.Underruns != 1 || telemetry.MissingSamples != 2 {
-		t.Fatalf("underrun telemetry = %+v, want 1 event and 2 samples", telemetry)
+	// The pad eases out of the last real sample instead of stepping to zero,
+	// because the step is the click a starved queue is actually heard as.
+	played := int16(binary.LittleEndian.Uint16(destination[0:]))
+	first := int16(binary.LittleEndian.Uint16(destination[4:]))
+	second := int16(binary.LittleEndian.Uint16(destination[8:]))
+	if first == 0 {
+		t.Fatalf("underrun pad stepped straight to silence")
 	}
+	if absInt16(first) > absInt16(played) || absInt16(second) >= absInt16(first) {
+		t.Fatalf(
+			"underrun pad = %d then %d, want a decay out of %d",
+			first, second, played,
+		)
+	}
+	telemetry := queue.telemetry()
+	if telemetry.Underruns != 1 || telemetry.MissingSamples != 4 {
+		t.Fatalf("underrun telemetry = %+v, want 1 event and 4 samples", telemetry)
+	}
+}
+
+// TestPCMQueueUnderrunFillReachesSilence pins the other half of the property:
+// the eased pad is a short slope, not a permanent tone.
+func TestPCMQueueUnderrunFillReachesSilence(t *testing.T) {
+	queue := newPCMQueue(4_096)
+	queue.enqueue([]byte{0xFF, 0x7F, 0xFF, 0x7F})
+	destination := make([]byte, 4_096)
+	if _, err := queue.Read(destination); err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	for index := 1_024; index < len(destination); index++ {
+		if destination[index] != 0 {
+			t.Fatalf("byte %d = %d, want silence", index, destination[index])
+		}
+	}
+}
+
+func absInt16(value int16) int32 {
+	if value < 0 {
+		return -int32(value)
+	}
+	return int32(value)
 }
 
 func TestPCMQueueDropsOldestStereoFrames(t *testing.T) {
@@ -64,15 +101,18 @@ func TestPCMQueueDropsOldestStereoFrames(t *testing.T) {
 	if telemetry.FillFrames != 2 || telemetry.CapacityFrames != 2 {
 		t.Fatalf("queue fill telemetry = %+v, want 2/2 frames", telemetry)
 	}
+	// The retained bytes are the newest frames. Read is checked separately
+	// because it smooths the seam the drop just created, so the samples it
+	// hands to the player deliberately differ from the stored ones.
+	want := []byte{2, 2, 2, 2, 3, 3, 3, 3}
+	for index := range want {
+		if queue.data[index] != want[index] {
+			t.Fatalf("retained byte %d = %d, want %d", index, queue.data[index], want[index])
+		}
+	}
 	destination := make([]byte, 8)
 	if _, err := queue.Read(destination); err != nil {
 		t.Fatalf("Read: %v", err)
-	}
-	want := []byte{2, 2, 2, 2, 3, 3, 3, 3}
-	for index := range want {
-		if destination[index] != want[index] {
-			t.Fatalf("byte %d = %d, want %d", index, destination[index], want[index])
-		}
 	}
 	if got := queue.availableBytes(); got != 0 {
 		t.Fatalf("available bytes after read = %d, want 0", got)
@@ -320,5 +360,88 @@ func TestTrimmingAStalePrefixKeepsTheHealthyQueue(t *testing.T) {
 	}
 	if !output.started {
 		t.Fatal("a 5 ms stale trim restarted playback")
+	}
+}
+
+// TestAProducerGapKeepsTheQueuedSound pins the reflex that made continuous
+// music break up: a chunk starting later than the stream ended used to flush
+// everything already buffered and restart playback behind a fresh prebuffer.
+// The gap is bridged instead, so what is queued still plays and the timeline
+// keeps its place.
+func TestAProducerGapKeepsTheQueuedSound(t *testing.T) {
+	const latency = 60 * time.Millisecond
+	output := &audioOutput{
+		queue:          newPCMQueue(audioQueueBytes(latency)),
+		prebufferBytes: audioPrebufferBytes(latency),
+		prebufferWait:  latency,
+	}
+	first := AudioChunk{
+		SampleRate:  hostAudioSampleRate,
+		Channels:    2,
+		PCM16:       make([]int16, 441*2),
+		StartSample: 1_000,
+		Generation:  6,
+	}
+	if err := output.enqueue(first, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	queued := output.queue.availableBytes()
+	if queued != 441*4 {
+		t.Fatalf("queued %d bytes, want %d", queued, 441*4)
+	}
+	// One sample of daylight - the shape mixer rounding used to produce dozens
+	// of times a second.
+	if err := output.enqueue(AudioChunk{
+		SampleRate:   hostAudioSampleRate,
+		Channels:     2,
+		PCM16:        make([]int16, 441*2),
+		StartGuestNS: int64(10 * time.Millisecond),
+		StartSample:  1_442,
+		Generation:   6,
+	}, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	if got := output.queue.availableBytes(); got != queued+441*4+4 {
+		t.Fatalf(
+			"queue held %d bytes after a one-sample gap, want %d",
+			got, queued+441*4+4,
+		)
+	}
+	if output.nextSample != 1_883 {
+		t.Fatalf("stream cursor = %d, want 1883", output.nextSample)
+	}
+}
+
+// A pause longer than the queue can hold is left to drain rather than
+// materialized: the player consumes in real time and has nothing else to play,
+// so the silence costs no memory and still keeps its place.
+func TestALongProducerGapIsNotMaterialized(t *testing.T) {
+	const latency = 60 * time.Millisecond
+	output := &audioOutput{
+		queue:          newPCMQueue(audioQueueBytes(latency)),
+		prebufferBytes: audioPrebufferBytes(latency),
+		prebufferWait:  latency,
+	}
+	if err := output.enqueue(AudioChunk{
+		SampleRate:  hostAudioSampleRate,
+		Channels:    2,
+		PCM16:       make([]int16, 441*2),
+		StartSample: 0,
+		Generation:  6,
+	}, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := output.enqueue(AudioChunk{
+		SampleRate:   hostAudioSampleRate,
+		Channels:     2,
+		PCM16:        make([]int16, 441*2),
+		StartGuestNS: int64(time.Second),
+		StartSample:  hostAudioSampleRate,
+		Generation:   6,
+	}, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	if got := output.queue.availableBytes(); got != 2*441*4 {
+		t.Fatalf("queue held %d bytes across a one-second pause, want %d", got, 2*441*4)
 	}
 }
