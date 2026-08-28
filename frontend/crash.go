@@ -89,8 +89,11 @@ func handleShellCrash(
 	if env.prompter != nil {
 		confirmed, available = env.prompter.confirmCrashReport(fmt.Sprintf(
 			"ARAM crashed (%s).\n\n"+
-				"Submit a redacted crash report so it can be fixed?\n"+
-				"No game data or file paths are uploaded.",
+				"Submit a crash report so it can be fixed?\n\n"+
+				"The report is attached to a public issue. Host file paths\n"+
+				"are removed. It carries logs, diagnostics, and - when the\n"+
+				"emulated machine faulted - a few kilobytes of guest memory\n"+
+				"from around the crash.",
 			panicType,
 		))
 	}
