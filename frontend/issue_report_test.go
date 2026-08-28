@@ -65,7 +65,7 @@ func TestOpenIssueTrackerShowsReportFormWithCurrentTitle(t *testing.T) {
 		t.Fatalf("issue panel = %#v", shell.panel)
 	}
 	if shell.panel.FieldValues["game_title"] != "Maple Archer" ||
-		shell.panel.FieldValues["repository"] != "aram-frontend" ||
+		shell.panel.FieldValues["repository"] != "aram-core" ||
 		shell.panel.FieldValues[issueReportScreenshotField] != "true" {
 		t.Fatalf("issue form values = %#v", shell.panel.FieldValues)
 	}
@@ -74,9 +74,9 @@ func TestOpenIssueTrackerShowsReportFormWithCurrentTitle(t *testing.T) {
 	}
 	repository := shell.panel.Fields[3]
 	if len(repository.Options) != 3 ||
-		repository.Options[0].Value != "aram-frontend" ||
+		repository.Options[0].Value != "aram-core" ||
 		repository.Options[1].Value != "aram-emu" ||
-		repository.Options[2].Value != "aram-core" {
+		repository.Options[2].Value != "aram-frontend" {
 		t.Fatalf("repository options = %#v", repository.Options)
 	}
 	screenshot := shell.panel.Fields[4]
