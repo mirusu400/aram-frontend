@@ -40,6 +40,14 @@ type pcmQueue struct {
 	missingBytes  uint64
 	overruns      uint64
 	droppedFrames uint64
+	// Declick state. lastOut is the last sample handed to the player, residual
+	// is the step left over at a seam, and the two flags say where the next
+	// seam is: silent tracks whether the previous frame was fill, spliceNext is
+	// set when the queue itself discarded audio.
+	lastOut    [2]int32
+	residual   [2]int32
+	silent     bool
+	spliceNext bool
 }
 
 func newPCMQueue(maxBytes int) *pcmQueue {
@@ -55,12 +63,16 @@ func (q *pcmQueue) Read(destination []byte) (int, error) {
 	}
 	available := len(q.data) - q.offset
 	count := min(len(destination), available)
+	// Only whole stereo frames are handed over, so a seam always falls on a
+	// frame boundary and the declick below can reason in frames.
+	count -= count % 4
 	copy(destination, q.data[q.offset:q.offset+count])
 	clear(destination[count:])
 	if missing := len(destination) - count; missing > 0 {
 		q.underruns++
 		q.missingBytes += uint64(missing)
 	}
+	q.declick(destination, count)
 	q.offset += count
 	if q.offset == len(q.data) {
 		q.data = q.data[:0]
@@ -70,6 +82,83 @@ func (q *pcmQueue) Read(destination []byte) (int, error) {
 		q.offset = 0
 	}
 	return len(destination), nil
+}
+
+// declick smooths every seam the player is about to hear: the frame where the
+// producer ran out, the frame where it came back, and any frame where the queue
+// itself discarded buffered sound.
+//
+// A seam is a step in the waveform, and a step is exactly the click that reads
+// as crackle - the ear is far more sensitive to the discontinuity than to the
+// missing milliseconds around it. Carrying the step forward as an offset that
+// decays over a fraction of a millisecond turns it into a slope, so a short
+// starvation sounds like a dip rather than a tick. realBytes is how much of
+// destination is genuine audio; anything past it is fill.
+func (q *pcmQueue) declick(destination []byte, realBytes int) {
+	frames := len(destination) / 4
+	realFrames := realBytes / 4
+	if frames == 0 {
+		return
+	}
+	if q.settled(frames, realFrames) {
+		last := (min(realFrames, frames) - 1) * 4
+		if last < 0 {
+			return
+		}
+		q.lastOut[0] = int32(int16(binary.LittleEndian.Uint16(destination[last:])))
+		q.lastOut[1] = int32(int16(binary.LittleEndian.Uint16(destination[last+2:])))
+		return
+	}
+	for frame := 0; frame < frames; frame++ {
+		silent := frame >= realFrames
+		seam := silent != q.silent || (!silent && q.spliceNext)
+		q.silent = silent
+		if !silent {
+			q.spliceNext = false
+		}
+		base := frame * 4
+		for channel := 0; channel < 2; channel++ {
+			at := base + channel*2
+			sample := int32(int16(binary.LittleEndian.Uint16(destination[at:])))
+			if seam {
+				q.residual[channel] = q.lastOut[channel] - sample
+			}
+			value := clampPCM16(sample + q.residual[channel])
+			binary.LittleEndian.PutUint16(destination[at:], uint16(value))
+			q.lastOut[channel] = int32(value)
+			q.residual[channel] = q.residual[channel] *
+				declickDecayNumerator / declickDecayDenominator
+		}
+	}
+}
+
+// settled reports that this buffer holds no seam and carries no correction, so
+// the samples can go to the player untouched. Whole seconds of playback are
+// this case, and the ear only ever hears the exceptions.
+func (q *pcmQueue) settled(frames, realFrames int) bool {
+	return q.residual == [2]int32{} &&
+		!q.spliceNext &&
+		q.silent == (realFrames == 0) &&
+		(realFrames == 0 || realFrames >= frames)
+}
+
+// declickDecay shapes how fast a seam correction fades. 15/16 per frame is
+// about a third of a millisecond at 44.1 kHz: long enough to turn a step into a
+// slope the ear reads as continuous, short enough that it displaces no audible
+// content.
+const (
+	declickDecayNumerator   = 15
+	declickDecayDenominator = 16
+)
+
+func clampPCM16(value int32) int16 {
+	if value > 32767 {
+		return 32767
+	}
+	if value < -32768 {
+		return -32768
+	}
+	return int16(value)
 }
 
 func (q *pcmQueue) enqueue(data []byte) {
@@ -98,7 +187,35 @@ func (q *pcmQueue) enqueue(data []byte) {
 		}
 		q.overruns++
 		q.droppedFrames += uint64(dropped / 4)
+		q.spliceNext = true
 	}
+}
+
+// enqueueSilence appends a pause, easing out of whatever is already queued so
+// the stream slopes into the gap instead of stepping into it.
+func (q *pcmQueue) enqueueSilence(frames int) {
+	if frames <= 0 {
+		return
+	}
+	silence := make([]byte, frames*4)
+	q.mu.Lock()
+	tail := len(q.data) - 4
+	if tail >= q.offset {
+		for channel := 0; channel < 2; channel++ {
+			value := int32(int16(binary.LittleEndian.Uint16(
+				q.data[tail+channel*2:],
+			)))
+			for frame := 0; frame < frames && value != 0; frame++ {
+				value = value * declickDecayNumerator / declickDecayDenominator
+				binary.LittleEndian.PutUint16(
+					silence[frame*4+channel*2:],
+					uint16(int16(value)),
+				)
+			}
+		}
+	}
+	q.mu.Unlock()
+	q.enqueue(silence)
 }
 
 func (q *pcmQueue) availableBytes() int {
@@ -122,6 +239,7 @@ func (q *pcmQueue) setMaxBytes(maxBytes int) {
 	q.offset += drop
 	q.overruns++
 	q.droppedFrames += uint64(drop / 4)
+	q.spliceNext = true
 }
 
 func (q *pcmQueue) telemetry() AudioQueueTelemetry {
@@ -141,6 +259,10 @@ func (q *pcmQueue) flush() {
 	q.mu.Lock()
 	q.data = q.data[:0]
 	q.offset = 0
+	// Whatever plays next follows a discarded buffer, so it is a seam. lastOut
+	// is deliberately kept: gliding from the sample the player actually heard is
+	// the whole point.
+	q.spliceNext = true
 	q.mu.Unlock()
 }
 
@@ -342,14 +464,32 @@ func (o *audioOutput) synchronizeChunk(
 		o.staleFrames += overlap
 		frames -= int(overlap)
 	} else if chunk.StartSample > o.nextSample {
-		generation := o.generation
-		nextSample := chunk.StartSample
-		o.flush()
-		o.generation = generation
-		o.nextSample = nextSample
+		o.bridgeGap(chunk.StartSample-o.nextSample, chunk.SampleRate)
 	}
 	o.nextSample = chunk.StartSample + uint64(frames)
 	return true
+}
+
+// bridgeGap absorbs a pause the producer left in the stream.
+//
+// Restarting host playback for this was the wrong reflex. A flush threw away
+// every millisecond already buffered ahead of the gap and then waited for a
+// fresh prebuffer, so a pause the guest meant to be short became a much longer
+// hole with a click at each end - and the mixer's own rounding used to open a
+// one-sample "gap" tens of times a second, which is what made continuous music
+// break up. Anything the queue can hold is filled with silence so playback
+// keeps its timeline; a longer pause is simply left to drain, which sounds the
+// same and costs nothing, because the player consumes in real time and there is
+// nothing else to give it.
+func (o *audioOutput) bridgeGap(frames uint64, sampleRate int) {
+	if frames == 0 || sampleRate <= 0 {
+		return
+	}
+	hostFrames := frames * hostAudioSampleRate / uint64(sampleRate)
+	if hostFrames == 0 || hostFrames*4 > uint64(o.queue.maxBytes) {
+		return
+	}
+	o.queue.enqueueSilence(int(hostFrames))
 }
 
 func (o *audioOutput) trimChunkPrefix(chunk *AudioChunk, frames int) {
