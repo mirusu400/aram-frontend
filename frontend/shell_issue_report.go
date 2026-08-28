@@ -63,11 +63,11 @@ func (s *Shell) openIssueTracker() {
 			{
 				ID:    "repository",
 				Label: "Expected repository",
-				Value: "aram-frontend",
+				Value: "aram-core",
 				Options: []ToolFieldOption{
-					{Value: "aram-frontend", Label: "ARAM Frontend"},
-					{Value: "aram-emu", Label: "ARAM Emulator"},
 					{Value: "aram-core", Label: "ARAM Core"},
+					{Value: "aram-emu", Label: "ARAM Emulator"},
+					{Value: "aram-frontend", Label: "ARAM Frontend"},
 				},
 			},
 			{
@@ -88,7 +88,7 @@ func (s *Shell) openIssueTracker() {
 			"situation":                "",
 			"game_title":               gameTitle,
 			"carrier":                  "",
-			"repository":               "aram-frontend",
+			"repository":               "aram-core",
 			issueReportScreenshotField: "true",
 		},
 	}

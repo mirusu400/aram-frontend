@@ -624,7 +624,7 @@ func TestIssueReportFormRendersAtCompactSize(t *testing.T) {
 	if dropdown == nil {
 		t.Fatal("repository dropdown was not created")
 	}
-	core := shell.panel.Fields[3].Options[2]
+	core := shell.panel.Fields[3].Options[0]
 	dropdown.SetSelectedEntry(core)
 	shell.interfaceUI.ui.Update()
 	if shell.panel.FieldValues["repository"] != "aram-core" {
