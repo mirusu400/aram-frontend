@@ -80,33 +80,46 @@ func (s *Shell) drainAudioOnce(allowCreate bool) {
 	if s.audioOutput == nil && !allowCreate {
 		return
 	}
-	chunk := backend.DrainAudio()
-	if len(chunk.PCM16) == 0 {
-		if s.audioOutput != nil {
-			s.audioOutput.startIfReady(time.Now())
+	for taken := 0; taken < maxAudioChunksPerDrain; taken++ {
+		chunk := backend.DrainAudio()
+		if len(chunk.PCM16) == 0 {
+			break
 		}
-		return
-	}
-	if s.audioOutput == nil {
-		output, err := newAudioOutput(s.currentAudioSettings())
-		if err != nil {
-			s.appendLog(s.tr("Audio output: ") + err.Error())
-			return
+		if s.audioOutput == nil {
+			output, err := newAudioOutput(s.currentAudioSettings())
+			if err != nil {
+				s.appendLog(s.tr("Audio output: ") + err.Error())
+				return
+			}
+			s.audioOutput = output
+			s.startAudioPumpLocked()
 		}
-		s.audioOutput = output
-		s.startAudioPumpLocked()
+		if err := s.audioOutput.enqueue(
+			chunk,
+			s.latestVideoGuestNS.Load(),
+			s.latestVideoGeneration.Load(),
+		); err != nil && allowCreate {
+			// Only the main-thread caller touches s.logs; the pump goroutine
+			// must not. A rare encode error still surfaces on the next Update
+			// tick.
+			s.appendLog(s.tr("Audio stream: ") + err.Error())
+		}
 	}
-	if err := s.audioOutput.enqueue(
-		chunk,
-		s.latestVideoGuestNS.Load(),
-		s.latestVideoGeneration.Load(),
-	); err != nil && allowCreate {
-		// Only the main-thread caller touches s.logs; the pump goroutine must
-		// not. A rare encode error still surfaces on the next Update tick.
-		s.appendLog(s.tr("Audio stream: ") + err.Error())
+	if s.audioOutput != nil {
+		s.audioOutput.startIfReady(time.Now())
 	}
-	s.audioOutput.startIfReady(time.Now())
 }
+
+// maxAudioChunksPerDrain bounds one drain pass.
+//
+// A backend publishes a chunk per service advance, and a title that parks on
+// timers splits one presentation quantum into several of them. Taking a single
+// chunk per pass therefore consumed guest audio more slowly than the guest
+// produced it, and the backend's own retention window silently dropped the
+// excess - a starvation that grows worse exactly when a title is already
+// struggling. The bound still keeps one pass short so the lock is never held
+// for long.
+const maxAudioChunksPerDrain = 16
 
 // startAudioPumpLocked launches the audio pump goroutine the first time an
 // output exists. The pump feeds produced PCM into the queue every few
