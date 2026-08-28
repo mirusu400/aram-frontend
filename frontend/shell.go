@@ -130,6 +130,7 @@ type Shell struct {
 	externalSelectionCanceled chan struct{}
 	dropResults               chan dropResult
 	artifactResults           chan artifactResult
+	saveRestoreResults        chan saveRestoreResult
 	issueReportResults        chan issueReportResult
 	issueCommentResults       chan issueCommentResult
 	toolResults               chan toolResult
@@ -182,6 +183,7 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		externalSelectionCanceled: make(chan struct{}, 1),
 		dropResults:               make(chan dropResult, 2),
 		artifactResults:           make(chan artifactResult, 4),
+		saveRestoreResults:        make(chan saveRestoreResult, 2),
 		issueReportResults:        make(chan issueReportResult, 2),
 		issueCommentResults:       make(chan issueCommentResult, 2),
 		toolResults:               make(chan toolResult, 2),

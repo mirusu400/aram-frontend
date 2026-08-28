@@ -568,5 +568,20 @@
   "Touch layout saved": "터치 버튼 배치를 저장했습니다",
   "Touch layout reset to defaults": "터치 버튼 배치를 기본값으로 되돌렸습니다",
   "Touch layout unchanged": "터치 버튼 배치를 변경하지 않았습니다",
-  "Touch layout: ": "터치 버튼 배치: "
+  "Touch layout: ": "터치 버튼 배치: ",
+  "Back Up Save...": "세이브 백업...",
+  "Restore Save...": "세이브 복원...",
+  "Save backup": "세이브 백업",
+  "Save backup: no title is loaded": "세이브 백업: 불러온 타이틀이 없습니다",
+  "Save backup: this input does not support save backup": "세이브 백업: 이 입력은 세이브 백업을 지원하지 않습니다",
+  "Backing up save...": "세이브를 백업하는 중...",
+  "Restore save: no title is loaded": "세이브 복원: 불러온 타이틀이 없습니다",
+  "Restore save: this input does not support save restore": "세이브 복원: 이 입력은 세이브 복원을 지원하지 않습니다",
+  "Restore save: ": "세이브 복원: ",
+  "Waiting for save backup selection...": "세이브 백업 파일 선택을 기다리는 중...",
+  "Restoring save from %s...": "%s에서 세이브를 복원하는 중...",
+  "Save restored from %s": "%s에서 세이브를 복원했습니다",
+  "Open Save Backup Folder": "세이브 백업 폴더 열기",
+  "Save backup folder: ": "세이브 백업 폴더: ",
+  "Save backup folder opened: %s": "세이브 백업 폴더를 열었습니다: %s"
 }

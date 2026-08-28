@@ -11,6 +11,9 @@ func (unsupportedPicker) OpenFile() (string, error) {
 func (unsupportedPicker) OpenFontFile() (string, error) {
 	return "", ErrPickerUnavailable
 }
+func (unsupportedPicker) OpenSaveBackupFile() (string, error) {
+	return "", ErrPickerUnavailable
+}
 func (unsupportedPicker) OpenFirmwareDirectory(string) (string, error) {
 	return "", ErrPickerUnavailable
 }

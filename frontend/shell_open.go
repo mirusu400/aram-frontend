@@ -14,6 +14,7 @@ const (
 	operationOpen operation = iota
 	operationFirmware
 	operationRecent
+	operationImportSave
 )
 
 type pickerResult struct {
@@ -36,6 +37,11 @@ func (s *Shell) consumePickerResult(result pickerResult) {
 		default:
 			s.setStatus(s.tr("File picker: ") + result.err.Error())
 		}
+		return
+	}
+	if result.operation == operationImportSave {
+		s.state = s.preDialogState
+		s.importSaveDataFromPath(result.path)
 		return
 	}
 	s.openRequest(OpenRequest{

@@ -95,6 +95,21 @@ func defaultMenus() []Menu {
 				{ID: "emu.load_state", Label: "Load State", Shortcut: "F9", Backend: CommandLoadState},
 				{ID: "emu.save_state", Label: "Save State", Shortcut: "F10", Backend: CommandSaveState},
 				{
+					ID:             "emu.export_save",
+					Label:          "Back Up Save...",
+					Enabled:        hasInput,
+					DisabledReason: "Open a title or firmware input first",
+					Action:         (*Shell).exportSaveData,
+				},
+				{
+					ID:             "emu.import_save",
+					Label:          "Restore Save...",
+					Enabled:        hasInput,
+					DisabledReason: "Open a title or firmware input first",
+					Action:         (*Shell).importSaveData,
+				},
+				{ID: "emu.open_save_folder", Label: "Open Save Backup Folder", Action: (*Shell).openSaveBackupFolder},
+				{
 					ID:     "emu.state_slot",
 					Action: (*Shell).cycleStateSlot,
 					DynamicLabel: func(shell *Shell) string {

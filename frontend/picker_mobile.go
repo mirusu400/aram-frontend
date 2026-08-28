@@ -47,6 +47,10 @@ func (mobilePicker) OpenFontFile() (string, error) {
 	return "", ErrPickerUnavailable
 }
 
+func (mobilePicker) OpenSaveBackupFile() (string, error) {
+	return "", ErrPickerUnavailable
+}
+
 func (mobilePicker) OpenFirmwareDirectory(string) (string, error) {
 	return "", requestNativeDocument(true)
 }
