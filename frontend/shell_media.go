@@ -106,7 +106,9 @@ func (s *Shell) drainAudioOnce(allowCreate bool) {
 		}
 	}
 	if s.audioOutput != nil {
-		s.audioOutput.startIfReady(time.Now())
+		now := time.Now()
+		s.audioOutput.startIfReady(now)
+		s.audioOutput.maybeSample(now)
 	}
 }
 
@@ -204,6 +206,17 @@ func (s *Shell) audioQueueTelemetry() AudioQueueTelemetry {
 		return AudioQueueTelemetry{}
 	}
 	return s.audioOutput.telemetry()
+}
+
+// audioTraceRender returns the rendered audio event trace for the debug bundle,
+// or nil when no output has been created (no audio has played this session).
+func (s *Shell) audioTraceRender() []byte {
+	s.audioMu.Lock()
+	defer s.audioMu.Unlock()
+	if s.audioOutput == nil {
+		return nil
+	}
+	return s.audioOutput.trace.render()
 }
 
 func (s *Shell) syncBackendState() {

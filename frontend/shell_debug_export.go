@@ -73,6 +73,8 @@ func (s *Shell) captureDebugBundleSnapshot(createdAt time.Time) debugBundleSnaps
 		Build:        build,
 		FrontendLogs: logs,
 		Audio:        s.audioQueueTelemetry(),
+		AudioTrace:   s.audioTraceRender(),
+		CPUProfile:   s.snapshotCPUProfile(),
 		Redactions:   redactions,
 		Screenshot:   screenshot,
 	}
