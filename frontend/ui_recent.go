@@ -9,6 +9,12 @@ import (
 	"github.com/ebitenui/ebitenui/widget"
 )
 
+// recentWindowWidth is the fixed preferred width of the Open Recent dialog.
+// Entry labels are budgeted against this width (clamped by the viewport), not
+// the app viewport, so the focused row never overflows its cell and ebitenui's
+// list focus-scroll does not tremble left/right.
+const recentWindowWidth = 760
+
 func (u *shellUI) syncRecentPanel(shell *Shell) {
 	recent := append([]string(nil), shell.settings.RecentFiles...)
 	signature := fmt.Sprintf(
@@ -46,8 +52,16 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 		},
 	))
 
-	labelWidth := max(28, min(104, (u.viewportWidth-96)/7))
-	detailWidth := max(28, min(104, (u.viewportWidth-84)/7))
+	// The Open Recent list lives inside a fixed-width window (see the
+	// centeredWindowRect call below), not the full app viewport. Budget each
+	// entry label to the list cell width so the widest row can never exceed the
+	// cell: entry buttons size to their own text, and an overflowing row makes
+	// ebitenui's list focus-scroll (scrollVisible) unable to settle, so the row
+	// text trembles left/right every frame. Leave room for the list padding,
+	// entry text padding, and the vertical scrollbar.
+	windowWidth := min(recentWindowWidth, u.viewportWidth-2*centeredWindowMargin)
+	labelWidth := max(28, min(90, (windowWidth-140)/7))
+	detailWidth := max(28, min(104, (windowWidth-96)/7))
 	selectedPath := ""
 	if len(recent) > 0 {
 		selectedPath = recent[0]
@@ -239,7 +253,7 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 		widget.WindowOpts.Location(centeredWindowRect(
 			u.viewportWidth,
 			u.viewportHeight,
-			760,
+			recentWindowWidth,
 			580,
 		)),
 	)
