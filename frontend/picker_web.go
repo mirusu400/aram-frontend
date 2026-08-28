@@ -52,6 +52,10 @@ func (webPicker) OpenFontFile() (string, error) {
 	return "", ErrPickerUnavailable
 }
 
+func (webPicker) OpenSaveBackupFile() (string, error) {
+	return "", ErrPickerUnavailable
+}
+
 func (webPicker) OpenFirmwareDirectory(string) (string, error) {
 	// A firmware set is a directory of pieces; the browser file dialog cannot
 	// deliver one as in-memory bytes, so it is unavailable on web for now.

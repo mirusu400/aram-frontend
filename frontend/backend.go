@@ -365,6 +365,19 @@ type DebugExportBackend interface {
 	DebugArtifacts(context.Context) ([]DebugArtifact, error)
 }
 
+// SaveTransferBackend exports and imports the loaded title's writable storage
+// (its flash save) as a portable, self-describing backup blob. It lets a save
+// survive loss of the local state directory: the user writes the blob somewhere
+// safe and restores it later, even onto another install. ExportSaveData returns
+// the backup bytes for the loaded title; ImportSaveData validates a backup,
+// refuses one that belongs to a different title, and applies it. A backend that
+// does not implement it simply offers no save backup, and the frontend reports
+// that rather than silently doing nothing.
+type SaveTransferBackend interface {
+	ExportSaveData() ([]byte, error)
+	ImportSaveData([]byte) error
+}
+
 type BackendNamer interface {
 	BackendName() string
 }

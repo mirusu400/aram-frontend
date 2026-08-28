@@ -109,6 +109,12 @@ func (s *Shell) consumeResults() {
 				s.tr(settingValueLabel(result.kind)),
 				result.path,
 			))
+		case result := <-s.saveRestoreResults:
+			if result.err != nil {
+				s.setStatus(s.tr("Restore save: ") + result.err.Error())
+				continue
+			}
+			s.setStatus(s.trf("Save restored from %s", result.name))
 		case result := <-s.issueReportResults:
 			s.consumeIssueReportResult(result)
 		case result := <-s.issueCommentResults:

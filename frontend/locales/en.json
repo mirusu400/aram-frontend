@@ -568,5 +568,20 @@
   "Touch layout saved": "Touch layout saved",
   "Touch layout reset to defaults": "Touch layout reset to defaults",
   "Touch layout unchanged": "Touch layout unchanged",
-  "Touch layout: ": "Touch layout: "
+  "Touch layout: ": "Touch layout: ",
+  "Back Up Save...": "Back Up Save...",
+  "Restore Save...": "Restore Save...",
+  "Save backup": "Save backup",
+  "Save backup: no title is loaded": "Save backup: no title is loaded",
+  "Save backup: this input does not support save backup": "Save backup: this input does not support save backup",
+  "Backing up save...": "Backing up save...",
+  "Restore save: no title is loaded": "Restore save: no title is loaded",
+  "Restore save: this input does not support save restore": "Restore save: this input does not support save restore",
+  "Restore save: ": "Restore save: ",
+  "Waiting for save backup selection...": "Waiting for save backup selection...",
+  "Restoring save from %s...": "Restoring save from %s...",
+  "Save restored from %s": "Save restored from %s",
+  "Open Save Backup Folder": "Open Save Backup Folder",
+  "Save backup folder: ": "Save backup folder: ",
+  "Save backup folder opened: %s": "Save backup folder opened: %s"
 }

@@ -12,6 +12,7 @@ type Picker interface {
 	OpenFile() (string, error)
 	OpenFontFile() (string, error)
 	OpenFirmwareDirectory(previous string) (string, error)
+	OpenSaveBackupFile() (string, error)
 	ChooseRecent([]string) (string, error)
 }
 
@@ -33,4 +34,8 @@ func firmwareImagePatterns() []string {
 
 func fontFilePatterns() []string {
 	return []string{"*.bdf", "*.ttf", "*.otf", "*.ttc"}
+}
+
+func saveBackupPatterns() []string {
+	return []string{"*.aramsave"}
 }
