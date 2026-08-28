@@ -44,5 +44,7 @@ func RunWithOptions(
 		shell.DispatchExternalCommand("file.open")
 	}
 	defer shell.closeAudio()
-	return ebiten.RunGame(shell)
+	return runGameWithCrashReporting(shell, func() error {
+		return ebiten.RunGame(shell)
+	})
 }

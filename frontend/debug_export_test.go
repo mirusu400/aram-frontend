@@ -85,10 +85,14 @@ func TestWriteDebugBundleIncludesManifestLogsAndBackendArtifacts(t *testing.T) {
 		"core.json",
 		"core.log",
 		"frontend.log",
+		"goroutines.txt",
 		"manifest.json",
 		"screenshot.png",
 	}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("entries = %v, want %v", got, want)
+	}
+	if !bytes.Contains(entries["goroutines.txt"], []byte("goroutine ")) {
+		t.Fatalf("goroutines.txt = %q", entries["goroutines.txt"])
 	}
 	if string(entries["frontend.log"]) !=
 		"01:02:03  Loaded synthetic.dat\n01:02:04  synthetic fault\n" {
@@ -109,7 +113,7 @@ func TestWriteDebugBundleIncludesManifestLogsAndBackendArtifacts(t *testing.T) {
 		manifest.Session.Audio.FillFrames != 128 {
 		t.Fatalf("manifest = %+v", manifest)
 	}
-	if len(manifest.Files) != 4 {
+	if len(manifest.Files) != 5 {
 		t.Fatalf("manifest files = %+v", manifest.Files)
 	}
 	for _, file := range manifest.Files {

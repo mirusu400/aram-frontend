@@ -23,7 +23,26 @@ const (
 	debugArtifactSizeLimit   = 8 << 20
 	debugBundleSizeLimit     = 32 << 20
 	debugCollectionTimeout   = 10 * time.Second
+	debugGoroutineDumpLimit  = 8 << 20
 )
+
+// captureGoroutineDump returns a stack dump of every goroutine, capped so a
+// pathological process cannot produce an unbounded artifact. It is the key
+// signal for a hang or deadlock, where the point-in-time state says nothing
+// about which goroutine is stuck and why.
+func captureGoroutineDump() string {
+	buffer := make([]byte, 1<<20)
+	for {
+		written := runtime.Stack(buffer, true)
+		if written < len(buffer) {
+			return string(buffer[:written])
+		}
+		if len(buffer) >= debugGoroutineDumpLimit {
+			return string(buffer)
+		}
+		buffer = make([]byte, 2*len(buffer))
+	}
+}
 
 type debugBundleSnapshot struct {
 	CreatedAt     time.Time
@@ -36,6 +55,9 @@ type debugBundleSnapshot struct {
 	Build         debugBuildReport
 	FrontendLogs  []string
 	Audio         AudioQueueTelemetry
+	AudioTrace    []byte
+	CPUProfile    []byte
+	CrashReport   []byte
 	Redactions    []string
 	Screenshot    *image.RGBA
 }
@@ -150,6 +172,36 @@ func writeDebugBundle(
 		mediaType: "text/plain; charset=utf-8",
 		data:      frontendLog,
 	}}
+	files = append(files, debugBundleFile{
+		name:      "goroutines.txt",
+		source:    "frontend",
+		mediaType: "text/plain; charset=utf-8",
+		data:      []byte(redactDebugText(captureGoroutineDump(), snapshot.Redactions)),
+	})
+	if len(snapshot.AudioTrace) != 0 {
+		files = append(files, debugBundleFile{
+			name:      "audio-trace.log",
+			source:    "frontend",
+			mediaType: "text/plain; charset=utf-8",
+			data:      snapshot.AudioTrace,
+		})
+	}
+	if len(snapshot.CPUProfile) != 0 {
+		files = append(files, debugBundleFile{
+			name:      "cpu.pprof",
+			source:    "frontend",
+			mediaType: "application/octet-stream",
+			data:      snapshot.CPUProfile,
+		})
+	}
+	if len(snapshot.CrashReport) != 0 {
+		files = append(files, debugBundleFile{
+			name:      "crash.txt",
+			source:    "frontend",
+			mediaType: "text/plain; charset=utf-8",
+			data:      snapshot.CrashReport,
+		})
+	}
 	if snapshot.Screenshot != nil {
 		var screenshot bytes.Buffer
 		if err := png.Encode(&screenshot, snapshot.Screenshot); err != nil {

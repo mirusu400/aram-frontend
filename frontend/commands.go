@@ -183,6 +183,7 @@ func defaultMenus() []Menu {
 				{ID: "tools.compatibility", Label: "Compatibility Report", Enabled: hasInput, Action: (*Shell).openCompatibilityPanel},
 				{ID: "tools.logs", Label: "Logs", Action: func(shell *Shell) { shell.openToolPanel(ToolLogs) }},
 				{ID: "tools.export_debug", Label: "Export Debug Bundle...", Shortcut: "Ctrl+Shift+D", Action: (*Shell).saveDebugBundle},
+				{ID: "tools.toggle_cpu_profile", Label: "Toggle CPU Profiling", Action: (*Shell).toggleCPUProfile},
 				{ID: "tools.open_debug_folder", Label: "Open Debug Bundle Folder", Action: (*Shell).openDebugBundleFolder},
 			},
 		},
