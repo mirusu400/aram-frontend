@@ -74,9 +74,11 @@ directly by the frontend.
 
 ## Windows input
 
-The default keyboard profile maps arrows, Enter, Backspace, Q/E soft keys,
-Page Up/Down handset volume keys, Space, digits, comma/star, and period/hash
-into backend-neutral controls. A
+The default keyboard profile maps arrows, Enter, Backspace for cancel/back,
+Home/End for call/end-call, Q/E soft keys, Page Up/Down handset volume keys,
+Space, digits, comma/star, and period/hash into backend-neutral controls. The
+optional desktop virtual keypad exposes those phone actions as CALL, END,
+CANCEL, VOL-, and VOL+ buttons alongside the navigation and number keys. A
 WASD direction preset is also supported. Every keyboard action can be
 remapped by clicking its binding row and pressing the desired physical key;
 Escape cancels capture. Assigning an already-used key swaps the two actions

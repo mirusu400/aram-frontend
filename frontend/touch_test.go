@@ -106,10 +106,20 @@ func TestVirtualKeypadStaysInRightRailAndMapsEveryButton(t *testing.T) {
 			t.Fatalf("virtual keypad panel outside right rail at %dx%d: %v", width, height, panel)
 		}
 		buttons := virtualKeypadButtonsFor(width, height)
-		if len(buttons) != 21 {
-			t.Fatalf("virtual keypad button count = %d, want 21", len(buttons))
+		if len(buttons) != 25 {
+			t.Fatalf("virtual keypad button count = %d, want 25", len(buttons))
+		}
+		phoneKeys := map[string]string{
+			"send": "CALL", "end": "END", "back": "CANCEL",
+			"volume-up": "VOL+", "volume-down": "VOL-",
 		}
 		for _, button := range buttons {
+			if label, ok := phoneKeys[button.Control]; ok {
+				if button.Label != label {
+					t.Errorf("virtual key %q label = %q, want %q", button.Control, button.Label, label)
+				}
+				delete(phoneKeys, button.Control)
+			}
 			point := button.Bounds.Min.Add(button.Bounds.Size().Div(2))
 			control, ok := virtualKeypadControlAtSize(
 				point.X,
@@ -123,6 +133,9 @@ func TestVirtualKeypadStaysInRightRailAndMapsEveryButton(t *testing.T) {
 			if !button.Bounds.In(panel) {
 				t.Errorf("virtual key %q outside panel: %v not in %v", button.Control, button.Bounds, panel)
 			}
+		}
+		if len(phoneKeys) != 0 {
+			t.Errorf("virtual keypad is missing phone controls: %v", phoneKeys)
 		}
 	}
 }

@@ -51,7 +51,7 @@ var gamepadButtonOptions = []gamepadButtonOption{
 
 var controllerControlOrder = []string{
 	"up", "down", "left", "right",
-	"ok", "back", "soft-left", "soft-right", "volume-up", "volume-down",
+	"ok", "back", "send", "end", "soft-left", "soft-right", "volume-up", "volume-down",
 	"menu", "star", "hash",
 }
 
@@ -99,6 +99,8 @@ func keyboardBindings(profile string) []keyBinding {
 	bindings := append(directions,
 		keyBinding{Control: "ok", Key: ebiten.KeyEnter, Label: "Enter"},
 		keyBinding{Control: "back", Key: ebiten.KeyBackspace, Label: "Backspace"},
+		keyBinding{Control: "send", Key: ebiten.KeyHome, Label: "Home"},
+		keyBinding{Control: "end", Key: ebiten.KeyEnd, Label: "End"},
 		keyBinding{Control: "soft-left", Key: ebiten.KeyQ, Label: "Q"},
 		keyBinding{Control: "soft-right", Key: ebiten.KeyE, Label: "E"},
 		keyBinding{Control: "volume-up", Key: ebiten.KeyPageUp, Label: "Page Up"},
@@ -227,7 +229,11 @@ func gamepadBindings(layout string) []gamepadBinding {
 	ids := defaultGamepadBindingIDs(layout)
 	bindings := make([]gamepadBinding, 0, len(controllerControlOrder))
 	for _, control := range controllerControlOrder {
-		option, _ := gamepadButtonOptionByID(ids[control])
+		option, ok := gamepadButtonOptionByID(ids[control])
+		if !ok {
+			bindings = append(bindings, gamepadBinding{Control: control})
+			continue
+		}
 		bindings = append(bindings, gamepadBinding{
 			Control: control,
 			ID:      option.ID,
