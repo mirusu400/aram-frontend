@@ -8,6 +8,11 @@ import (
 	"syscall/js"
 )
 
+const (
+	initialWebPackageGlobal  = "__aramInitialPackage"
+	maxInitialWebPackageSize = 32 * 1024 * 1024
+)
+
 // webPicker is the web/wasm document picker. A browser has no filesystem path
 // for a user selection, so instead of returning a path (desktop) or deferring
 // to a native host that later calls OpenExternalDocument (mobile), it opens a
@@ -40,6 +45,41 @@ func deliverWebInput(name string, data []byte, firmware bool) {
 	if sink != nil {
 		sink(name, data, firmware)
 	}
+}
+
+// takeInitialWebInput consumes the integrity-checked package staged by the
+// browser host before Go.run starts. The host owns URL parsing, CORS fetching,
+// size limiting, and SHA-256 verification; this boundary only copies the
+// Uint8Array into Go-owned memory and reuses the ordinary web picker sink.
+func takeInitialWebInput() {
+	global := js.Global()
+	initial := global.Get(initialWebPackageGlobal)
+	if initial.Type() == js.TypeUndefined || initial.IsNull() {
+		return
+	}
+	global.Delete(initialWebPackageGlobal)
+
+	name := strings.TrimSpace(initial.Get("name").String())
+	if name == "" {
+		name = "application.zip"
+	}
+	view := initial.Get("data")
+	uint8Array := global.Get("Uint8Array")
+	if !view.Truthy() || !uint8Array.Truthy() || !view.InstanceOf(uint8Array) {
+		global.Get("console").Call("error", "ARAM permalink package has no Uint8Array data")
+		return
+	}
+	size := view.Get("byteLength").Int()
+	if size <= 0 || size > maxInitialWebPackageSize {
+		global.Get("console").Call("error", "ARAM permalink package has an invalid size")
+		return
+	}
+	data := make([]byte, size)
+	if copied := js.CopyBytesToGo(data, view); copied != size {
+		global.Get("console").Call("error", "ARAM permalink package copy was incomplete")
+		return
+	}
+	deliverWebInput(name, data, false)
 }
 
 func NewPlatformPicker() Picker { return webPicker{} }

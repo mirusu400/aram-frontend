@@ -38,6 +38,7 @@ func Run(backend Backend, initialPath string) error {
 	ebiten.SetWindowSize(logicalWidth, logicalHeight)
 	shell := NewShell(backend, NewPlatformPicker(), "")
 	setWebInputSink(shell.OpenExternalBytes)
+	takeInitialWebInput()
 	defer shell.closeAudio()
 	return ebiten.RunGame(shell)
 }
