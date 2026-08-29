@@ -117,6 +117,7 @@ type Shell struct {
 	touchHiddenDraft          map[string]bool
 	touchDeckRatioDraft       int
 	touchScaleDraft           int
+	touchGridStepDraft        int
 	touchLayoutDrag           map[ebiten.TouchID]string
 	touchLayoutDragOffset     map[ebiten.TouchID]image.Point
 	touchLayoutDragPoint      map[ebiten.TouchID]image.Point

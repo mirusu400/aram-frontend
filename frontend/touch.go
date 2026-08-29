@@ -138,6 +138,19 @@ func placedTouchBounds(
 	return rectAt(centerX-half, centerY-half, size, size)
 }
 
+// snapToGrid rounds a screen coordinate to the nearest multiple of step, which
+// the layout editor uses to align a dragged button. A step of zero (the grid
+// off) leaves the coordinate alone.
+func snapToGrid(v, step int) int {
+	if step <= 0 {
+		return v
+	}
+	if v >= 0 {
+		return ((v + step/2) / step) * step
+	}
+	return -((-v + step/2) / step) * step
+}
+
 // normalizedTouchPlacement is the inverse of placedTouchBounds for a button
 // center dragged to x, y.
 func normalizedTouchPlacement(x, y, width, height int) TouchPlacement {

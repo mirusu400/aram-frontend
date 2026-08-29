@@ -207,6 +207,80 @@ func TestResettingTheTouchLayoutClearsTheDraft(t *testing.T) {
 	}
 }
 
+// TestSnapToGridRounds pins the grid arithmetic the layout editor drags
+// against: an off grid is a no-op, an on grid rounds to the nearest pitch, and
+// a small negative overshoot at the edge still lands on a lattice line.
+func TestSnapToGridRounds(t *testing.T) {
+	cases := []struct{ v, step, want int }{
+		{0, 0, 0},
+		{37, 0, 37},
+		{37, 8, 40},
+		{35, 8, 32},
+		{36, 8, 40},
+		{-5, 8, -8},
+		{-3, 8, 0},
+	}
+	for _, c := range cases {
+		if got := snapToGrid(c.v, c.step); got != c.want {
+			t.Errorf("snapToGrid(%d, %d) = %d, want %d", c.v, c.step, got, c.want)
+		}
+	}
+}
+
+// TestTouchGridStepperArmsAndDisarms is the point of the grid stepper doubling
+// as an on/off switch: it starts off, a minus press cannot arm it, the first
+// plus press arms it at the minimum, and stepping back below the minimum turns
+// snapping off again.
+func TestTouchGridStepperArmsAndDisarms(t *testing.T) {
+	shell := &Shell{settings: defaultSettings()}
+	shell.touchLayoutEditing = true
+	shell.adjustTouchEditorGrid(-touchEditorGridStepDelta)
+	if got := shell.touchEditorGridStep(); got != 0 {
+		t.Fatalf("grid armed from off by a minus press: %d", got)
+	}
+	shell.adjustTouchEditorGrid(touchEditorGridStepDelta)
+	if got := shell.touchEditorGridStep(); got != touchGridStepMin {
+		t.Fatalf("first plus press = %d, want %d", got, touchGridStepMin)
+	}
+	shell.adjustTouchEditorGrid(-touchEditorGridStepDelta)
+	if got := shell.touchEditorGridStep(); got != 0 {
+		t.Fatalf("minus below the minimum = %d, want off", got)
+	}
+}
+
+// TestTouchGridStepStopsAtMaximum keeps the grid from coarsening past its cap,
+// which would push the pitch beyond a phone's usable travel.
+func TestTouchGridStepStopsAtMaximum(t *testing.T) {
+	shell := &Shell{settings: defaultSettings()}
+	shell.touchLayoutEditing = true
+	for i := 0; i < 100; i++ {
+		shell.adjustTouchEditorGrid(touchEditorGridStepDelta)
+	}
+	if got := shell.touchEditorGridStep(); got != touchGridStepMax {
+		t.Fatalf("grid climbed to %d, want the %d cap", got, touchGridStepMax)
+	}
+}
+
+// TestSavingTheTouchLayoutPersistsTheGridStep proves the editing aid survives a
+// save and a reload, so the grid the user set is the grid they get next time.
+func TestSavingTheTouchLayoutPersistsTheGridStep(t *testing.T) {
+	temporary := t.TempDir()
+	t.Setenv("APPDATA", temporary)
+	t.Setenv("XDG_CONFIG_HOME", temporary)
+	t.Setenv("HOME", temporary)
+
+	shell := &Shell{settings: defaultSettings()}
+	shell.touchLayoutEditing = true
+	shell.touchGridStepDraft = 24
+	shell.saveTouchLayoutEdit()
+	if shell.settings.TouchGridStep != 24 {
+		t.Fatalf("grid step not applied: %d", shell.settings.TouchGridStep)
+	}
+	if loaded := loadSettings(); loaded.TouchGridStep != 24 {
+		t.Fatalf("grid step not persisted: %d", loaded.TouchGridStep)
+	}
+}
+
 func TestFocusControlsScaleWithTheTouchSetting(t *testing.T) {
 	width, height := 914, 411
 	small := focusControlButtonsScaled(width, height, 0.8)

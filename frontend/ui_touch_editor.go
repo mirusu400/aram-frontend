@@ -20,6 +20,8 @@ const (
 	touchEditorGuestLarger  = "editor-guest-larger"
 	touchEditorSizeSmaller  = "editor-size-smaller"
 	touchEditorSizeLarger   = "editor-size-larger"
+	touchEditorGridFiner    = "editor-grid-finer"
+	touchEditorGridCoarser  = "editor-grid-coarser"
 )
 
 const (
@@ -30,6 +32,10 @@ const (
 	// touchEditorDeckStep and touchEditorSizeStep are one press of a stepper.
 	touchEditorDeckStep = 5
 	touchEditorSizeStep = 10
+	// touchEditorGridStepDelta is one press of the grid stepper: the pixel
+	// pitch coarsens or refines by this much, and stepping below the minimum
+	// turns snapping off.
+	touchEditorGridStepDelta = 8
 	// touchEditorTrayChip is the size a put-away button shrinks to in the
 	// tray, small enough that a full deck's worth still fits above the deck.
 	touchEditorTrayChip = 44
@@ -48,10 +54,11 @@ func touchLayoutEditorSteppers(width int) []touchButton {
 	rows := []struct{ minus, plus string }{
 		{touchEditorGuestSmaller, touchEditorGuestLarger},
 		{touchEditorSizeSmaller, touchEditorSizeLarger},
+		{touchEditorGridFiner, touchEditorGridCoarser},
 	}
 	span := min(width-touchEditorActionGap*2, 420)
 	left := max(touchEditorActionGap, (width-span)/2)
-	buttons := make([]touchButton, 0, 4)
+	buttons := make([]touchButton, 0, len(rows)*2)
 	for index, row := range rows {
 		y := touchEditorStepperRow(index)
 		buttons = append(buttons,
@@ -75,7 +82,7 @@ func touchLayoutEditorSteppers(width int) []touchButton {
 // touchEditorTrayBounds is the strip that holds put-away buttons. Dropping a
 // button in it hides the button; dragging one out brings it back.
 func touchEditorTrayBounds(width, height int, options touchLayoutOptions) image.Rectangle {
-	top := touchEditorStepperRow(2) + 24
+	top := touchEditorStepperRow(3) + 24
 	deckTop := height - statusBarHeight -
 		touchDeckHeightWithOptions(width, height, options)
 	bottom := min(top+touchEditorTrayChip*2+touchEditorTrayGap*3, max(top+1, deckTop-8))
@@ -162,6 +169,10 @@ func (s *Shell) drawTouchLayoutEditor(screen *ebiten.Image) {
 		color.NRGBA{A: 110},
 	)
 
+	if step := s.touchEditorGridStep(); step > 0 {
+		s.drawTouchEditorGrid(screen, width, height, step)
+	}
+
 	dragging := make(map[string]bool, len(s.touchLayoutDrag))
 	for _, buttonID := range s.touchLayoutDrag {
 		dragging[buttonID] = true
@@ -180,9 +191,14 @@ func (s *Shell) drawTouchLayoutEditor(screen *ebiten.Image) {
 	if s.design == nil {
 		return
 	}
+	gridReading := s.tr("Grid snap: off")
+	if step := s.touchEditorGridStep(); step > 0 {
+		gridReading = s.trf("Grid snap: %d px", step)
+	}
 	readings := []string{
 		s.trf("Guest screen %d%%", 100-s.touchEditorDeckRatio()),
 		s.trf("Button size %d%%", s.touchEditorScale()),
+		gridReading,
 	}
 	for index, reading := range readings {
 		row := rectAt(0, touchEditorStepperRow(index), width, touchEditorActionHeight)
@@ -195,7 +211,7 @@ func (s *Shell) drawTouchLayoutEditor(screen *ebiten.Image) {
 			centeredTextTop(s.design.Type.Strong, row, s.design.Type.CenterNudge),
 		)
 	}
-	hintBounds := rectAt(0, touchEditorStepperRow(2), width, 20)
+	hintBounds := rectAt(0, touchEditorStepperRow(3), width, 20)
 	drawCenteredText(
 		screen,
 		s.tr("Drag buttons to move them, or into the tray to put them away"),
@@ -204,6 +220,24 @@ func (s *Shell) drawTouchLayoutEditor(screen *ebiten.Image) {
 		hintBounds,
 		hintBounds.Min.Y,
 	)
+}
+
+// drawTouchEditorGrid overlays the snap lattice a dragged button lands on, so
+// the pixel pitch the stepper reports is something the user can actually see.
+// It stops at the status bar because that band never holds a button.
+func (s *Shell) drawTouchEditorGrid(screen *ebiten.Image, width, height, step int) {
+	line := color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0x22}
+	if s.design != nil {
+		tint := s.design.Palette.BorderStrong
+		line = color.NRGBA{R: tint.R, G: tint.G, B: tint.B, A: 0x30}
+	}
+	limit := height - statusBarHeight
+	for x := step; x < width; x += step {
+		ebitenutil.DrawRect(screen, float64(x), 0, 1, float64(limit), line)
+	}
+	for y := step; y < limit; y += step {
+		ebitenutil.DrawRect(screen, 0, float64(y), float64(width), 1, line)
+	}
 }
 
 // drawTouchEditorTray marks the strip that puts buttons away and shows what is
