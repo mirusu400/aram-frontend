@@ -73,10 +73,11 @@ func TestOpenIssueTrackerShowsReportFormWithCurrentTitle(t *testing.T) {
 		t.Fatalf("issue form = %#v", shell.panel)
 	}
 	repository := shell.panel.Fields[3]
-	if len(repository.Options) != 3 ||
+	if len(repository.Options) != 4 ||
 		repository.Options[0].Value != "aram-core" ||
 		repository.Options[1].Value != "aram-emu" ||
-		repository.Options[2].Value != "aram-frontend" {
+		repository.Options[2].Value != "aram-frontend" ||
+		repository.Options[3].Value != "aram-cheat" {
 		t.Fatalf("repository options = %#v", repository.Options)
 	}
 	screenshot := shell.panel.Fields[4]
@@ -153,6 +154,9 @@ func TestIssueReportDraftRejectsMissingSituationAndUnknownRepository(t *testing.
 	}
 	if normalized := normalizeIssueRepository("코어"); normalized != "aram-core" {
 		t.Fatalf("Korean repository alias = %q", normalized)
+	}
+	if normalized := normalizeIssueRepository("치트"); normalized != "aram-cheat" {
+		t.Fatalf("cheat repository alias = %q", normalized)
 	}
 }
 
