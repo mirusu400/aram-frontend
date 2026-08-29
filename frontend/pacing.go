@@ -3,6 +3,7 @@ package frontend
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"time"
 )
 
@@ -195,29 +196,53 @@ func (s *Shell) scheduleRunningFrame() {
 	if owed == 0 {
 		return
 	}
-	generation := s.frameGeneration
-	startedAt := now
+	s.startFrameWorker()
 	s.frameRunPending = true
-	go func() {
+	s.frameRunRequests <- frameRunRequest{
+		backend:    backend,
+		owed:       owed,
+		quantum:    quantum,
+		generation: s.frameGeneration,
+		startedAt:  now,
+	}
+}
+
+// startFrameWorker launches the guest frame worker once, on first use. The
+// worker owns a single de-prioritised OS thread for the shell's lifetime, so a
+// heavy title yields CPU to the interface instead of stalling it.
+func (s *Shell) startFrameWorker() {
+	s.frameWorkerOnce.Do(func() {
+		go s.runFrameWorker()
+	})
+}
+
+// runFrameWorker executes batched guest quanta off the interface goroutine. It
+// pins itself to one OS thread and lowers that thread's priority so the guest
+// never starves the ebiten update/draw thread of CPU. It processes one batch
+// at a time; scheduleRunningFrame only enqueues while no batch is in flight.
+func (s *Shell) runFrameWorker() {
+	runtime.LockOSThread()
+	lowerCurrentThreadPriority()
+	for request := range s.frameRunRequests {
 		var (
 			completed int
 			err       error
 		)
-		for range owed {
-			if err = backend.RunFrame(context.Background()); err != nil {
+		for range request.owed {
+			if err = request.backend.RunFrame(context.Background()); err != nil {
 				break
 			}
 			completed++
 		}
 		s.frameRunResults <- frameRunResult{
-			generation:      generation,
+			generation:      request.generation,
 			completedQuanta: completed,
-			guestAdvanced:   time.Duration(completed) * quantum,
-			startedAt:       startedAt,
+			guestAdvanced:   time.Duration(completed) * request.quantum,
+			startedAt:       request.startedAt,
 			completedAt:     s.now(),
 			err:             err,
 		}
-	}()
+	}
 }
 
 // speedSettingValue labels the speed control with the achieved ratio beside the
