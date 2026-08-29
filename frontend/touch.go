@@ -102,8 +102,8 @@ func touchControlButtonsWithOptions(
 		{ID: "right", Control: "right", Label: "RIGHT", Bounds: rectAt(dpadX+buttonSize+gap, dpadY, buttonSize, buttonSize)},
 		{ID: "down", Control: "down", Label: "DOWN", Bounds: rectAt(dpadX, dpadY+buttonSize+gap, buttonSize, buttonSize)},
 		{ID: "soft-left", Control: "soft-left", Label: "L", Bounds: rectAt(actionX, actionY-buttonSize-gap, buttonSize, buttonSize)},
-		{ID: "soft-right", Control: "soft-right", Label: "R", Bounds: rectAt(actionX+buttonSize*2+gap*2, actionY-buttonSize-gap, buttonSize, buttonSize)},
-		{ID: "back", Control: "back", Label: "BACK", Bounds: rectAt(actionX, actionY, buttonSize, buttonSize)},
+		{ID: "soft-right", Control: "soft-right", Label: "CANCEL", Bounds: rectAt(actionX+buttonSize*2+gap*2, actionY-buttonSize-gap, buttonSize, buttonSize)},
+		{ID: "back", Control: "back", Label: "C", Bounds: rectAt(actionX, actionY, buttonSize, buttonSize)},
 		{ID: "menu", Control: "menu", Label: "MENU", Bounds: rectAt(actionX+buttonSize+gap, actionY, buttonSize, buttonSize)},
 		{ID: "ok-action", Control: "ok", Label: "OK", Bounds: rectAt(actionX+buttonSize*2+gap*2, actionY, buttonSize, buttonSize)},
 	}

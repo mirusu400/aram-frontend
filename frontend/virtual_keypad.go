@@ -61,7 +61,7 @@ func virtualKeypadButtonsFor(width, height int) []touchButton {
 		{
 			{Control: "soft-left", Label: "L"},
 			{Control: "up", Label: "UP"},
-			{Control: "soft-right", Label: "R"},
+			{Control: "soft-right", Label: "CANCEL"},
 		},
 		{
 			{Control: "left", Label: "LEFT"},
@@ -75,7 +75,7 @@ func virtualKeypadButtonsFor(width, height int) []touchButton {
 		},
 		{
 			{},
-			{Control: "back", Label: "CANCEL"},
+			{Control: "back", Label: "C"},
 			{},
 		},
 		{
