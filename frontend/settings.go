@@ -85,6 +85,7 @@ type Settings struct {
 	TouchDeckRatio    int                          `json:"touch_deck_ratio,omitempty"`
 	TouchLayout       map[string]TouchPlacement    `json:"touch_layout,omitempty"`
 	TouchHidden       map[string]bool              `json:"touch_hidden,omitempty"`
+	TouchGridStep     int                          `json:"touch_grid_step,omitempty"`
 	UpdateChannel     string                       `json:"update_channel"`
 	WelcomeCompleted  bool                         `json:"welcome_completed"`
 	IssueReports      []IssueReportRecord          `json:"issue_reports,omitempty"`
@@ -106,6 +107,11 @@ const (
 	// controls and the ceiling protects the game.
 	touchDeckRatioMin = 20
 	touchDeckRatioMax = 65
+	// touchGridStep bounds the layout editor's snap grid, measured in screen
+	// pixels. Zero means the grid is off and a button drops wherever the
+	// finger lifts; a non-zero step aligns every drag to that pixel lattice.
+	touchGridStepMin = 8
+	touchGridStepMax = 64
 )
 
 // touchScaleFactor maps the persisted percentage (0 means unset) to a
@@ -195,6 +201,9 @@ func (s *Settings) normalize() {
 	}
 	if s.TouchDeckRatio != 0 {
 		s.TouchDeckRatio = clampInt(s.TouchDeckRatio, touchDeckRatioMin, touchDeckRatioMax)
+	}
+	if s.TouchGridStep != 0 {
+		s.TouchGridStep = clampInt(s.TouchGridStep, touchGridStepMin, touchGridStepMax)
 	}
 	if len(s.TouchHidden) > 0 {
 		// A button hidden by an older layout that no longer exists would

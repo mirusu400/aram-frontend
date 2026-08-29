@@ -69,6 +69,39 @@ func (s *Shell) adjustTouchEditorScale(delta int) {
 	s.setStatus(s.trf("Touch button size: %d%%", s.touchScaleDraft))
 }
 
+// touchEditorGridStep is the snap grid the editor draws and drags against, in
+// screen pixels. Zero means the grid is off.
+func (s *Shell) touchEditorGridStep() int {
+	if s.touchGridStepDraft <= 0 {
+		return 0
+	}
+	return clampInt(s.touchGridStepDraft, touchGridStepMin, touchGridStepMax)
+}
+
+// adjustTouchEditorGrid coarsens or refines the snap grid. Stepping the grid
+// below its minimum turns snapping off, and the first step up from off arms it
+// at the minimum, so one stepper doubles as the on/off switch.
+func (s *Shell) adjustTouchEditorGrid(delta int) {
+	step := s.touchEditorGridStep()
+	switch {
+	case step == 0:
+		if delta > 0 {
+			step = touchGridStepMin
+		}
+	default:
+		step = clampInt(step+delta, 0, touchGridStepMax)
+		if step < touchGridStepMin {
+			step = 0
+		}
+	}
+	s.touchGridStepDraft = step
+	if step == 0 {
+		s.setStatus(s.tr("Grid snap: off"))
+		return
+	}
+	s.setStatus(s.trf("Grid snap: %d px", step))
+}
+
 // setTouchButtonHidden puts a button away or brings it back while editing.
 func (s *Shell) setTouchButtonHidden(id string, hidden bool) {
 	if s.touchHiddenDraft == nil {
@@ -117,6 +150,7 @@ func (s *Shell) beginTouchLayoutEdit() {
 	s.touchHiddenDraft = copyTouchHidden(s.settings.TouchHidden)
 	s.touchDeckRatioDraft = s.settings.TouchDeckRatio
 	s.touchScaleDraft = s.touchControlScalePercent()
+	s.touchGridStepDraft = s.settings.TouchGridStep
 	s.touchLayoutDrag = make(map[ebiten.TouchID]string)
 	s.touchLayoutDragOffset = make(map[ebiten.TouchID]image.Point)
 	s.touchLayoutDragPoint = make(map[ebiten.TouchID]image.Point)
@@ -137,6 +171,7 @@ func (s *Shell) saveTouchLayoutEdit() {
 	s.settings.TouchHidden = hidden
 	s.settings.TouchDeckRatio = s.touchDeckRatioDraft
 	s.settings.TouchControlScale = s.touchScaleDraft
+	s.settings.TouchGridStep = s.touchEditorGridStep()
 	s.endTouchLayoutEdit()
 	if err := s.settings.save(); err != nil {
 		s.setStatus(s.tr("Touch layout: ") + err.Error())
@@ -150,6 +185,7 @@ func (s *Shell) resetTouchLayoutDraft() {
 	s.touchHiddenDraft = make(map[string]bool)
 	s.touchDeckRatioDraft = 0
 	s.touchScaleDraft = 100
+	s.touchGridStepDraft = 0
 	s.touchLayoutDrag = make(map[ebiten.TouchID]string)
 	s.touchLayoutDragOffset = make(map[ebiten.TouchID]image.Point)
 	s.touchLayoutDragPoint = make(map[ebiten.TouchID]image.Point)
@@ -167,6 +203,7 @@ func (s *Shell) endTouchLayoutEdit() {
 	s.touchHiddenDraft = nil
 	s.touchDeckRatioDraft = 0
 	s.touchScaleDraft = 0
+	s.touchGridStepDraft = 0
 	s.touchLayoutDrag = nil
 	s.touchLayoutDragOffset = nil
 	s.touchLayoutDragPoint = nil
@@ -197,6 +234,10 @@ func (s *Shell) handleTouchLayoutEditTouches() {
 				s.adjustTouchEditorScale(-touchEditorSizeStep)
 			case touchEditorSizeLarger:
 				s.adjustTouchEditorScale(touchEditorSizeStep)
+			case touchEditorGridFiner:
+				s.adjustTouchEditorGrid(-touchEditorGridStepDelta)
+			case touchEditorGridCoarser:
+				s.adjustTouchEditorGrid(touchEditorGridStepDelta)
 			}
 			return
 		}
@@ -218,9 +259,10 @@ func (s *Shell) handleTouchLayoutEditTouches() {
 			continue
 		}
 		offset := s.touchLayoutDragOffset[id]
+		step := s.touchEditorGridStep()
 		s.touchLayoutDraft[buttonID] = normalizedTouchPlacement(
-			x+offset.X,
-			y+offset.Y,
+			snapToGrid(x+offset.X, step),
+			snapToGrid(y+offset.Y, step),
 			width,
 			height,
 		)
@@ -262,9 +304,10 @@ func (s *Shell) finishTouchLayoutDrag(id ebiten.TouchID, width, height int) {
 		s.setStatus(s.trf("%s hidden", s.touchButtonName(buttonID)))
 	case !inTray && wasHidden:
 		s.setTouchButtonHidden(buttonID, false)
+		step := s.touchEditorGridStep()
 		s.touchLayoutDraft[buttonID] = normalizedTouchPlacement(
-			point.X+offset.X,
-			point.Y+offset.Y,
+			snapToGrid(point.X+offset.X, step),
+			snapToGrid(point.Y+offset.Y, step),
 			width,
 			height,
 		)
