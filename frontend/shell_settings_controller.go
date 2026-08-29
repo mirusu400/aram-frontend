@@ -232,6 +232,10 @@ func controlDisplayName(control string) string {
 		return "Soft key left"
 	case "soft-right":
 		return "Soft key right"
+	case "volume-up":
+		return "Volume up"
+	case "volume-down":
+		return "Volume down"
 	case "menu":
 		return "Menu"
 	case "star":
