@@ -236,7 +236,6 @@
   "ARAM product": "ARAM 제품",
   "Integrated aram-emu build with aram-core and aram-frontend.": "aram-core와 aram-frontend가 포함된 통합 aram-emu 빌드입니다.",
   "aram-core developer tools": "aram-core 개발자 도구",
-  "Optional CLI debugger/inspectors; the emulator runtime is already built into ARAM product.": "선택 사항인 CLI 디버거와 검사 도구입니다. 에뮬레이터 런타임은 ARAM 제품에 이미 포함되어 있습니다.",
   "aram-frontend": "aram-frontend",
   "Standalone frontend archive without the integrated emulator backend.": "통합 에뮬레이터 백엔드가 없는 독립 실행형 프런트엔드 압축 파일입니다.",
   "Download folder": "다운로드 폴더",
