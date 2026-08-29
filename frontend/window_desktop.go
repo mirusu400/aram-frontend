@@ -27,12 +27,15 @@ func Run(backend Backend, initialPath string) error {
 	return RunWithOptions(backend, initialPath, false)
 }
 
-// RunWithOptions lets the integrated desktop bootstrap reopen the native file
-// picker after it installs and relaunches a selected update channel.
+// RunWithOptions is the integrated desktop bootstrap entry point. The trailing
+// bool once reopened the native file picker after the bootstrap installed and
+// relaunched a selected update channel; that unsolicited popup was removed, so
+// the flag is now accepted for the aram-emu call sites but ignored. The app
+// relaunches to its normal idle state and the user opens a file when they want.
 func RunWithOptions(
 	backend Backend,
 	initialPath string,
-	openOnStart bool,
+	_ bool,
 ) error {
 	ebiten.SetWindowTitle("ARAM - Archived Runtime for ARM Mobiles")
 	ebiten.SetWindowIcon(appIcons())
@@ -43,9 +46,6 @@ func RunWithOptions(
 	// Enable the native fault dialog on the real desktop run only. Tests build
 	// their shells with NewShell directly and must never raise a real dialog.
 	shell.faultPrompter = platformReportPrompter
-	if openOnStart && initialPath == "" {
-		shell.DispatchExternalCommand("file.open")
-	}
 	defer shell.closeAudio()
 	return runGameWithCrashReporting(shell, func() error {
 		return ebiten.RunGame(shell)
