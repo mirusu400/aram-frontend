@@ -95,7 +95,6 @@ func (s *Shell) completeWelcomeWithBundledStable() {
 	s.setStatus(s.tr(
 		"No Stable release is published yet; continuing with the bundled build",
 	))
-	s.DispatchExternalCommand("file.open")
 }
 
 func (s *Shell) dismissWelcome() {
