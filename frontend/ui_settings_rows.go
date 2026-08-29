@@ -382,6 +382,15 @@ func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 			value:       "Reset all",
 			action:      shell.resetControllerBindings,
 		})
+	case "Experiments":
+		rows = []settingsRowModel{
+			{
+				label:       "CPU profiling",
+				description: "Continuously sample the frontend's CPU use so a debug bundle can include a profile. Adds a small runtime cost.",
+				value:       onOff(shell.settings.CPUProfile),
+				action:      shell.toggleCPUProfile,
+			},
+		}
 	case "Updates":
 		rows = updateSettingsRowModels(shell)
 	default:

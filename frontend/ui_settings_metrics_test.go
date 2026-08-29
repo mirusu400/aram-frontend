@@ -7,7 +7,7 @@ import (
 )
 
 var settingsSectionsUnderTest = []string{
-	"General", "Appearance", "Graphics", "Audio", "Controls", "Bindings", "Updates",
+	"General", "Appearance", "Graphics", "Audio", "Controls", "Bindings", "Experiments", "Updates",
 }
 
 // TestSettingsRowGeometryFitsPanel is the regression guard for a settings
