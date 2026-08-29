@@ -3,9 +3,16 @@ package frontend
 import (
 	"context"
 	"fmt"
+	"os"
 	"runtime"
 	"time"
 )
+
+// debugPacing logs, on change, why the guest frame pump does or does not run.
+// It is a temporary diagnostic for headless/handheld bring-up.
+var debugPacing = os.Getenv("ARAM_DEBUG_PACING") != ""
+var lastPacingReason string
+var pendingStuck, owedZero int
 
 const (
 	// framePacingFallbackQuantum is used when a backend cannot report how much
@@ -169,6 +176,33 @@ func (s *Shell) MeasuredSpeed() float64 {
 // controls went to the panel. Panels that opted into guest input (a cheat
 // toggled mid-fight) keep the title running exactly as before.
 func (s *Shell) scheduleRunningFrame() {
+	if debugPacing {
+		reason := "OK"
+		switch {
+		case !s.hostActive:
+			reason = "hostInactive"
+		case s.hostPaused:
+			reason = "hostPaused"
+		case s.loading:
+			reason = "loading"
+		case s.dialogOpen:
+			reason = "dialogOpen"
+		case !s.guestInputAllowed():
+			reason = "panelOpen"
+		case s.problem != nil:
+			reason = "problem"
+		case s.input == nil:
+			reason = "nilInput"
+		case len(s.busyCommands) != 0:
+			reason = "busyCommands"
+		case s.backend.State() != StateRunning:
+			reason = fmt.Sprintf("state=%v", s.backend.State())
+		}
+		if reason != lastPacingReason {
+			fmt.Fprintf(os.Stderr, "pacing: %s\n", reason)
+			lastPacingReason = reason
+		}
+	}
 	if !s.hostActive ||
 		s.hostPaused ||
 		s.loading ||
@@ -190,10 +224,22 @@ func (s *Shell) scheduleRunningFrame() {
 	now := s.now()
 	s.accumulateFramePacing(now, quantum)
 	if s.frameRunPending {
+		if debugPacing {
+			pendingStuck++
+			if pendingStuck%120 == 1 {
+				fmt.Fprintf(os.Stderr, "sched: frameRunPending stuck (n=%d)\n", pendingStuck)
+			}
+		}
 		return
 	}
 	owed := s.takeFrameQuanta(quantum)
 	if owed == 0 {
+		if debugPacing {
+			owedZero++
+			if owedZero%240 == 1 {
+				fmt.Fprintf(os.Stderr, "sched: owed=0 (n=%d) quantum=%v\n", owedZero, quantum)
+			}
+		}
 		return
 	}
 	s.startFrameWorker()
@@ -236,6 +282,9 @@ func (s *Shell) runFrameWorker() {
 			completed int
 			err       error
 		)
+		if debugPacing {
+			fmt.Fprintf(os.Stderr, "worker: batch owed=%d\n", request.owed)
+		}
 		for range request.owed {
 			if err = request.backend.RunFrame(context.Background()); err != nil {
 				break
@@ -244,6 +293,9 @@ func (s *Shell) runFrameWorker() {
 			if request.uiPriority {
 				time.Sleep(uiPriorityFrameRest)
 			}
+		}
+		if debugPacing {
+			fmt.Fprintf(os.Stderr, "worker: done completed=%d err=%v\n", completed, err)
 		}
 		s.frameRunResults <- frameRunResult{
 			generation:      request.generation,

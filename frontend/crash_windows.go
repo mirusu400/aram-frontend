@@ -7,9 +7,9 @@ import (
 	"unsafe"
 )
 
-type windowsCrashPrompter struct{}
+type windowsReportPrompter struct{}
 
-func init() { platformCrashPrompter = windowsCrashPrompter{} }
+func init() { platformReportPrompter = windowsReportPrompter{} }
 
 const (
 	messageBoxYesNo         = 0x00000004
@@ -19,12 +19,14 @@ const (
 	messageBoxResultYes     = 6
 )
 
-// confirmCrashReport shows a native Yes/No dialog. The ebiten window is already
-// gone after a main-loop panic, so this is a top-level system-modal box.
-func (windowsCrashPrompter) confirmCrashReport(message string) (bool, bool) {
+// confirmReport shows a native Yes/No dialog. It is a top-level system-modal
+// box with no owner window: the crash caller has already lost the ebiten window
+// to a panic, and the fault caller runs it off the update goroutine so the
+// still-live window keeps painting behind it.
+func (windowsReportPrompter) confirmReport(title, message string) (bool, bool) {
 	user32 := syscall.NewLazyDLL("user32.dll")
 	messageBox := user32.NewProc("MessageBoxW")
-	title, err := syscall.UTF16PtrFromString("ARAM crashed")
+	caption, err := syscall.UTF16PtrFromString(title)
 	if err != nil {
 		return false, false
 	}
@@ -35,7 +37,7 @@ func (windowsCrashPrompter) confirmCrashReport(message string) (bool, bool) {
 	result, _, _ := messageBox.Call(
 		0,
 		uintptr(unsafe.Pointer(body)),
-		uintptr(unsafe.Pointer(title)),
+		uintptr(unsafe.Pointer(caption)),
 		uintptr(messageBoxYesNo|messageBoxIconError|
 			messageBoxSystemModal|messageBoxSetForeground),
 	)

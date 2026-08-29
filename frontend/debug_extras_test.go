@@ -78,7 +78,7 @@ type stubCrashPrompter struct {
 	available bool
 }
 
-func (s stubCrashPrompter) confirmCrashReport(string) (bool, bool) {
+func (s stubCrashPrompter) confirmReport(string, string) (bool, bool) {
 	return s.confirm, s.available
 }
 

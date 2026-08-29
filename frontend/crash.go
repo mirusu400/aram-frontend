@@ -9,32 +9,35 @@ import (
 	"time"
 )
 
-// crashPrompter asks the user whether to submit a crash report. It is a native
-// OS dialog because a panic has already torn down the ebiten UI loop, so the
-// in-app report panel is gone with it.
-type crashPrompter interface {
-	// confirmCrashReport shows a modal asking whether to submit. available is
-	// false on a platform with no native dialog wired, in which case confirmed
-	// is ignored and no report is sent.
-	confirmCrashReport(message string) (confirmed bool, available bool)
+// reportPrompter asks the user whether to report a problem through a native OS
+// dialog. Two callers use it: the crash handler, because a panic has already
+// torn down the ebiten UI loop and the in-app report panel is gone with it; and
+// the guest-fault handler, because a fault freezes the title behind a status
+// line the user can easily miss.
+type reportPrompter interface {
+	// confirmReport shows a modal with the given caption asking whether to
+	// report. available is false on a platform with no native dialog wired, in
+	// which case confirmed is ignored and nothing is sent.
+	confirmReport(title, message string) (confirmed bool, available bool)
 }
 
-// defaultCrashPrompter is the cross-platform fallback: no native dialog, so the
-// handler writes the bundle to disk and exits without asking. A platform build
-// file (crash_windows.go) replaces it with a real dialog.
-type defaultCrashPrompter struct{}
+// defaultReportPrompter is the cross-platform fallback: no native dialog, so
+// the crash handler writes the bundle to disk and exits without asking and the
+// fault handler stays silent. A platform build file (crash_windows.go) replaces
+// it with a real dialog.
+type defaultReportPrompter struct{}
 
-func (defaultCrashPrompter) confirmCrashReport(string) (bool, bool) {
+func (defaultReportPrompter) confirmReport(string, string) (bool, bool) {
 	return false, false
 }
 
-// platformCrashPrompter is swapped in by a platform build file's init.
-var platformCrashPrompter crashPrompter = defaultCrashPrompter{}
+// platformReportPrompter is swapped in by a platform build file's init.
+var platformReportPrompter reportPrompter = defaultReportPrompter{}
 
 // crashEnvironment gathers the collaborators the crash handler needs so tests
 // can stand in for the native dialog, the relay, the browser, and process exit.
 type crashEnvironment struct {
-	prompter crashPrompter
+	prompter reportPrompter
 	relay    issueRelayService
 	openURL  func(string) error
 	exit     func(int)
@@ -46,7 +49,7 @@ func defaultCrashEnvironment(shell *Shell) crashEnvironment {
 		relay = newIssueRelayClient()
 	}
 	return crashEnvironment{
-		prompter: platformCrashPrompter,
+		prompter: platformReportPrompter,
 		relay:    relay,
 		openURL:  openExternalURL,
 		exit:     os.Exit,
@@ -87,7 +90,7 @@ func handleShellCrash(
 
 	confirmed, available := false, false
 	if env.prompter != nil {
-		confirmed, available = env.prompter.confirmCrashReport(fmt.Sprintf(
+		confirmed, available = env.prompter.confirmReport("ARAM crashed", fmt.Sprintf(
 			"ARAM crashed (%s).\n\n"+
 				"Submit a crash report so it can be fixed?\n\n"+
 				"The report is attached to a public issue. Host file paths\n"+
