@@ -42,7 +42,7 @@ func virtualKeypadButtonsFor(width, height int) []touchButton {
 		padding     = 10
 		headerSpace = 34
 		gap         = 6
-		rows        = 7
+		rows        = 9
 		columns     = 3
 	)
 	availableHeight := max(1, panel.Dy()-padding*2-headerSpace)
@@ -54,6 +54,11 @@ func virtualKeypadButtonsFor(width, height int) []touchButton {
 
 	layout := [rows][columns]touchButton{
 		{
+			{Control: "volume-down", Label: "VOL-"},
+			{Control: "menu", Label: "MENU"},
+			{Control: "volume-up", Label: "VOL+"},
+		},
+		{
 			{Control: "soft-left", Label: "L"},
 			{Control: "up", Label: "UP"},
 			{Control: "soft-right", Label: "R"},
@@ -64,9 +69,14 @@ func virtualKeypadButtonsFor(width, height int) []touchButton {
 			{Control: "right", Label: "RIGHT"},
 		},
 		{
-			{Control: "back", Label: "BACK"},
+			{Control: "send", Label: "CALL"},
 			{Control: "down", Label: "DOWN"},
-			{Control: "menu", Label: "MENU"},
+			{Control: "end", Label: "END"},
+		},
+		{
+			{},
+			{Control: "back", Label: "CANCEL"},
+			{},
 		},
 		{
 			{Control: "num1", Label: "1"},
@@ -94,6 +104,9 @@ func virtualKeypadButtonsFor(width, height int) []touchButton {
 	for row := range layout {
 		for column := range layout[row] {
 			button := layout[row][column]
+			if button.Control == "" {
+				continue
+			}
 			button.Bounds = rectAt(
 				x+column*(buttonWidth+gap),
 				y+row*(buttonHeight+gap),
