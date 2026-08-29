@@ -255,6 +255,7 @@
   "Center": "Center",
   "Stretch": "Stretch",
   "Fill": "Fill",
+  "Aspect": "Aspect",
   "Fill the screen": "Fill the screen",
   "Screen layout: %s": "Screen layout: %s",
   "Global": "Global",

@@ -22,7 +22,10 @@ var requiredRetroSlices = []string{
 
 // requiredRetroIcons lists the toolbar icons buildApplicationToolbar wires up;
 // each must exist in both the normal and the inverted ink set.
-var requiredRetroIcons = []string{"open", "play", "pause", "stop", "reset", "settings", "keypad"}
+var requiredRetroIcons = []string{
+	"open", "play", "pause", "stop", "reset", "settings", "keypad",
+	"fullscreen", "aspect",
+}
 
 func TestRetroThemeAssetsComplete(t *testing.T) {
 	for _, family := range retroFamilies() {

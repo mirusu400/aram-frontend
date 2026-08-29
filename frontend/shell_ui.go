@@ -112,7 +112,7 @@ func (u *shellUI) sync(shell *Shell) {
 	for id, button := range u.toolbarButtons {
 		visible := true
 		if width < 620 && (id == "emu.stop" || id == "emu.reset" ||
-			id == "view.keypad" || id == "view.layout") {
+			id == "view.keypad" || id == "view.layout" || id == "view.aspect") {
 			visible = false
 		}
 		if width < 480 && id == "emu.pause" {
@@ -155,6 +155,7 @@ func (u *shellUI) sync(shell *Shell) {
 	for id, active := range map[string]bool{
 		"view.keypad": shell.settings.ShowVirtualKeypad,
 		"view.layout": shell.settings.ScreenLayout == "stretch",
+		"view.aspect": shell.settings.PreserveAspect,
 	} {
 		if button, ok := u.toolbarButtons[id]; ok {
 			if active {

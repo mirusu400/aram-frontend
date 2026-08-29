@@ -397,6 +397,22 @@ func TestFillToolbarButtonTogglesScreenLayout(t *testing.T) {
 	}
 }
 
+func TestAspectToolbarButtonTogglesPreserveAspect(t *testing.T) {
+	shell := NewShell(NullBackend{}, nil, "")
+	if shell.interfaceUI.toolbarButtons["view.aspect"] == nil {
+		t.Fatal("toolbar has no preserve-aspect button")
+	}
+	before := shell.settings.PreserveAspect
+	shell.dispatchCommand("view.aspect")
+	if shell.settings.PreserveAspect == before {
+		t.Fatal("aspect button did not toggle PreserveAspect")
+	}
+	shell.dispatchCommand("view.aspect")
+	if shell.settings.PreserveAspect != before {
+		t.Fatal("aspect button did not toggle back")
+	}
+}
+
 func TestControllerCommandOpensControlsSettings(t *testing.T) {
 	shell := NewShell(NullBackend{}, nil, "")
 	shell.dispatchCommand("tools.controller")
