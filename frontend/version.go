@@ -1,6 +1,7 @@
 package frontend
 
 import (
+	"strconv"
 	"strings"
 	"time"
 )
@@ -65,6 +66,91 @@ func nightlyBuildStamp(override, timestamp string, build debugBuildReport) strin
 		return shorten(raw, 40)
 	}
 	return parsed.UTC().Format("2006-01-02 15:04 UTC")
+}
+
+// runningReleaseChannel reports the channel of the running build and whether
+// this is a published release build at all. Development and untagged builds
+// return ok=false so the startup update check stays silent for them: the user
+// asked for the notice only on a Stable or Nightly build.
+func runningReleaseChannel() (updateChannel, bool) {
+	injected := formatInjectedVersion(BuildVersion)
+	switch {
+	case strings.HasPrefix(injected, "Nightly "):
+		return updateChannelNightly, true
+	case injected == "" || strings.HasPrefix(injected, "Development"):
+		return updateChannelStable, false
+	default:
+		return updateChannelStable, true
+	}
+}
+
+// updateIsNewer reports whether latest is a newer build than current on the
+// channel. Nightly versions embed unordered commit SHAs, so any difference
+// from the running build means a newer Nightly exists; Stable versions are
+// ordered semver tags and only a strictly greater one counts.
+func updateIsNewer(current, latest string, channel updateChannel) bool {
+	current = strings.TrimSpace(current)
+	latest = strings.TrimSpace(latest)
+	if current == "" || latest == "" {
+		return false
+	}
+	if channel == updateChannelNightly {
+		return latest != current
+	}
+	if order, ok := compareStableVersions(latest, current); ok {
+		return order > 0
+	}
+	return latest != current
+}
+
+// compareStableVersions compares two dotted numeric version tags (an optional
+// leading v and any -prerelease/+build suffix are ignored). It returns a
+// sign like strings.Compare and ok=false when either side is not numeric, so
+// the caller can fall back to a plain inequality test.
+func compareStableVersions(left, right string) (int, bool) {
+	leftFields, leftOK := stableVersionFields(left)
+	rightFields, rightOK := stableVersionFields(right)
+	if !leftOK || !rightOK {
+		return 0, false
+	}
+	for index := 0; index < len(leftFields) || index < len(rightFields); index++ {
+		var leftValue, rightValue int
+		if index < len(leftFields) {
+			leftValue = leftFields[index]
+		}
+		if index < len(rightFields) {
+			rightValue = rightFields[index]
+		}
+		if leftValue != rightValue {
+			if leftValue < rightValue {
+				return -1, true
+			}
+			return 1, true
+		}
+	}
+	return 0, true
+}
+
+func stableVersionFields(value string) ([]int, bool) {
+	value = strings.TrimSpace(value)
+	value = strings.TrimPrefix(value, "v")
+	value = strings.TrimPrefix(value, "V")
+	if cut := strings.IndexAny(value, "-+"); cut >= 0 {
+		value = value[:cut]
+	}
+	if value == "" {
+		return nil, false
+	}
+	parts := strings.Split(value, ".")
+	fields := make([]int, 0, len(parts))
+	for _, part := range parts {
+		number, err := strconv.Atoi(strings.TrimSpace(part))
+		if err != nil {
+			return nil, false
+		}
+		fields = append(fields, number)
+	}
+	return fields, true
 }
 
 func formatInjectedVersion(value string) string {

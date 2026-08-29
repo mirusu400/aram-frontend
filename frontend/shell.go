@@ -136,6 +136,10 @@ type Shell struct {
 	issueCommentResults       chan issueCommentResult
 	toolResults               chan toolResult
 	updateResults             chan updateResult
+	updateCheckResults        chan updateCheckResult
+	updateNoticeReady         bool
+	updateNoticeVersion       string
+	updateNoticeChannel       updateChannel
 }
 
 func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
@@ -189,6 +193,7 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		issueCommentResults:       make(chan issueCommentResult, 2),
 		toolResults:               make(chan toolResult, 2),
 		updateResults:             make(chan updateResult, 4),
+		updateCheckResults:        make(chan updateCheckResult, 1),
 	}
 	shell.hostActiveRequest.Store(true)
 	if shell.settings.CPUProfile {
@@ -224,6 +229,7 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		shell.appendLog(shell.tr("Custom controller database loaded"))
 	}
 	shell.appendLog(shell.status)
+	shell.startUpdateCheck()
 	if initialPath != "" {
 		shell.openRequest(OpenRequest{Path: initialPath})
 	}

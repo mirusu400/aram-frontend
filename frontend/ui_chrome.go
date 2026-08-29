@@ -2,6 +2,7 @@ package frontend
 
 import (
 	"image"
+	"time"
 
 	"github.com/ebitenui/ebitenui/widget"
 )
@@ -67,20 +68,81 @@ func (u *shellUI) buildTopBar(shell *Shell) *widget.Container {
 		menuRow.AddChild(button)
 	}
 	bar.AddChild(menuRow)
+
+	// The menu bar's right edge seats a trailing cluster: the update-available
+	// badge (hidden until the startup check finds a newer build) and, on a
+	// desktop Nightly, the build stamp. A row keeps them spaced as the stamp
+	// text changes width.
+	trailing := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+			widget.RowLayoutOpts.Spacing(design.Space.S),
+			widget.RowLayoutOpts.Padding(&widget.Insets{Right: design.Space.M}),
+		)),
+		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+			HorizontalPosition: widget.AnchorLayoutPositionEnd,
+			VerticalPosition:   widget.AnchorLayoutPositionCenter,
+		})),
+	)
+	u.updateBadge = u.buildUpdateBadge(shell)
+	trailing.AddChild(u.updateBadge)
 	if stamp := currentNightlyBuildStamp(); stamp != "" && !platformUsesTouchLayout() {
 		u.buildStampText = design.text(
 			shell.trf("Nightly build %s", stamp),
 			design.Type.Caption,
 			design.Palette.TextMuted,
-			widget.AnchorLayoutData{
-				HorizontalPosition: widget.AnchorLayoutPositionEnd,
-				VerticalPosition:   widget.AnchorLayoutPositionCenter,
-				Padding:            &widget.Insets{Right: design.Space.M},
-			},
+			widget.RowLayoutData{Position: widget.RowLayoutPositionCenter},
 		)
-		bar.AddChild(u.buildStampText)
+		trailing.AddChild(u.buildStampText)
 	}
+	bar.AddChild(trailing)
 	return bar
+}
+
+// buildUpdateBadge makes the menu-bar "update available" button. It starts
+// hidden; sync() reveals it once a background check reports a newer build and
+// keeps its hover tooltip pointed at the found version. Clicking opens the
+// same Updates panel as Help ▸ Check for Updates.
+func (u *shellUI) buildUpdateBadge(shell *Shell) *widget.Button {
+	design := u.design
+	label := shell.tr("Update available")
+	width := len([]rune(label))*8 + 24
+
+	u.updateBadgeTip = design.text("", design.Type.Caption, design.Palette.Text, nil)
+	tipContent := widget.NewContainer(
+		widget.ContainerOpts.BackgroundImage(design.Components.Dropdown),
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(design.Space.S)),
+		)),
+	)
+	tipContent.AddChild(u.updateBadgeTip)
+	tip := widget.NewToolTip(
+		widget.ToolTipOpts.Content(tipContent),
+		widget.ToolTipOpts.Delay(250*time.Millisecond),
+		widget.ToolTipOpts.Position(widget.TOOLTIP_POS_WIDGET),
+	)
+
+	style := design.Components.MenuButton
+	padding := style.Padding
+	badge := widget.NewButton(
+		widget.ButtonOpts.WidgetOpts(
+			widget.WidgetOpts.MinSize(width, menuRowHeight),
+			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
+				Position: widget.RowLayoutPositionCenter,
+			}),
+			widget.WidgetOpts.ToolTip(tip),
+		),
+		widget.ButtonOpts.Image(style.Image),
+		widget.ButtonOpts.Text(label, design.Type.Strong, style.Text),
+		widget.ButtonOpts.TextPosition(widget.TextPositionCenter, widget.TextPositionCenter),
+		widget.ButtonOpts.TextPadding(&padding),
+		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
+			shell.openUpdatesPanel()
+		}),
+	)
+	badge.GetWidget().CustomData = "help.updates"
+	badge.GetWidget().SetVisibility(widget.Visibility_Hide)
+	return badge
 }
 
 func (u *shellUI) buildApplicationToolbar(shell *Shell) *widget.Container {
