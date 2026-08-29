@@ -27,6 +27,59 @@ func (s *Shell) cycleUpdateChannel() {
 	))
 }
 
+// startUpdateCheck asks GitHub, in the background, whether a newer build of
+// the running channel exists. It runs only for published Stable/Nightly
+// builds; a development build has no meaningful version to compare and stays
+// silent. The result flows back through updateCheckResults like every other
+// async result so the shell state is only ever touched on the UI goroutine.
+func (s *Shell) startUpdateCheck() {
+	channel, ok := runningReleaseChannel()
+	if !ok {
+		return
+	}
+	checker, ok := s.updater.(updateChecker)
+	if !ok {
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		version, err := checker.CheckLatest(ctx, updateComponentProduct, channel)
+		s.updateCheckResults <- updateCheckResult{
+			component: updateComponentProduct,
+			channel:   channel,
+			version:   version,
+			err:       err,
+		}
+	}()
+}
+
+// consumeUpdateCheckResult records a background check. A newer build raises
+// the menu-bar notice; a failure is logged quietly because an update check
+// the user did not ask for should never interrupt them with a status message.
+func (s *Shell) consumeUpdateCheckResult(result updateCheckResult) {
+	if result.err != nil {
+		s.appendLog(s.trf("Update check: %s", result.err.Error()))
+		return
+	}
+	if !updateIsNewer(currentApplicationVersion(), result.version, result.channel) {
+		return
+	}
+	s.updateNoticeReady = true
+	s.updateNoticeVersion = result.version
+	s.updateNoticeChannel = result.channel
+	s.appendLog(s.updateNoticeTooltip())
+}
+
+// updateNoticeTooltip is the hover text on the menu-bar update badge.
+func (s *Shell) updateNoticeTooltip() string {
+	return s.trf(
+		"New %s version available: %s",
+		s.tr(updateChannelLabel(s.updateNoticeChannel)),
+		s.updateNoticeVersion,
+	)
+}
+
 func (s *Shell) downloadUpdate(component updateComponent) bool {
 	if _, err := updateAssetName(component, runtime.GOOS, runtime.GOARCH); err != nil {
 		s.setStatus(s.tr("Update: ") + err.Error())

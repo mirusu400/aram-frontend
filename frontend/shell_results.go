@@ -123,6 +123,8 @@ func (s *Shell) consumeResults() {
 			s.consumeToolResult(result)
 		case result := <-s.updateResults:
 			s.consumeUpdateResult(result)
+		case result := <-s.updateCheckResults:
+			s.consumeUpdateCheckResult(result)
 		default:
 			return
 		}

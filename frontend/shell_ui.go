@@ -21,6 +21,8 @@ type shellUI struct {
 	toolbarButtons       map[string]*widget.Button
 	toolbarTitle         *widget.Text
 	buildStampText       *widget.Text
+	updateBadge          *widget.Button
+	updateBadgeTip       *widget.Text
 	statusBar            *widget.Container
 	statusText           *widget.Text
 	statusMeta           *widget.Text
@@ -98,6 +100,12 @@ func (u *shellUI) sync(shell *Shell) {
 	u.toolbarTitle.GetWidget().SetVisibility(visibility(width >= 760))
 	if u.buildStampText != nil {
 		u.buildStampText.GetWidget().SetVisibility(visibility(width >= 700))
+	}
+	if u.updateBadge != nil {
+		u.updateBadge.GetWidget().SetVisibility(visibility(shell.updateNoticeReady))
+		if shell.updateNoticeReady && u.updateBadgeTip != nil {
+			u.updateBadgeTip.Label = shell.updateNoticeTooltip()
+		}
 	}
 	u.statusMeta.GetWidget().SetVisibility(visibility(width >= 700))
 	u.syncStatusIndicators(shell, width)

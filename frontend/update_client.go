@@ -108,13 +108,7 @@ func (updater *gitHubUpdater) Download(
 			assetName,
 		)
 	}
-	version := strings.TrimSpace(release.TagName)
-	if channel == updateChannelNightly && strings.TrimSpace(release.Name) != "" {
-		version = strings.TrimSpace(release.Name)
-	}
-	if version == "" {
-		version = updateChannelLabel(channel)
-	}
+	version := releaseVersion(release, channel)
 	path, err := updater.downloadAsset(
 		ctx,
 		info.Repository,
@@ -131,6 +125,40 @@ func (updater *gitHubUpdater) Download(
 		Version:   version,
 		Path:      path,
 	}, nil
+}
+
+// CheckLatest reports the version string of the newest published release for
+// the component on the channel without downloading anything. It is the
+// metadata half of Download, used by the background startup update check.
+func (updater *gitHubUpdater) CheckLatest(
+	ctx context.Context,
+	component updateComponent,
+	channel updateChannel,
+) (string, error) {
+	info, ok := updateInfo(component)
+	if !ok {
+		return "", fmt.Errorf("unknown update component %q", component)
+	}
+	channel = normalizeUpdateChannel(string(channel))
+	release, err := updater.fetchRelease(ctx, info.Repository, channel)
+	if err != nil {
+		return "", err
+	}
+	return releaseVersion(release, channel), nil
+}
+
+// releaseVersion picks the human version a release advertises: the Nightly
+// release rewrites its rolling tag on every build, so its Name carries the
+// identity; a Stable release is identified by its tag.
+func releaseVersion(release gitHubRelease, channel updateChannel) string {
+	version := strings.TrimSpace(release.TagName)
+	if channel == updateChannelNightly && strings.TrimSpace(release.Name) != "" {
+		version = strings.TrimSpace(release.Name)
+	}
+	if version == "" {
+		version = updateChannelLabel(channel)
+	}
+	return version
 }
 
 func (updater *gitHubUpdater) fetchRelease(

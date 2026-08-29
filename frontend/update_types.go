@@ -50,6 +50,22 @@ type updateDownloader interface {
 	Download(context.Context, updateComponent, updateChannel) (updateDownload, error)
 }
 
+// updateChecker fetches the newest published version for a component without
+// downloading it. The real gitHubUpdater satisfies both interfaces; the
+// startup check type-asserts for this one so test doubles that only download
+// stay valid.
+type updateChecker interface {
+	CheckLatest(context.Context, updateComponent, updateChannel) (string, error)
+}
+
+// updateCheckResult carries a background version check back to the shell loop.
+type updateCheckResult struct {
+	component updateComponent
+	channel   updateChannel
+	version   string
+	err       error
+}
+
 func updateInfo(component updateComponent) (updateComponentInfo, bool) {
 	switch component {
 	case updateComponentProduct:
