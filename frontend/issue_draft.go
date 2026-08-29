@@ -66,7 +66,7 @@ func newIssueReportDraft(fields map[string]string) (issueReportDraft, error) {
 	}
 	if draft.Repository == "" {
 		return issueReportDraft{}, errors.New(
-			"Expected repository must be frontend, emu, or core.",
+			"Expected repository must be frontend, emu, core, or cheat.",
 		)
 	}
 	if utf8.RuneCountInString(draft.GameTitle) > 200 ||
@@ -86,6 +86,8 @@ func normalizeIssueRepository(value string) string {
 		return "aram-emu"
 	case "core", "aram-core", "코어":
 		return "aram-core"
+	case "cheat", "aram-cheat", "치트":
+		return "aram-cheat"
 	default:
 		return ""
 	}

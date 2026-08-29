@@ -565,7 +565,7 @@
   "Opened GitHub issue draft": "Opened GitHub issue draft",
   "Situation is required.": "Situation is required.",
   "Situation must be 500 characters or fewer.": "Situation must be 500 characters or fewer.",
-  "Expected repository must be frontend, emu, or core.": "Expected repository must be frontend, emu, or core.",
+  "Expected repository must be frontend, emu, core, or cheat.": "Expected repository must be frontend, emu, core, or cheat.",
   "Game title or carrier is too long.": "Game title or carrier is too long.",
   "Issue report is too long; shorten the situation or game title.": "Issue report is too long; shorten the situation or game title.",
   "Frontend preview only; run `go run ./cmd/aram` from aram-emu to use emulation commands": "Frontend preview only; run `go run ./cmd/aram` from aram-emu to use emulation commands",
@@ -583,6 +583,8 @@
   "Guest screen %d%%": "Guest screen %d%%",
   "Button size %d%%": "Button size %d%%",
   "Guest screen: %d%% of the display": "Guest screen: %d%% of the display",
+  "Grid snap: off": "Grid snap: off",
+  "Grid snap: %d px": "Grid snap: %d px",
   "%s hidden": "%s hidden",
   "%s restored": "%s restored",
   "Drag the touch buttons, then save the layout": "Drag the touch buttons, then save the layout",
@@ -604,5 +606,8 @@
   "Save restored from %s": "Save restored from %s",
   "Open Save Backup Folder": "Open Save Backup Folder",
   "Save backup folder: ": "Save backup folder: ",
-  "Save backup folder opened: %s": "Save backup folder opened: %s"
+  "Save backup folder opened: %s": "Save backup folder opened: %s",
+  "ARAM stopped": "ARAM stopped",
+  "The emulated machine faulted and the title stopped.\n\nReason: %s\n\nOpen the issue report form so this can be fixed? A redacted debug bundle (host file paths removed) is attached to a public GitHub issue.": "The emulated machine faulted and the title stopped.\n\nReason: %s\n\nOpen the issue report form so this can be fixed? A redacted debug bundle (host file paths removed) is attached to a public GitHub issue.",
+  "Emulator fault: %s": "Emulator fault: %s"
 }

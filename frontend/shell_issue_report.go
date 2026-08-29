@@ -68,6 +68,7 @@ func (s *Shell) openIssueTracker() {
 					{Value: "aram-core", Label: "ARAM Core"},
 					{Value: "aram-emu", Label: "ARAM Emulator"},
 					{Value: "aram-frontend", Label: "ARAM Frontend"},
+					{Value: "aram-cheat", Label: "ARAM Cheat"},
 				},
 			},
 			{
