@@ -51,7 +51,8 @@ var gamepadButtonOptions = []gamepadButtonOption{
 
 var controllerControlOrder = []string{
 	"up", "down", "left", "right",
-	"ok", "back", "soft-left", "soft-right", "menu", "star", "hash",
+	"ok", "back", "soft-left", "soft-right", "volume-up", "volume-down",
+	"menu", "star", "hash",
 }
 
 var directionControlOrder = []string{"up", "down", "left", "right"}
@@ -100,6 +101,8 @@ func keyboardBindings(profile string) []keyBinding {
 		keyBinding{Control: "back", Key: ebiten.KeyBackspace, Label: "Backspace"},
 		keyBinding{Control: "soft-left", Key: ebiten.KeyQ, Label: "Q"},
 		keyBinding{Control: "soft-right", Key: ebiten.KeyE, Label: "E"},
+		keyBinding{Control: "volume-up", Key: ebiten.KeyPageUp, Label: "Page Up"},
+		keyBinding{Control: "volume-down", Key: ebiten.KeyPageDown, Label: "Page Down"},
 		keyBinding{Control: "menu", Key: ebiten.KeySpace, Label: "Space"},
 		keyBinding{Control: "star", Key: ebiten.KeyComma, Label: ","},
 		keyBinding{Control: "hash", Key: ebiten.KeyPeriod, Label: "."},
@@ -159,6 +162,10 @@ func keyboardKeyLabel(key ebiten.Key) string {
 		return "Arrow Left"
 	case ebiten.KeyArrowRight:
 		return "Arrow Right"
+	case ebiten.KeyPageUp:
+		return "Page Up"
+	case ebiten.KeyPageDown:
+		return "Page Down"
 	case ebiten.KeyControlLeft:
 		return "Left Ctrl"
 	case ebiten.KeyControlRight:

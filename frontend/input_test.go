@@ -228,6 +228,20 @@ func TestKeyboardBindingsIncludePhoneNumberControls(t *testing.T) {
 	}
 }
 
+func TestKeyboardBindingsIncludeIndependentPhoneVolumeControls(t *testing.T) {
+	profile := defaultSettings().globalControllerProfile()
+	bindings := keyboardBindingIDsForProfile(profile)
+	if got := bindings["volume-up"]; got != ebiten.KeyPageUp.String() {
+		t.Fatalf("volume-up binding = %q, want %q", got, ebiten.KeyPageUp.String())
+	}
+	if got := bindings["volume-down"]; got != ebiten.KeyPageDown.String() {
+		t.Fatalf("volume-down binding = %q, want %q", got, ebiten.KeyPageDown.String())
+	}
+	if bindings["volume-up"] == bindings["volume-down"] {
+		t.Fatal("phone volume controls share one keyboard binding")
+	}
+}
+
 func TestGamepadBindingCaptureSupportsNumberControls(t *testing.T) {
 	profile := defaultSettings().globalControllerProfile()
 
