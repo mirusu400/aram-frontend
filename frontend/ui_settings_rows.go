@@ -481,26 +481,6 @@ func updateSettingsRowModels(shell *Shell) []settingsRowModel {
 			disabled: !shell.updateActionAvailable(updateComponentProduct),
 		},
 		{
-			label: "aram-core developer tools",
-			description: shell.updateRowDescription(
-				updateComponentCore,
-				"Optional CLI debugger/inspectors; the emulator runtime is already built into ARAM product.",
-			),
-			value:    shell.updateActionLabel(updateComponentCore),
-			action:   func() { shell.downloadUpdate(updateComponentCore) },
-			disabled: !shell.updateActionAvailable(updateComponentCore),
-		},
-		{
-			label: "aram-frontend",
-			description: shell.updateRowDescription(
-				updateComponentFrontend,
-				"Optional standalone UI archive; it does not update the integrated ARAM app.",
-			),
-			value:    shell.updateActionLabel(updateComponentFrontend),
-			action:   func() { shell.downloadUpdate(updateComponentFrontend) },
-			disabled: !shell.updateActionAvailable(updateComponentFrontend),
-		},
-		{
 			label:       "Download folder",
 			description: "Archives are verified and saved without replacing the running application.",
 			value:       downloadRootLabel,

@@ -236,7 +236,6 @@
   "ARAM product": "ARAM product",
   "Integrated aram-emu build with aram-core and aram-frontend.": "Integrated aram-emu build with aram-core and aram-frontend.",
   "aram-core developer tools": "aram-core developer tools",
-  "Optional CLI debugger/inspectors; the emulator runtime is already built into ARAM product.": "Optional CLI debugger/inspectors; the emulator runtime is already built into ARAM product.",
   "aram-frontend": "aram-frontend",
   "Standalone frontend archive without the integrated emulator backend.": "Standalone frontend archive without the integrated emulator backend.",
   "Download folder": "Download folder",
