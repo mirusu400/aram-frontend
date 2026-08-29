@@ -242,6 +242,33 @@ func TestKeyboardBindingsIncludeIndependentPhoneVolumeControls(t *testing.T) {
 	}
 }
 
+func TestKeyboardBindingsIncludeIndependentPhoneActionControls(t *testing.T) {
+	profile := defaultSettings().globalControllerProfile()
+	bindings := keyboardBindingIDsForProfile(profile)
+	want := map[string]ebiten.Key{
+		"send": ebiten.KeyHome,
+		"end":  ebiten.KeyEnd,
+		"back": ebiten.KeyBackspace,
+	}
+	seen := make(map[string]bool, len(want))
+	for control, key := range want {
+		if got := bindings[control]; got != key.String() {
+			t.Errorf("%s binding = %q, want %q", control, got, key.String())
+		}
+		if seen[bindings[control]] {
+			t.Errorf("phone action controls reuse keyboard binding %q", bindings[control])
+		}
+		seen[bindings[control]] = true
+	}
+
+	gamepadIDs := bindingIDs(gamepadBindingsForProfile(profile))
+	for _, control := range []string{"send", "end", "volume-up", "volume-down"} {
+		if gamepadIDs[control] != "" {
+			t.Errorf("%s should start with no gamepad binding, got %q", control, gamepadIDs[control])
+		}
+	}
+}
+
 func TestGamepadBindingCaptureSupportsNumberControls(t *testing.T) {
 	profile := defaultSettings().globalControllerProfile()
 

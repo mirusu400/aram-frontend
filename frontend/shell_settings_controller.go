@@ -227,7 +227,11 @@ func controlDisplayName(control string) string {
 	case "ok":
 		return "Confirm"
 	case "back":
-		return "Back"
+		return "Cancel / Back"
+	case "send":
+		return "Call"
+	case "end":
+		return "End call"
 	case "soft-left":
 		return "Soft key left"
 	case "soft-right":
