@@ -110,7 +110,7 @@ func TestVirtualKeypadStaysInRightRailAndMapsEveryButton(t *testing.T) {
 			t.Fatalf("virtual keypad button count = %d, want 25", len(buttons))
 		}
 		phoneKeys := map[string]string{
-			"send": "CALL", "end": "END", "back": "CANCEL",
+			"send": "CALL", "end": "END", "soft-right": "CANCEL", "back": "C",
 			"volume-up": "VOL+", "volume-down": "VOL-",
 		}
 		for _, button := range buttons {
@@ -137,5 +137,18 @@ func TestVirtualKeypadStaysInRightRailAndMapsEveryButton(t *testing.T) {
 		if len(phoneKeys) != 0 {
 			t.Errorf("virtual keypad is missing phone controls: %v", phoneKeys)
 		}
+	}
+}
+
+func TestTouchDeckDistinguishesCancelFromClear(t *testing.T) {
+	labels := make(map[string]string)
+	for _, button := range touchControlButtonsFor(720, 900) {
+		labels[button.Control] = button.Label
+	}
+	if got := labels["soft-right"]; got != "CANCEL" {
+		t.Errorf("right soft key label = %q, want CANCEL", got)
+	}
+	if got := labels["back"]; got != "C" {
+		t.Errorf("clear key label = %q, want C", got)
 	}
 }
