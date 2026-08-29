@@ -352,10 +352,30 @@ func TestConfigureCommandOpensCategorySettingsWindow(t *testing.T) {
 	if shell.interfaceUI.settingsSection != "General" {
 		t.Fatalf("initial settings section = %q", shell.interfaceUI.settingsSection)
 	}
-	for _, id := range []string{"file.open", "emu.start", "emu.pause", "emu.stop", "emu.configure"} {
+	for _, id := range []string{"file.open", "emu.start", "emu.pause", "emu.stop", "emu.configure", "view.keypad"} {
 		if shell.interfaceUI.toolbarButtons[id] == nil {
 			t.Errorf("application toolbar omitted %q", id)
 		}
+	}
+}
+
+func TestKeypadToolbarButtonTogglesVirtualKeypad(t *testing.T) {
+	shell := NewShell(NullBackend{}, nil, "")
+	if shell.interfaceUI.toolbarButtons["view.keypad"] == nil {
+		t.Fatal("toolbar has no virtual keypad button")
+	}
+	before := shell.settings.ShowVirtualKeypad
+	shell.dispatchCommand("view.keypad")
+	if shell.settings.ShowVirtualKeypad == before {
+		t.Fatal("keypad command did not toggle ShowVirtualKeypad")
+	}
+	command, found := shell.findCommand("view.keypad")
+	if !found || command.DisplayLabel(shell) == "" {
+		t.Fatalf("keypad command label = %q, found=%t", command.DisplayLabel(shell), found)
+	}
+	shell.dispatchCommand("view.keypad")
+	if shell.settings.ShowVirtualKeypad != before {
+		t.Fatal("keypad command did not toggle back")
 	}
 }
 
