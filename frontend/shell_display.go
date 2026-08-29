@@ -13,6 +13,14 @@ func (s *Shell) toggleIntegerScaling() {
 	))
 }
 
+// toggleUIPriority flips the persisted UI-priority preference. The frame worker
+// reads it per batch, so the change takes effect on the next scheduled frame.
+func (s *Shell) toggleUIPriority() {
+	s.settings.UIPriority = !s.settings.UIPriority
+	_ = s.settings.save()
+	s.setStatus(s.trf("UI priority: %s", s.tr(onOff(s.settings.UIPriority))))
+}
+
 func (s *Shell) toggleAspectRatio() {
 	s.settings.PreserveAspect = !s.settings.PreserveAspect
 	_ = s.settings.save()

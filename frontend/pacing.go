@@ -204,8 +204,16 @@ func (s *Shell) scheduleRunningFrame() {
 		quantum:    quantum,
 		generation: s.frameGeneration,
 		startedAt:  now,
+		uiPriority: s.settings.UIPriority,
 	}
 }
+
+// uiPriorityFrameRest is the pause the worker takes after each guest frame when
+// UI priority is on. Lowering the worker thread's priority already lets the
+// interface preempt the guest; this hands back a slice of the physical core as
+// well, so even a single- or dual-core host stays responsive while a heavy
+// title runs a little slower.
+const uiPriorityFrameRest = 3 * time.Millisecond
 
 // startFrameWorker launches the guest frame worker once, on first use. The
 // worker owns a single de-prioritised OS thread for the shell's lifetime, so a
@@ -233,6 +241,9 @@ func (s *Shell) runFrameWorker() {
 				break
 			}
 			completed++
+			if request.uiPriority {
+				time.Sleep(uiPriorityFrameRest)
+			}
 		}
 		s.frameRunResults <- frameRunResult{
 			generation:      request.generation,

@@ -385,6 +385,12 @@ func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 	case "Experiments":
 		rows = []settingsRowModel{
 			{
+				label:       "UI priority",
+				description: "Give the interface CPU priority over the guest, so menus and input stay smooth while a heavy title runs a little slower.",
+				value:       onOff(shell.settings.UIPriority),
+				action:      shell.toggleUIPriority,
+			},
+			{
 				label:       "CPU profiling",
 				description: "Continuously sample the frontend's CPU use so a debug bundle can include a profile. Adds a small runtime cost.",
 				value:       onOff(shell.settings.CPUProfile),

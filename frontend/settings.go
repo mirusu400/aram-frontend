@@ -69,6 +69,7 @@ type Settings struct {
 	AudioMixMode      bool                         `json:"audio_mix_mode"`
 	AudioSoften       bool                         `json:"audio_soften"`
 	CPUProfile        bool                         `json:"cpu_profile"`
+	UIPriority        bool                         `json:"ui_priority"`
 	KeyboardProfile   string                       `json:"keyboard_profile"`
 	KeyboardBindings  map[string]string            `json:"keyboard_bindings,omitempty"`
 	GamepadEnabled    bool                         `json:"gamepad_enabled"`

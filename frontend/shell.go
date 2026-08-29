@@ -50,6 +50,7 @@ type frameRunRequest struct {
 	quantum    time.Duration
 	generation uint64
 	startedAt  time.Time
+	uiPriority bool
 }
 
 type Shell struct {

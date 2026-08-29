@@ -415,6 +415,33 @@ func TestExperimentsSectionHasCPUProfilingToggle(t *testing.T) {
 	}
 }
 
+func TestUIPriorityToggleAndExperimentsRow(t *testing.T) {
+	isolateSettings(t)
+	shell := NewShell(NullBackend{}, nil, "")
+	if shell.settings.UIPriority {
+		t.Fatal("UI priority should default off")
+	}
+	shell.toggleUIPriority()
+	if !shell.settings.UIPriority {
+		t.Fatal("toggle did not enable UI priority")
+	}
+	shell.toggleUIPriority()
+	if shell.settings.UIPriority {
+		t.Fatal("toggle did not disable UI priority")
+	}
+	u := shell.interfaceUI
+	u.settingsSection = "Experiments"
+	found := false
+	for _, row := range u.settingsRowModels(shell) {
+		if row.label == "UI priority" && row.action != nil {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("Experiments section is missing the UI priority row")
+	}
+}
+
 func TestAspectToolbarButtonTogglesPreserveAspect(t *testing.T) {
 	shell := NewShell(NullBackend{}, nil, "")
 	if shell.interfaceUI.toolbarButtons["view.aspect"] == nil {
