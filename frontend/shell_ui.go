@@ -111,7 +111,8 @@ func (u *shellUI) sync(shell *Shell) {
 	u.syncStatusIndicators(shell, width)
 	for id, button := range u.toolbarButtons {
 		visible := true
-		if width < 620 && (id == "emu.stop" || id == "emu.reset" || id == "view.keypad") {
+		if width < 620 && (id == "emu.stop" || id == "emu.reset" ||
+			id == "view.keypad" || id == "view.layout") {
 			visible = false
 		}
 		if width < 480 && id == "emu.pause" {
@@ -141,21 +142,26 @@ func (u *shellUI) sync(shell *Shell) {
 		button.GetWidget().Disabled = !found || !command.IsEnabled(shell)
 	}
 
-	// The keypad button is the toolbar's one toggle, so it wears the sunken
-	// pressed face while the keypad is on the way the settings navigation marks
-	// its active section. Every other toolbar action is a momentary command.
-	if button, ok := u.toolbarButtons["view.keypad"]; ok {
-		base := u.design.Components.SubtleButton.Image
-		if shell.settings.ShowVirtualKeypad {
-			button.SetImage(&widget.ButtonImage{
-				Idle:         base.Pressed,
-				Hover:        base.Pressed,
-				Pressed:      base.Pressed,
-				PressedHover: base.Pressed,
-				Disabled:     base.Disabled,
-			})
-		} else {
-			button.SetImage(base)
+	// Toolbar toggles wear the sunken pressed face while active, the way the
+	// settings navigation marks its section; momentary actions never do.
+	base := u.design.Components.SubtleButton.Image
+	pressed := &widget.ButtonImage{
+		Idle:         base.Pressed,
+		Hover:        base.Pressed,
+		Pressed:      base.Pressed,
+		PressedHover: base.Pressed,
+		Disabled:     base.Disabled,
+	}
+	for id, active := range map[string]bool{
+		"view.keypad": shell.settings.ShowVirtualKeypad,
+		"view.layout": shell.settings.ScreenLayout == "stretch",
+	} {
+		if button, ok := u.toolbarButtons[id]; ok {
+			if active {
+				button.SetImage(pressed)
+			} else {
+				button.SetImage(base)
+			}
 		}
 	}
 

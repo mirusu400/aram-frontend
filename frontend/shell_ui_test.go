@@ -379,6 +379,24 @@ func TestKeypadToolbarButtonTogglesVirtualKeypad(t *testing.T) {
 	}
 }
 
+func TestFillToolbarButtonTogglesScreenLayout(t *testing.T) {
+	shell := NewShell(NullBackend{}, nil, "")
+	if shell.interfaceUI.toolbarButtons["view.layout"] == nil {
+		t.Fatal("toolbar has no fill (screen layout) button")
+	}
+	if shell.settings.ScreenLayout != "center" {
+		t.Fatalf("default screen layout = %q, want center", shell.settings.ScreenLayout)
+	}
+	shell.dispatchCommand("view.layout")
+	if shell.settings.ScreenLayout != "stretch" {
+		t.Fatalf("fill button did not stretch the display: %q", shell.settings.ScreenLayout)
+	}
+	shell.dispatchCommand("view.layout")
+	if shell.settings.ScreenLayout != "center" {
+		t.Fatalf("fill button did not toggle back: %q", shell.settings.ScreenLayout)
+	}
+}
+
 func TestControllerCommandOpensControlsSettings(t *testing.T) {
 	shell := NewShell(NullBackend{}, nil, "")
 	shell.dispatchCommand("tools.controller")
