@@ -41,6 +41,17 @@ type frameRunResult struct {
 	err             error
 }
 
+// frameRunRequest hands a batch of guest quanta to the persistent low-priority
+// frame worker. Running the guest on its own de-prioritised OS thread keeps a
+// heavy title from starving the interface of CPU.
+type frameRunRequest struct {
+	backend    FrameBackend
+	owed       int
+	quantum    time.Duration
+	generation uint64
+	startedAt  time.Time
+}
+
 type Shell struct {
 	backend              Backend
 	picker               Picker
@@ -111,6 +122,7 @@ type Shell struct {
 	busyCommands              map[BackendCommand]bool
 	frameRunPending           bool
 	frameGeneration           uint64
+	frameWorkerOnce           sync.Once
 	frameAccumulator          time.Duration
 	lastFramePacingAt         time.Time
 	pacingGuestAdvanced       time.Duration
@@ -125,6 +137,7 @@ type Shell struct {
 	backendResults            chan backendResult
 	commandResults            chan commandResult
 	frameRunResults           chan frameRunResult
+	frameRunRequests          chan frameRunRequest
 	openStageResults          chan OpenStage
 	externalOpen              chan OpenRequest
 	externalCommands          chan string
@@ -182,6 +195,7 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		backendResults:            make(chan backendResult, 2),
 		commandResults:            make(chan commandResult, 8),
 		frameRunResults:           make(chan frameRunResult, 2),
+		frameRunRequests:          make(chan frameRunRequest, 1),
 		openStageResults:          make(chan OpenStage, 4),
 		externalOpen:              make(chan OpenRequest, 2),
 		externalCommands:          make(chan string, 4),
