@@ -252,6 +252,28 @@ func TestCycleSpeedAdvancesThroughPresets(t *testing.T) {
 // "jit" default forward. Naming a core in the stored settings is what made the
 // choice wrong on platforms that do not have it and stale once a faster core
 // landed; "fastest" is resolved by the backend at open time and always exists.
+func TestCPUProfilingDefaultsOnAndPersistsOff(t *testing.T) {
+	if !defaultSettings().CPUProfile {
+		t.Fatal("CPU profiling should default on")
+	}
+	// Dropping omitempty is what lets an explicit off survive a save/load
+	// round trip instead of being omitted and defaulting back on.
+	blob, err := json.Marshal(Settings{CPUProfile: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(blob), `"cpu_profile":false`) {
+		t.Fatalf("cpu_profile was omitted from %s", blob)
+	}
+	loaded := defaultSettings()
+	if err := json.Unmarshal(blob, &loaded); err != nil {
+		t.Fatal(err)
+	}
+	if loaded.CPUProfile {
+		t.Fatal("an explicit off did not survive a load over the on default")
+	}
+}
+
 func TestSettingsDefaultCPUIsFastestAvailable(t *testing.T) {
 	if got := defaultSettings().CPUChoice; got != "fastest" {
 		t.Fatalf("default CPUChoice = %q, want %q", got, "fastest")

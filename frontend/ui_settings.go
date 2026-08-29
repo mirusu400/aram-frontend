@@ -53,7 +53,7 @@ func (u *shellUI) updateSettingsTouchScroll(shell *Shell) {
 
 func (u *shellUI) syncSettingsPanel(shell *Shell) {
 	switch u.settingsSection {
-	case "General", "Appearance", "Graphics", "Audio", "Controls", "Bindings", "Updates":
+	case "General", "Appearance", "Graphics", "Audio", "Controls", "Bindings", "Experiments", "Updates":
 	default:
 		u.settingsSection = "General"
 	}
@@ -130,7 +130,7 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 		design.Palette.AccentHover,
 		widget.RowLayoutData{Stretch: true},
 	))
-	for _, section := range []string{"General", "Appearance", "Graphics", "Audio", "Controls", "Bindings", "Updates"} {
+	for _, section := range []string{"General", "Appearance", "Graphics", "Audio", "Controls", "Bindings", "Experiments", "Updates"} {
 		sectionName := section
 		button := design.button(
 			shell.tr(sectionName),
@@ -352,6 +352,8 @@ func settingsSectionDescription(section string) string {
 		return "Configure normalized host input."
 	case "Bindings":
 		return "Select an action, then press the keyboard or gamepad button to assign."
+	case "Experiments":
+		return "Optional experimental features that may affect performance or stability."
 	case "Updates":
 		return "Download the latest public ARAM component archives from GitHub."
 	default:

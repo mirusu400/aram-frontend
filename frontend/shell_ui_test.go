@@ -397,6 +397,24 @@ func TestFillToolbarButtonTogglesScreenLayout(t *testing.T) {
 	}
 }
 
+func TestExperimentsSectionHasCPUProfilingToggle(t *testing.T) {
+	shell := NewShell(NullBackend{}, nil, "")
+	u := shell.interfaceUI
+	u.settingsSection = "Experiments"
+	found := false
+	for _, row := range u.settingsRowModels(shell) {
+		if row.label == "CPU profiling" {
+			if row.action == nil {
+				t.Fatal("CPU profiling row has no toggle action")
+			}
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("Experiments section is missing the CPU profiling row")
+	}
+}
+
 func TestAspectToolbarButtonTogglesPreserveAspect(t *testing.T) {
 	shell := NewShell(NullBackend{}, nil, "")
 	if shell.interfaceUI.toolbarButtons["view.aspect"] == nil {
