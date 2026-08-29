@@ -124,6 +124,9 @@ type Shell struct {
 	busyCommands              map[BackendCommand]bool
 	frameRunPending           bool
 	frameGeneration           uint64
+	faultPrompter             reportPrompter
+	faultPrompted             bool
+	faultPromptGeneration     uint64
 	frameWorkerOnce           sync.Once
 	frameAccumulator          time.Duration
 	lastFramePacingAt         time.Time
@@ -140,6 +143,7 @@ type Shell struct {
 	commandResults            chan commandResult
 	frameRunResults           chan frameRunResult
 	frameRunRequests          chan frameRunRequest
+	faultReportRequests       chan string
 	openStageResults          chan OpenStage
 	externalOpen              chan OpenRequest
 	externalCommands          chan string
@@ -198,6 +202,7 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		commandResults:            make(chan commandResult, 8),
 		frameRunResults:           make(chan frameRunResult, 2),
 		frameRunRequests:          make(chan frameRunRequest, 1),
+		faultReportRequests:       make(chan string, 1),
 		openStageResults:          make(chan OpenStage, 4),
 		externalOpen:              make(chan OpenRequest, 2),
 		externalCommands:          make(chan string, 4),

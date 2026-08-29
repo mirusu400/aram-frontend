@@ -40,6 +40,9 @@ func RunWithOptions(
 	ebiten.SetWindowSizeLimits(720, 540, -1, -1)
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 	shell := NewShell(backend, NewPlatformPicker(), initialPath)
+	// Enable the native fault dialog on the real desktop run only. Tests build
+	// their shells with NewShell directly and must never raise a real dialog.
+	shell.faultPrompter = platformReportPrompter
 	if openOnStart && initialPath == "" {
 		shell.DispatchExternalCommand("file.open")
 	}

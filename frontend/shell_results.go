@@ -68,7 +68,10 @@ func (s *Shell) consumeResults() {
 					Recoverable: true,
 				}
 				s.setStatus(s.tr("Run frame: ") + result.err.Error())
+				s.promptFaultReport(s.problem)
 			}
+		case reason := <-s.faultReportRequests:
+			s.consumeFaultReportRequest(reason)
 		case result := <-s.dropResults:
 			if result.err != nil {
 				s.setStatus(s.tr("Drop: ") + result.err.Error())
