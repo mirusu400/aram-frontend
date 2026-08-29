@@ -96,6 +96,10 @@ func drawModernIcon(name string, ink color.Color) *ebiten.Image {
 				vector.DrawFilledCircle(img, x, y, 1.7, ink, true)
 			}
 		}
+	case "aspect":
+		// A closed screen frame: keep the display's proportions. Distinct from
+		// the fullscreen mark's four detached corners.
+		vector.StrokeRect(img, 3.5, 6.5, 17, 11, w, ink, true)
 	case "fullscreen":
 		// Four outward corner brackets: the expand-to-fill mark.
 		vector.StrokeLine(img, 4, 10, 4, 4, w, ink, true)

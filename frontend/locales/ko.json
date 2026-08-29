@@ -255,6 +255,7 @@
   "Center": "가운데",
   "Stretch": "꽉차게",
   "Fill": "꽉차게",
+  "Aspect": "비율",
   "Fill the screen": "화면을 꽉차게 표시",
   "Screen layout: %s": "화면 배치: %s",
   "Global": "전역",

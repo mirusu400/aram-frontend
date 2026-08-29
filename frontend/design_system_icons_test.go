@@ -12,7 +12,7 @@ import (
 func TestModernToolbarIconsCoverEveryAction(t *testing.T) {
 	for _, name := range []string{
 		"open", "play", "pause", "stop",
-		"reset", "settings", "keypad", "fullscreen",
+		"reset", "settings", "keypad", "fullscreen", "aspect",
 	} {
 		if drawModernIcon(name, color.Black) == nil {
 			t.Errorf("modern toolbar icon %q did not render", name)

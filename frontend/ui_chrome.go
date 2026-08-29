@@ -261,6 +261,7 @@ func (u *shellUI) buildApplicationToolbar(shell *Shell) *widget.Container {
 	addSeparator()
 	addAction("view.keypad", shell.tr("Keypad"), "keypad", "", 74)
 	addAction("view.layout", shell.tr("Fill"), "fullscreen", shell.tr("Fill the screen"), 64)
+	addAction("view.aspect", shell.tr("Aspect"), "aspect", shell.tr("Preserve aspect ratio"), 64)
 
 	u.toolbarTitle = design.text(
 		"",
