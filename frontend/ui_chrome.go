@@ -174,6 +174,8 @@ func (u *shellUI) buildApplicationToolbar(shell *Shell) *widget.Container {
 	addAction("emu.reset", shell.tr("Reset"), "reset", 62)
 	addSeparator()
 	addAction("emu.configure", shell.tr("Settings"), "settings", 82)
+	addSeparator()
+	addAction("view.keypad", shell.tr("Keypad"), "keypad", 74)
 
 	u.toolbarTitle = design.text(
 		"",

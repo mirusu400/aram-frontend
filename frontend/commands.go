@@ -137,6 +137,16 @@ func defaultMenus() []Menu {
 					Enabled: func(*Shell) bool { return platformUsesTouchLayout() },
 					Action:  (*Shell).toggleFocusMode,
 				},
+				{
+					ID:     "view.keypad",
+					Action: (*Shell).toggleVirtualKeypad,
+					DynamicLabel: func(shell *Shell) string {
+						return shell.trf(
+							"Virtual keypad: %s",
+							shell.tr(onOff(shell.settings.ShowVirtualKeypad)),
+						)
+					},
+				},
 				{ID: "view.integer", Label: "Integer Scaling", Action: (*Shell).toggleIntegerScaling},
 				{ID: "view.aspect", Label: "Preserve Aspect Ratio", Action: (*Shell).toggleAspectRatio},
 				{ID: "view.fit", Label: "Fit Window", Shortcut: "Ctrl+0", Action: (*Shell).fitWindow},
