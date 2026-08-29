@@ -191,12 +191,15 @@ func (u *shellUI) buildApplicationToolbar(shell *Shell) *widget.Container {
 
 	addAction := func(id, label, icon, tooltip string, width int) {
 		commandID := id
+		if tooltip == "" {
+			tooltip = label
+		}
 		var button *widget.Button
-		if graphic := design.retroIcon(icon); graphic != nil {
-			// Sprite skins draw the era-style icon toolbar instead of the
-			// text actions; the labels stay available through the menus. An
-			// icon-only button is opaque, so it carries a hover tooltip when
-			// one is supplied.
+		if graphic := design.actionIcon(icon); graphic != nil {
+			// Both skins draw an icon toolbar: the sprite pack for retro
+			// families, flat vector glyphs for the modern one. An icon-only
+			// button is opaque, so it carries a hover tooltip naming the
+			// action, and the text labels stay available through the menus.
 			iconOpts := []widget.WidgetOpt{widget.WidgetOpts.MinSize(
 				toolbarButtonWidth, toolbarButtonHeight)}
 			if tooltip != "" {
