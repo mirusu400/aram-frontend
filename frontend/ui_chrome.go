@@ -108,19 +108,10 @@ func (u *shellUI) buildUpdateBadge(shell *Shell) *widget.Button {
 	label := shell.tr("Update available")
 	width := len([]rune(label))*8 + 24
 
-	u.updateBadgeTip = design.text("", design.Type.Caption, design.Palette.Text, nil)
-	tipContent := widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(design.Components.Dropdown),
-		widget.ContainerOpts.Layout(widget.NewRowLayout(
-			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(design.Space.S)),
-		)),
-	)
-	tipContent.AddChild(u.updateBadgeTip)
-	tip := widget.NewToolTip(
-		widget.ToolTipOpts.Content(tipContent),
-		widget.ToolTipOpts.Delay(250*time.Millisecond),
-		widget.ToolTipOpts.Position(widget.TOOLTIP_POS_WIDGET),
-	)
+	// The badge's tooltip text is refreshed in sync() with the found version,
+	// so hold on to its Text widget.
+	tip, tipText := u.buildTextTooltip("")
+	u.updateBadgeTip = tipText
 
 	style := design.Components.MenuButton
 	padding := style.Padding
@@ -143,6 +134,27 @@ func (u *shellUI) buildUpdateBadge(shell *Shell) *widget.Button {
 	badge.GetWidget().CustomData = "help.updates"
 	badge.GetWidget().SetVisibility(widget.Visibility_Hide)
 	return badge
+}
+
+// buildTextTooltip makes a small hover tooltip carrying one line of text. It
+// returns the Text widget too so callers with changing copy (the update badge)
+// can rewrite it; callers with fixed copy ignore it.
+func (u *shellUI) buildTextTooltip(label string) (*widget.ToolTip, *widget.Text) {
+	design := u.design
+	text := design.text(label, design.Type.Caption, design.Palette.Text, nil)
+	content := widget.NewContainer(
+		widget.ContainerOpts.BackgroundImage(design.Components.Dropdown),
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(design.Space.S)),
+		)),
+	)
+	content.AddChild(text)
+	tip := widget.NewToolTip(
+		widget.ToolTipOpts.Content(content),
+		widget.ToolTipOpts.Delay(250*time.Millisecond),
+		widget.ToolTipOpts.Position(widget.TOOLTIP_POS_WIDGET),
+	)
+	return tip, text
 }
 
 func (u *shellUI) buildApplicationToolbar(shell *Shell) *widget.Container {
@@ -177,15 +189,22 @@ func (u *shellUI) buildApplicationToolbar(shell *Shell) *widget.Container {
 		})),
 	)
 
-	addAction := func(id, label, icon string, width int) {
+	addAction := func(id, label, icon, tooltip string, width int) {
 		commandID := id
 		var button *widget.Button
 		if graphic := design.retroIcon(icon); graphic != nil {
 			// Sprite skins draw the era-style icon toolbar instead of the
-			// text actions; the labels stay available through the menus.
+			// text actions; the labels stay available through the menus. An
+			// icon-only button is opaque, so it carries a hover tooltip when
+			// one is supplied.
+			iconOpts := []widget.WidgetOpt{widget.WidgetOpts.MinSize(
+				toolbarButtonWidth, toolbarButtonHeight)}
+			if tooltip != "" {
+				tip, _ := u.buildTextTooltip(tooltip)
+				iconOpts = append(iconOpts, widget.WidgetOpts.ToolTip(tip))
+			}
 			button = widget.NewButton(
-				widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.MinSize(
-					toolbarButtonWidth, toolbarButtonHeight)),
+				widget.ButtonOpts.WidgetOpts(iconOpts...),
 				widget.ButtonOpts.Image(design.Components.SubtleButton.Image),
 				widget.ButtonOpts.Graphic(graphic),
 				widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
@@ -228,16 +247,17 @@ func (u *shellUI) buildApplicationToolbar(shell *Shell) *widget.Container {
 		))
 	}
 
-	addAction("file.open", shell.tr("Open"), "open", 68)
+	addAction("file.open", shell.tr("Open"), "open", "", 68)
 	addSeparator()
-	addAction("emu.start", shell.tr("Start"), "play", 64)
-	addAction("emu.pause", shell.tr("Pause"), "pause", 64)
-	addAction("emu.stop", shell.tr("Stop"), "stop", 60)
-	addAction("emu.reset", shell.tr("Reset"), "reset", 62)
+	addAction("emu.start", shell.tr("Start"), "play", "", 64)
+	addAction("emu.pause", shell.tr("Pause"), "pause", "", 64)
+	addAction("emu.stop", shell.tr("Stop"), "stop", "", 60)
+	addAction("emu.reset", shell.tr("Reset"), "reset", "", 62)
 	addSeparator()
-	addAction("emu.configure", shell.tr("Settings"), "settings", 82)
+	addAction("emu.configure", shell.tr("Settings"), "settings", "", 82)
 	addSeparator()
-	addAction("view.keypad", shell.tr("Keypad"), "keypad", 74)
+	addAction("view.keypad", shell.tr("Keypad"), "keypad", "", 74)
+	addAction("view.layout", shell.tr("Fill"), "fullscreen", shell.tr("Fill the screen"), 64)
 
 	u.toolbarTitle = design.text(
 		"",
