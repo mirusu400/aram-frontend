@@ -97,6 +97,10 @@ type Shell struct {
 	frame                     VideoFrame
 	frameImage                *ebiten.Image
 	displayEffectImage        *ebiten.Image
+	displayScaleImage         *ebiten.Image
+	displayScaleKey           displayScaleKey
+	displayScaleSequence      uint64
+	displayScaleValid         bool
 	displayHistoryImage       *ebiten.Image
 	displayResponseImage      *ebiten.Image
 	displayHistoryKey         displayHistoryKey

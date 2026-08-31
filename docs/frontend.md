@@ -38,7 +38,8 @@ mobile hosts should include `application/zip` in their document picker.
 - Rotation
 - Screen Layout
 - Nearest/linear filter
-- Display presets: Original, Crisp Fit, and Feature Phone TFT
+- Display presets: Original, Crisp Fit, Feature Phone TFT, Feature Phone STN,
+  and Smooth Pixel
 - Native-resolution Screenshot (`Ctrl+Shift+S`)
 
 The internal canvas follows the actual window size. Application chrome keeps
@@ -209,9 +210,14 @@ sampling: source-pixel centers remain flat while fractional-size boundaries
 blend across one output pixel. The TFT preset adds RGB565 colour, subtle LCD
 cell seams, uneven backlighting, and an exponential response history driven by
 display time, so moving pixels leave a real previous-frame trail and then
-settle even when the guest frame becomes static. Original keeps
-the separate nearest/linear texture setting. All presets affect presentation
-only; native-resolution screenshots remain untouched.
+settle even when the guest frame becomes static. Feature Phone STN uses a
+longer 75 ms response half-life, reduced saturation and contrast, a stronger
+green-yellow cast, and visible cell crosstalk to reproduce older passive-matrix
+panels. Smooth Pixel runs an independently implemented, edge-aware xBRZ-style
+2x pass before fitting the image; isolated pixels and thin glyph strokes are
+protected so small Hangul remains legible. Original keeps the separate
+nearest/linear texture setting. All presets affect presentation only;
+native-resolution screenshots remain untouched.
 
 Guest audio is drained from `AudioStreamBackend` on every tick, including ticks
 where a frame batch is still executing. A title heavy enough to keep a batch

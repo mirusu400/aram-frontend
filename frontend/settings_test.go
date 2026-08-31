@@ -65,11 +65,8 @@ func TestDisplayEffectPresetsHaveAStableCycleOrder(t *testing.T) {
 	if shell.settings.DisplayEffect != displayEffectFeaturePhoneTFT {
 		t.Fatalf("default display effect = %q, want TFT", shell.settings.DisplayEffect)
 	}
-	want := []string{
-		displayEffectOff,
-		displayEffectCrispFit,
-		displayEffectFeaturePhoneTFT,
-	}
+	shell.settings.DisplayEffect = displayEffectSmoothPixel
+	want := displayEffectChoices()
 	for _, effect := range want {
 		shell.cycleDisplayEffect()
 		if shell.settings.DisplayEffect != effect {
@@ -83,6 +80,8 @@ func TestDisplayEffectPresetChoicesMatchTheProductOrder(t *testing.T) {
 		displayEffectOff,
 		displayEffectCrispFit,
 		displayEffectFeaturePhoneTFT,
+		displayEffectFeaturePhoneSTN,
+		displayEffectSmoothPixel,
 	}
 	if got := displayEffectChoices(); !slices.Equal(got, want) {
 		t.Fatalf("display effect choices = %q, want %q", got, want)

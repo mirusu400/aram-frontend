@@ -144,6 +144,7 @@ func (s *Shell) drawGuestViewport(screen *ebiten.Image, viewport image.Rectangle
 // presentation preset from it. Original preserves the user's texture-filter
 // choice. Crisp Fit and handset panels use sharp bilinear sampling so integer
 // pixels stay flat while fractional window fits blend only at cell boundaries.
+// Smooth Pixel first builds a cached edge-aware 2x image in guest coordinates.
 func (s *Shell) drawGuestFrame(
 	screen *ebiten.Image,
 	destination image.Rectangle,
@@ -158,16 +159,28 @@ func (s *Shell) drawGuestFrame(
 
 	target := s.ensureDisplayEffectImage(destination.Dx(), destination.Dy())
 	target.Clear()
-	if err := s.drawSharpBilinear(target, sourceBounds); err != nil {
+	if effect == displayEffectSmoothPixel {
+		if err := s.drawSmoothPixel(target); err != nil {
+			if fallbackErr := s.drawSharpBilinear(target); fallbackErr != nil {
+				local := image.Rect(0, 0, destination.Dx(), destination.Dy())
+				target.DrawImage(s.frameImage, s.guestFrameDrawOptions(sourceBounds, local))
+			}
+		}
+		s.resetDisplayHistory()
+		drawDisplaySurface(screen, target, destination)
+		return
+	}
+	if err := s.drawSharpBilinear(target); err != nil {
 		// Fixed shader compilation is tested, but the frame must remain visible
 		// if a platform rejects it at runtime.
 		local := image.Rect(0, 0, destination.Dx(), destination.Dy())
 		target.DrawImage(s.frameImage, s.guestFrameDrawOptions(sourceBounds, local))
 	}
 
-	if effect == displayEffectFeaturePhoneTFT {
+	if effect == displayEffectFeaturePhoneTFT ||
+		effect == displayEffectFeaturePhoneSTN {
 		target = s.updateDisplayPersistence(target)
-		s.drawFeaturePhonePanel(screen, target, destination, sourceBounds)
+		s.drawFeaturePhonePanel(screen, target, destination, sourceBounds, effect)
 		return
 	}
 
@@ -179,7 +192,20 @@ var displayQuadIndices = []uint16{0, 1, 2, 1, 3, 2}
 
 func (s *Shell) drawSharpBilinear(
 	target *ebiten.Image,
+) error {
+	return drawSharpBilinearImage(
+		target,
+		s.frameImage,
+		s.frameImage.Bounds(),
+		s.settings.Rotation,
+	)
+}
+
+func drawSharpBilinearImage(
+	target *ebiten.Image,
+	source *ebiten.Image,
 	sourceBounds image.Rectangle,
+	rotation int,
 ) error {
 	shader, err := loadSharpBilinearShader()
 	if err != nil {
@@ -189,21 +215,79 @@ func (s *Shell) drawSharpBilinear(
 		target.Bounds(),
 		sourceBounds.Dx(),
 		sourceBounds.Dy(),
-		s.settings.Rotation,
+		rotation,
 	)
 	options := &ebiten.DrawTrianglesShaderOptions{
 		Uniforms: map[string]any{
 			"Scale": []float32{scaleX, scaleY},
 		},
 	}
-	options.Images[0] = s.frameImage
+	options.Images[0] = source
 	target.DrawTrianglesShader(
-		displayQuadVertices(target.Bounds(), sourceBounds, s.settings.Rotation),
+		displayQuadVertices(target.Bounds(), sourceBounds, rotation),
 		displayQuadIndices,
 		shader,
 		options,
 	)
 	return nil
+}
+
+type displayScaleKey struct {
+	Width      int
+	Height     int
+	Generation uint64
+}
+
+func (s *Shell) drawSmoothPixel(target *ebiten.Image) error {
+	scaled, err := s.smoothPixel2xImage()
+	if err != nil {
+		return err
+	}
+	return drawSharpBilinearImage(
+		target,
+		scaled,
+		scaled.Bounds(),
+		s.settings.Rotation,
+	)
+}
+
+// smoothPixel2xImage caches the native 2x result until the backend publishes
+// another guest sequence. Keeping the edge classifier in guest coordinates
+// makes its decisions independent of window size and screen rotation.
+func (s *Shell) smoothPixel2xImage() (*ebiten.Image, error) {
+	width, height := s.frameImage.Bounds().Dx(), s.frameImage.Bounds().Dy()
+	key := displayScaleKey{
+		Width:      width,
+		Height:     height,
+		Generation: s.frame.Generation,
+	}
+	if s.displayScaleValid && s.displayScaleKey == key &&
+		s.displayScaleSequence == s.frame.Sequence {
+		return s.displayScaleImage, nil
+	}
+
+	shader, err := loadSmoothPixelShader()
+	if err != nil {
+		return nil, err
+	}
+	scaled := ensureDisplaySurface(&s.displayScaleImage, width*2, height*2)
+	scaled.Clear()
+	options := &ebiten.DrawTrianglesShaderOptions{
+		Uniforms: map[string]any{
+			"SourceSize": []float32{float32(width), float32(height)},
+		},
+	}
+	options.Images[0] = s.frameImage
+	scaled.DrawTrianglesShader(
+		displayQuadVertices(scaled.Bounds(), s.frameImage.Bounds(), 0),
+		displayQuadIndices,
+		shader,
+		options,
+	)
+	s.displayScaleKey = key
+	s.displayScaleSequence = s.frame.Sequence
+	s.displayScaleValid = true
+	return scaled, nil
 }
 
 func displayQuadVertices(
@@ -331,15 +415,22 @@ func (s *Shell) updateDisplayPersistence(
 }
 
 func displayPersistenceWeight(effect string, elapsed time.Duration) float32 {
-	halfLife := 22 * time.Millisecond
-	if effect != displayEffectFeaturePhoneTFT {
+	halfLife := time.Duration(0)
+	maximum := 0.95
+	switch effect {
+	case displayEffectFeaturePhoneTFT:
+		halfLife = 22 * time.Millisecond
+	case displayEffectFeaturePhoneSTN:
+		halfLife = 75 * time.Millisecond
+		maximum = 0.975
+	default:
 		return 0
 	}
 	if elapsed <= 0 {
 		elapsed = time.Second / 60
 	}
 	weight := math.Pow(0.5, float64(elapsed)/float64(halfLife))
-	return float32(min(0.95, max(0.0, weight)))
+	return float32(min(maximum, max(0.0, weight)))
 }
 
 func (s *Shell) drawFeaturePhonePanel(
@@ -347,8 +438,12 @@ func (s *Shell) drawFeaturePhonePanel(
 	source *ebiten.Image,
 	destination image.Rectangle,
 	sourceBounds image.Rectangle,
+	effect string,
 ) {
 	shader, err := loadFeaturePhoneDisplayShader()
+	if effect == displayEffectFeaturePhoneSTN {
+		shader, err = loadFeaturePhoneSTNShader()
+	}
 	if err != nil {
 		drawDisplaySurface(screen, source, destination)
 		return
@@ -436,6 +531,10 @@ func (s *Shell) resetDisplayHistory() {
 
 func (s *Shell) releaseDisplaySurfaces() {
 	s.displayEffectImage = nil
+	s.displayScaleImage = nil
+	s.displayScaleKey = displayScaleKey{}
+	s.displayScaleSequence = 0
+	s.displayScaleValid = false
 	s.displayHistoryImage = nil
 	s.displayResponseImage = nil
 	s.resetDisplayHistory()
@@ -465,9 +564,15 @@ var (
 	temporalBlendShaderOnce       sync.Once
 	temporalBlendShader           *ebiten.Shader
 	temporalBlendShaderErr        error
+	smoothPixelShaderOnce         sync.Once
+	smoothPixelShader             *ebiten.Shader
+	smoothPixelShaderErr          error
 	featurePhoneDisplayShaderOnce sync.Once
 	featurePhoneDisplayShader     *ebiten.Shader
 	featurePhoneDisplayShaderErr  error
+	featurePhoneSTNShaderOnce     sync.Once
+	featurePhoneSTNShader         *ebiten.Shader
+	featurePhoneSTNShaderErr      error
 )
 
 func loadSharpBilinearShader() (*ebiten.Shader, error) {
@@ -486,12 +591,28 @@ func loadTemporalBlendShader() (*ebiten.Shader, error) {
 	return temporalBlendShader, temporalBlendShaderErr
 }
 
+func loadSmoothPixelShader() (*ebiten.Shader, error) {
+	smoothPixelShaderOnce.Do(func() {
+		smoothPixelShader, smoothPixelShaderErr =
+			ebiten.NewShader([]byte(smoothPixelShaderSource))
+	})
+	return smoothPixelShader, smoothPixelShaderErr
+}
+
 func loadFeaturePhoneDisplayShader() (*ebiten.Shader, error) {
 	featurePhoneDisplayShaderOnce.Do(func() {
 		featurePhoneDisplayShader, featurePhoneDisplayShaderErr =
 			ebiten.NewShader([]byte(featurePhoneDisplayShaderSource))
 	})
 	return featurePhoneDisplayShader, featurePhoneDisplayShaderErr
+}
+
+func loadFeaturePhoneSTNShader() (*ebiten.Shader, error) {
+	featurePhoneSTNShaderOnce.Do(func() {
+		featurePhoneSTNShader, featurePhoneSTNShaderErr =
+			ebiten.NewShader([]byte(featurePhoneSTNShaderSource))
+	})
+	return featurePhoneSTNShader, featurePhoneSTNShaderErr
 }
 
 // Sharp bilinear holds the center of each source pixel flat and confines
@@ -543,6 +664,104 @@ func Fragment(dstPos vec4, src0Pos vec2, color vec4) vec4 {
 	current := imageSrc0At(src0Pos)
 	history := imageSrc1At(src0Pos)
 	return mix(current, history, HistoryWeight)
+}
+`
+
+// Smooth Pixel is a clean-room, xBRZ-style 2x scaler. It uses a perceptual
+// colour distance and evaluates each source-pixel corner independently: only
+// a continuous diagonal crossing that corner is blended. Axis-aligned edges,
+// isolated pixels, and one-pixel strokes remain exact, which matters for the
+// tiny bitmap Hangul commonly drawn by WIPI titles.
+const smoothPixelShaderSource = `//kage:unit pixels
+
+package main
+
+var SourceSize vec2
+
+func SmoothSource(cell vec2) vec4 {
+	origin := imageSrc0Origin()
+	bounded := clamp(cell, vec2(0.0), SourceSize-vec2(1.0))
+	return imageSrc0At(origin+bounded+vec2(0.5))
+}
+
+func PerceptualDistance(a vec4, b vec4) float {
+	delta := a.rgb - b.rgb
+	luma := dot(delta, vec3(0.2627, 0.6780, 0.0593))
+	blueChroma := (delta.b-luma)*0.5
+	redChroma := (delta.r-luma)*0.5
+	alpha := a.a - b.a
+	return luma*luma*1.7 + blueChroma*blueChroma*0.35 +
+		redChroma*redChroma*0.55 + alpha*alpha
+}
+
+func SmoothSimilar(a vec4, b vec4) bool {
+	return PerceptualDistance(a, b) < 0.0022
+}
+
+func Fragment(dstPos vec4, src0Pos vec2, color vec4) vec4 {
+	outputPixel := floor(dstPos.xy)
+	cell := floor(outputPixel/2.0)
+	quadrant := mod(outputPixel, vec2(2.0))
+
+	center := SmoothSource(cell)
+	north := SmoothSource(cell+vec2(0.0, -1.0))
+	south := SmoothSource(cell+vec2(0.0, 1.0))
+	west := SmoothSource(cell+vec2(-1.0, 0.0))
+	east := SmoothSource(cell+vec2(1.0, 0.0))
+	northWest := SmoothSource(cell+vec2(-1.0, -1.0))
+	northEast := SmoothSource(cell+vec2(1.0, -1.0))
+	southWest := SmoothSource(cell+vec2(-1.0, 1.0))
+	southEast := SmoothSource(cell+vec2(1.0, 1.0))
+
+	// A lone contrasting source pixel is usually punctuation or part of a
+	// small glyph. Rounding all four corners would make it disappear.
+	isolated := SmoothSimilar(north, south) && SmoothSimilar(north, west) &&
+		SmoothSimilar(north, east) && !SmoothSimilar(center, north)
+	if isolated {
+		return center
+	}
+
+	horizontal := west
+	vertical := north
+	oppositeHorizontal := east
+	oppositeVertical := south
+	diagonal := northWest
+	if quadrant.x >= 1.0 {
+		horizontal = east
+		oppositeHorizontal = west
+		diagonal = northEast
+	}
+	if quadrant.y >= 1.0 {
+		vertical = south
+		oppositeVertical = north
+		if quadrant.x < 1.0 {
+			diagonal = southWest
+		} else {
+			diagonal = southEast
+		}
+	}
+
+	agreement := PerceptualDistance(horizontal, vertical)
+	centerHorizontal := PerceptualDistance(center, horizontal)
+	centerVertical := PerceptualDistance(center, vertical)
+	contrast := min(centerHorizontal, centerVertical)
+	continuity := agreement + PerceptualDistance(diagonal, horizontal)*0.25 +
+		PerceptualDistance(diagonal, vertical)*0.25
+	reverse := centerHorizontal + centerVertical +
+		PerceptualDistance(oppositeHorizontal, oppositeVertical)*0.25
+	centerSupported := SmoothSimilar(center, oppositeHorizontal) ||
+		SmoothSimilar(center, oppositeVertical)
+
+	if contrast > 0.0012 && continuity*2.0 < reverse && centerSupported {
+		candidate := (horizontal + vertical + diagonal) / 3.0
+		strength := 0.52
+		if agreement < 0.00045 && SmoothSimilar(diagonal, horizontal) &&
+			SmoothSimilar(diagonal, vertical) {
+			strength = 0.68
+		}
+		return mix(center, candidate, strength)
+	}
+	return center
 }
 `
 
@@ -603,6 +822,60 @@ func Fragment(dstPos vec4, src0Pos vec2, color vec4) vec4 {
 	vignette := 1.0 - 0.045*dot(centered, centered)
 	glare := max(0.0, 1.0-uv.x*0.65-uv.y*1.45) * 0.018
 	rgb = rgb*vignette + vec3(glare, glare, glare*0.82)
+	return vec4(clamp(rgb, vec3(0.0), vec3(1.0)), current.a)
+}
+`
+
+// Passive-matrix STN panels are substantially slower and less neutral than
+// TFT. Temporal lag is applied in a separate history pass; this shader adds
+// the panel's reduced colour separation, row crosstalk, coarse colour steps,
+// stronger cell seams, green-yellow polarizer and uneven backlight.
+const featurePhoneSTNShaderSource = `//kage:unit pixels
+
+package main
+
+var PixelPitch vec2
+
+func STNSample(pos vec2) vec4 {
+	origin := imageSrc0Origin()
+	size := imageSrc0Size()
+	halfPixel := vec2(0.5)
+	return imageSrc0At(clamp(pos, origin+halfPixel, origin+size-halfPixel))
+}
+
+func Fragment(dstPos vec4, src0Pos vec2, color vec4) vec4 {
+	current := STNSample(src0Pos)
+	horizontalTrail := STNSample(src0Pos-vec2(0.85, 0.2))
+	rowTrail := STNSample(src0Pos-vec2(0.0, 0.65))
+	rgb := current.rgb*0.86 + horizontalTrail.rgb*0.09 + rowTrail.rgb*0.05
+
+	luma := dot(rgb, vec3(0.299, 0.587, 0.114))
+	rgb = vec3(luma) + (rgb-vec3(luma))*0.48
+	rgb = (rgb-vec3(0.5))*0.80 + vec3(0.5)
+	rgb.r = floor(rgb.r*15.0+0.5) / 15.0
+	rgb.g = floor(rgb.g*15.0+0.5) / 15.0
+	rgb.b = floor(rgb.b*15.0+0.5) / 15.0
+	rgb = rgb*vec3(0.94, 1.015, 0.77) + vec3(0.018, 0.024, 0.008)
+
+	origin := imageSrc0Origin()
+	size := imageSrc0Size()
+	local := src0Pos - origin
+	cellShade := 1.0
+	if PixelPitch.x >= 2.4 && mod(local.x, PixelPitch.x) > PixelPitch.x-0.75 {
+		cellShade *= 0.88
+	}
+	if PixelPitch.y >= 2.4 && mod(local.y, PixelPitch.y) > PixelPitch.y-0.8 {
+		cellShade *= 0.86
+	}
+	rowBand := mod(floor(local.y/4.0), 2.0)
+	cellShade *= 0.985 + rowBand*0.015
+
+	uv := local / size
+	centered := uv*2.0 - 1.0
+	backlight := 0.97 - 0.09*dot(centered, centered)
+	viewingAngle := 1.0 - abs(uv.x-0.42)*0.055
+	glare := max(0.0, 1.0-uv.x*0.7-uv.y*1.3) * 0.026
+	rgb = rgb*cellShade*backlight*viewingAngle + vec3(glare, glare, glare*0.58)
 	return vec4(clamp(rgb, vec3(0.0), vec3(1.0)), current.a)
 }
 `

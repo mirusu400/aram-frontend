@@ -15,10 +15,12 @@ func TestFeaturePhoneDisplayShaderCompiles(t *testing.T) {
 	}
 }
 
-func TestCrispFitShadersCompile(t *testing.T) {
+func TestDisplayPresetShadersCompile(t *testing.T) {
 	for name, source := range map[string]string{
-		"sharp bilinear":  sharpBilinearShaderSource,
-		"LCD persistence": temporalBlendShaderSource,
+		"sharp bilinear":    sharpBilinearShaderSource,
+		"LCD persistence":   temporalBlendShaderSource,
+		"smooth pixel 2x":   smoothPixelShaderSource,
+		"feature phone STN": featurePhoneSTNShaderSource,
 	} {
 		if _, err := ebiten.NewShader([]byte(source)); err != nil {
 			t.Fatalf("compile %s shader: %v", name, err)
@@ -93,7 +95,51 @@ func TestTFTPersistenceUsesDisplayTimeAndDecays(t *testing.T) {
 	}
 }
 
-func TestDisplayPersistenceAdvancesOnlyForANewGuestFrame(t *testing.T) {
+func TestSTNPersistenceIsSlowerThanTFT(t *testing.T) {
+	stnHalfLife := 75 * time.Millisecond
+	if got := displayPersistenceWeight(displayEffectFeaturePhoneSTN, stnHalfLife); math.Abs(float64(got)-0.5) > 0.001 {
+		t.Fatalf("one STN half-life weight = %g, want 0.5", got)
+	}
+	frameTime := time.Second / 60
+	tft := displayPersistenceWeight(displayEffectFeaturePhoneTFT, frameTime)
+	stn := displayPersistenceWeight(displayEffectFeaturePhoneSTN, frameTime)
+	if stn <= tft || stn < 0.8 {
+		t.Fatalf("STN response is not visibly slower: TFT=%g STN=%g", tft, stn)
+	}
+	if got := displayPersistenceWeight(displayEffectSmoothPixel, frameTime); got != 0 {
+		t.Fatalf("non-panel persistence = %g, want 0", got)
+	}
+}
+
+func TestSmoothPixelBuildsAndCachesNative2xSurface(t *testing.T) {
+	shell := &Shell{
+		frame:      VideoFrame{Sequence: 4, Generation: 2},
+		frameImage: ebiten.NewImage(24, 32),
+	}
+	first, err := shell.smoothPixel2xImage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := first.Bounds(), image.Rect(0, 0, 48, 64); got != want {
+		t.Fatalf("smooth pixel surface = %v, want %v", got, want)
+	}
+	second, err := shell.smoothPixel2xImage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second != first {
+		t.Fatal("unchanged guest sequence rebuilt the smooth pixel surface")
+	}
+	shell.frame.Sequence++
+	if _, err := shell.smoothPixel2xImage(); err != nil {
+		t.Fatal(err)
+	}
+	if shell.displayScaleSequence != shell.frame.Sequence {
+		t.Fatalf("cached smooth sequence = %d, want %d", shell.displayScaleSequence, shell.frame.Sequence)
+	}
+}
+
+func TestDisplayPersistenceAdvancesWithDisplayTime(t *testing.T) {
 	shell := &Shell{settings: defaultSettings()}
 	clock := time.Unix(100, 0)
 	shell.nowFunc = func() time.Time { return clock }
@@ -124,8 +170,9 @@ func TestDisplayPersistenceAdvancesOnlyForANewGuestFrame(t *testing.T) {
 	}
 
 	shell.releaseDisplaySurfaces()
-	if shell.displayEffectImage != nil || shell.displayHistoryImage != nil ||
-		shell.displayResponseImage != nil || shell.displayHistoryValid {
+	if shell.displayEffectImage != nil || shell.displayScaleImage != nil ||
+		shell.displayHistoryImage != nil || shell.displayResponseImage != nil ||
+		shell.displayScaleValid || shell.displayHistoryValid {
 		t.Fatal("display surfaces survived title release")
 	}
 }

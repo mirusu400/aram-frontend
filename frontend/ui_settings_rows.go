@@ -162,7 +162,7 @@ func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 			},
 			{
 				label:       "Display preset",
-				description: "Choose original pixels, crisp fractional scaling, or a feature-phone TFT panel.",
+				description: "Choose original pixels, crisp fitting, feature-phone panels, or edge-aware xBRZ-style 2x smoothing.",
 				value:       displayEffectValueLabel(shell.settings.DisplayEffect),
 				action:      func() { shell.dispatchCommand("view.display_effect") },
 			},

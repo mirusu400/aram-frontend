@@ -13,6 +13,8 @@ const (
 	displayEffectOff                = "off"
 	displayEffectCrispFit           = "crisp-fit"
 	displayEffectFeaturePhoneTFT    = "feature-phone-tft"
+	displayEffectFeaturePhoneSTN    = "feature-phone-stn"
+	displayEffectSmoothPixel        = "smooth-pixel"
 	displayEffectFeaturePhoneLegacy = "feature-phone"
 )
 
@@ -21,6 +23,8 @@ func displayEffectChoices() []string {
 		displayEffectOff,
 		displayEffectCrispFit,
 		displayEffectFeaturePhoneTFT,
+		displayEffectFeaturePhoneSTN,
+		displayEffectSmoothPixel,
 	}
 }
 

@@ -89,6 +89,10 @@ func displayEffectValueLabel(effect string) string {
 		return "Crisp Fit"
 	case displayEffectFeaturePhoneTFT:
 		return "Feature Phone TFT"
+	case displayEffectFeaturePhoneSTN:
+		return "Feature Phone STN"
+	case displayEffectSmoothPixel:
+		return "Smooth Pixel"
 	default:
 		return "Original"
 	}
