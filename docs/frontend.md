@@ -38,7 +38,7 @@ mobile hosts should include `application/zip` in their document picker.
 - Rotation
 - Screen Layout
 - Nearest/linear filter
-- Display presets: Original, Crisp Fit, Feature Phone TFT, Feature Phone STN,
+- Display filter: Original, Crisp Fit, Feature Phone TFT, Feature Phone STN,
   Smooth Pixel, and CRT TV
 - Adjustable display-filter strength
 - Native-resolution Screenshot (`Ctrl+Shift+S`)
@@ -208,7 +208,7 @@ persistent texture is rebuilt only when the guest changes resolution. A
 backend that hands over tightly packed RGBA is uploaded without an intermediate
 copy.
 
-Feature Phone TFT is the default display preset. Crisp Fit uses sharp bilinear
+Feature Phone TFT is the default display filter. Crisp Fit uses sharp bilinear
 sampling: source-pixel centers remain flat while fractional-size boundaries
 blend across one output pixel. The TFT preset adds RGB565 colour, subtle LCD
 cell seams, uneven backlighting, and an exponential response history driven by

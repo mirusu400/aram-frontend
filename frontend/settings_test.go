@@ -377,6 +377,59 @@ func TestGraphicsSettingsExposePerTitleStrengthSlider(t *testing.T) {
 	}
 }
 
+// TestGraphicsDisplayFilterRowIsADropdown pins the graphics "Display filter"
+// control to a dropdown whose entries cover every display filter and whose
+// selection writes straight through to the saved profile. It replaced a
+// click-to-cycle action; a regression back to an action would drop the
+// dropdown and this fails.
+func TestGraphicsDisplayFilterRowIsADropdown(t *testing.T) {
+	temporary := t.TempDir()
+	t.Setenv("APPDATA", temporary)
+	t.Setenv("XDG_CONFIG_HOME", temporary)
+	shell := &Shell{
+		settings: defaultSettings(),
+		input:    &InputInfo{DisplayName: "example.dat", SHA256: "abc123"},
+	}
+	u := &shellUI{settingsSection: "Graphics"}
+
+	var row *settingsRowModel
+	for i := range u.settingsRowModels(shell) {
+		if u.settingsRowModels(shell)[i].label == "Display filter" {
+			r := u.settingsRowModels(shell)[i]
+			row = &r
+			break
+		}
+	}
+	if row == nil {
+		t.Fatal("Graphics section is missing the Display filter row")
+	}
+	if row.action != nil {
+		t.Fatal("Display filter row still has a click-to-cycle action")
+	}
+	if row.dropdown == nil {
+		t.Fatal("Display filter row has no dropdown")
+	}
+	choices := displayEffectChoices()
+	if row.dropdown.count != len(choices) {
+		t.Fatalf("dropdown count = %d, want %d", row.dropdown.count, len(choices))
+	}
+	for i, effect := range choices {
+		want := shell.tr(displayEffectValueLabel(effect))
+		if got := row.dropdown.label(i); got != want {
+			t.Fatalf("dropdown label(%d) = %q, want %q", i, got, want)
+		}
+	}
+	// value() reflects the saved effect, and apply() writes the picked one back.
+	target := displayEffectIndex(displayEffectCRTTV)
+	row.dropdown.apply(target)
+	if got := shell.displayProfile().DisplayEffect; got != displayEffectCRTTV {
+		t.Fatalf("after apply(%d) effect = %q, want %q", target, got, displayEffectCRTTV)
+	}
+	if got := row.dropdown.value(); got != target {
+		t.Fatalf("dropdown value() = %d, want %d", got, target)
+	}
+}
+
 func TestSpeedPresetIndexPicksClosest(t *testing.T) {
 	cases := []struct {
 		speed float64

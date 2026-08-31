@@ -167,14 +167,31 @@ func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 				disabled:    display.DisplayEffect != displayEffectOff,
 			},
 			{
-				label:       "Display preset",
+				label:       "Display filter",
 				description: "Choose original pixels, feature-phone panels, xBRZ-style smoothing, or an NTSC CRT TV.",
-				value:       displayEffectValueLabel(display.DisplayEffect),
-				action:      func() { shell.dispatchCommand("view.display_effect") },
+				dropdown: &settingsDropdownModel{
+					count: len(displayEffectChoices()),
+					label: func(i int) string {
+						choices := displayEffectChoices()
+						if i < 0 || i >= len(choices) {
+							return ""
+						}
+						return shell.tr(displayEffectValueLabel(choices[i]))
+					},
+					value: func() int {
+						return displayEffectIndex(shell.displayProfile().DisplayEffect)
+					},
+					apply: func(i int) {
+						choices := displayEffectChoices()
+						if i >= 0 && i < len(choices) {
+							shell.setDisplayEffect(choices[i])
+						}
+					},
+				},
 			},
 			{
 				label:       "Filter strength",
-				description: "Adjust the selected display preset from subtle to full.",
+				description: "Adjust the selected display filter from subtle to full.",
 				disabled:    !displayEffectSupportsStrength(display.DisplayEffect),
 				slider: &settingsSliderModel{
 					min:    displayEffectStrengthMin / 10,

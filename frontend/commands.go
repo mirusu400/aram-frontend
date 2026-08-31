@@ -182,7 +182,7 @@ func defaultMenus() []Menu {
 					Action: (*Shell).cycleDisplayEffect,
 					DynamicLabel: func(shell *Shell) string {
 						return shell.trf(
-							"Display Preset: %s",
+							"Display Filter: %s",
 							shell.tr(displayEffectValueLabel(shell.displayProfile().DisplayEffect)),
 						)
 					},

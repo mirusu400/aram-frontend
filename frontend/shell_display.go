@@ -78,8 +78,23 @@ func (s *Shell) cycleDisplayEffect() {
 	}
 	profile.DisplayEffect = choices[(current+1)%len(choices)]
 	s.saveDisplayProfile(profile, s.trf(
-		"Display Preset: %s",
+		"Display Filter: %s",
 		s.tr(displayEffectValueLabel(profile.DisplayEffect)),
+	))
+}
+
+// setDisplayEffect selects a display filter directly, backing the settings
+// dropdown. Unknown values are ignored so a stale index cannot clear the
+// current filter.
+func (s *Shell) setDisplayEffect(effect string) {
+	if !isDisplayEffectChoice(effect) {
+		return
+	}
+	profile := s.displayProfile()
+	profile.DisplayEffect = effect
+	s.saveDisplayProfile(profile, s.trf(
+		"Display Filter: %s",
+		s.tr(displayEffectValueLabel(effect)),
 	))
 }
 

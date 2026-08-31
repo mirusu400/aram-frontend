@@ -45,6 +45,17 @@ func isDisplayEffectChoice(effect string) bool {
 	return false
 }
 
+// displayEffectIndex returns the dropdown position of effect, defaulting to the
+// first entry (Original) when the saved value is unknown or legacy.
+func displayEffectIndex(effect string) int {
+	for index, choice := range displayEffectChoices() {
+		if choice == effect {
+			return index
+		}
+	}
+	return 0
+}
+
 // speedPresets are the emulation speeds the control offers, in slider order.
 var speedPresets = []float64{0.5, 1, 1.5, 2, 2.5, 3, 4}
 
