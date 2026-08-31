@@ -117,6 +117,7 @@ type debugSettingsReport struct {
 	Rotation       int     `json:"rotation"`
 	ScreenLayout   string  `json:"screen_layout"`
 	Filter         string  `json:"filter"`
+	DisplayEffect  string  `json:"display_effect"`
 	Muted          bool    `json:"muted"`
 	Volume         int     `json:"volume"`
 	AudioLatencyMS int     `json:"audio_latency_ms"`

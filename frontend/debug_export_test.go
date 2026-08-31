@@ -240,6 +240,9 @@ func TestCaptureDebugBundleCopiesGuestNativeScreenshot(t *testing.T) {
 	snapshot := shell.captureDebugBundleSnapshot(time.Now().UTC())
 	source.Set(10, 20, color.RGBA{R: 0, G: 0, B: 0, A: 0xff})
 
+	if snapshot.Settings.DisplayEffect != displayEffectFeaturePhone {
+		t.Fatalf("captured display effect = %q", snapshot.Settings.DisplayEffect)
+	}
 	if snapshot.Screenshot == nil ||
 		snapshot.Screenshot.Bounds() != image.Rect(0, 0, 2, 2) {
 		t.Fatalf("captured screenshot = %#v", snapshot.Screenshot)

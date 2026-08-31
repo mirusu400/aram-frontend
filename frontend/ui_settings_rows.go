@@ -160,6 +160,12 @@ func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 				action:      func() { shell.dispatchCommand("view.filter") },
 			},
 			{
+				label:       "Display effect",
+				description: "Simulate RGB565 color, LCD cells, response bleed, and uneven backlighting.",
+				value:       displayEffectValueLabel(shell.settings.DisplayEffect),
+				action:      func() { shell.dispatchCommand("view.display_effect") },
+			},
+			{
 				label:       "Screen layout",
 				description: "Center or stretch the guest display.",
 				value:       strings.Title(shell.settings.ScreenLayout),

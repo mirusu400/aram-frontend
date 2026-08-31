@@ -177,6 +177,16 @@ func defaultMenus() []Menu {
 						)
 					},
 				},
+				{
+					ID:     "view.display_effect",
+					Action: (*Shell).cycleDisplayEffect,
+					DynamicLabel: func(shell *Shell) string {
+						return shell.trf(
+							"Display Effect: %s",
+							shell.tr(displayEffectValueLabel(shell.settings.DisplayEffect)),
+						)
+					},
+				},
 				{ID: "view.screenshot", Label: "Screenshot", Shortcut: "Ctrl+Shift+S", Enabled: hasFrame, Action: (*Shell).saveScreenshot},
 			},
 		},

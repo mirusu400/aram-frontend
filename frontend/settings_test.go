@@ -39,6 +39,7 @@ func TestSettingsNormalizeRepairsDisplayOptions(t *testing.T) {
 	settings.Rotation = 17
 	settings.ScreenLayout = "broken"
 	settings.Filter = "broken"
+	settings.DisplayEffect = "broken"
 	settings.StateSlot = 99
 	settings.Speed = 3.7
 	settings.normalize()
@@ -47,9 +48,40 @@ func TestSettingsNormalizeRepairsDisplayOptions(t *testing.T) {
 		settings.ThemeMode != "light" ||
 		settings.ScreenLayout != "center" ||
 		settings.Filter != "nearest" ||
+		settings.DisplayEffect != "feature-phone" ||
 		settings.StateSlot != 0 ||
 		settings.Speed != 1 {
 		t.Fatalf("normalized settings = %#v", settings)
+	}
+}
+
+func TestFeaturePhoneDisplayEffectDefaultsOnAndCyclesOff(t *testing.T) {
+	temporary := t.TempDir()
+	t.Setenv("APPDATA", temporary)
+	t.Setenv("XDG_CONFIG_HOME", temporary)
+
+	shell := &Shell{settings: defaultSettings()}
+	if shell.settings.DisplayEffect != "feature-phone" {
+		t.Fatalf("default display effect = %q, want feature-phone", shell.settings.DisplayEffect)
+	}
+	shell.cycleDisplayEffect()
+	if shell.settings.DisplayEffect != "off" {
+		t.Fatalf("cycled display effect = %q, want off", shell.settings.DisplayEffect)
+	}
+	shell.cycleDisplayEffect()
+	if shell.settings.DisplayEffect != "feature-phone" {
+		t.Fatalf("second display effect = %q, want feature-phone", shell.settings.DisplayEffect)
+	}
+}
+
+func TestLegacySettingsReceiveFeaturePhoneDisplayEffect(t *testing.T) {
+	settings := defaultSettings()
+	if err := json.Unmarshal([]byte(`{"filter":"linear"}`), &settings); err != nil {
+		t.Fatal(err)
+	}
+	settings.normalize()
+	if settings.Filter != "linear" || settings.DisplayEffect != "feature-phone" {
+		t.Fatalf("legacy display settings = %#v", settings)
 	}
 }
 

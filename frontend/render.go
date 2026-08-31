@@ -5,6 +5,7 @@ import (
 	"image/color"
 	"math"
 	"strings"
+	"sync"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -135,6 +136,65 @@ func (s *Shell) drawGuestViewport(screen *ebiten.Image, viewport image.Rectangle
 		rotatedWidth, rotatedHeight = sourceHeight, sourceWidth
 	}
 	destination := s.frameDestination(viewport, rotatedWidth, rotatedHeight)
+	s.drawGuestFrame(screen, destination, sourceBounds)
+}
+
+// drawGuestFrame keeps sampling and the optional panel simulation separate.
+// The guest is first rotated and scaled exactly as it is without an effect;
+// the feature-phone pass then models the physical LCD over those final pixels.
+// This also keeps screenshots on the guest-native frame, before presentation.
+func (s *Shell) drawGuestFrame(
+	screen *ebiten.Image,
+	destination image.Rectangle,
+	sourceBounds image.Rectangle,
+) {
+	drawDestination := destination
+	target := screen
+	if s.settings.DisplayEffect == displayEffectFeaturePhone {
+		target = s.ensureDisplayEffectImage(destination.Dx(), destination.Dy())
+		target.Clear()
+		drawDestination = image.Rect(0, 0, destination.Dx(), destination.Dy())
+	}
+
+	target.DrawImage(s.frameImage, s.guestFrameDrawOptions(sourceBounds, drawDestination))
+	if target == screen {
+		return
+	}
+
+	shader, err := loadFeaturePhoneDisplayShader()
+	if err != nil {
+		// A fixed shader compilation failure is covered by a focused test. The
+		// runtime fallback still leaves the guest visible on unusual drivers.
+		options := &ebiten.DrawImageOptions{}
+		options.GeoM.Translate(float64(destination.Min.X), float64(destination.Min.Y))
+		screen.DrawImage(target, options)
+		return
+	}
+	pitchX, pitchY := displayPixelPitch(
+		destination,
+		sourceBounds.Dx(),
+		sourceBounds.Dy(),
+		s.settings.Rotation,
+	)
+	options := &ebiten.DrawRectShaderOptions{
+		Uniforms: map[string]any{
+			"PixelPitch": []float32{pitchX, pitchY},
+		},
+	}
+	options.Images[0] = target
+	options.GeoM.Translate(float64(destination.Min.X), float64(destination.Min.Y))
+	screen.DrawRectShader(destination.Dx(), destination.Dy(), shader, options)
+}
+
+func (s *Shell) guestFrameDrawOptions(
+	sourceBounds image.Rectangle,
+	destination image.Rectangle,
+) *ebiten.DrawImageOptions {
+	sourceWidth, sourceHeight := sourceBounds.Dx(), sourceBounds.Dy()
+	rotatedWidth, rotatedHeight := sourceWidth, sourceHeight
+	if s.settings.Rotation == 90 || s.settings.Rotation == 270 {
+		rotatedWidth, rotatedHeight = sourceHeight, sourceWidth
+	}
 	scaleX := float64(destination.Dx()) / float64(rotatedWidth)
 	scaleY := float64(destination.Dy()) / float64(rotatedHeight)
 
@@ -158,8 +218,110 @@ func (s *Shell) drawGuestViewport(screen *ebiten.Image, viewport image.Rectangle
 	} else {
 		options.Filter = ebiten.FilterNearest
 	}
-	screen.DrawImage(s.frameImage, options)
+	return options
 }
+
+func (s *Shell) ensureDisplayEffectImage(width, height int) *ebiten.Image {
+	if s.displayEffectImage == nil ||
+		s.displayEffectImage.Bounds().Dx() != width ||
+		s.displayEffectImage.Bounds().Dy() != height {
+		s.displayEffectImage = ebiten.NewImage(width, height)
+	}
+	return s.displayEffectImage
+}
+
+// displayPixelPitch reports how many final display pixels represent one guest
+// pixel. The LCD grid follows the rotated guest axes rather than the window,
+// so portrait and landscape titles retain square cells at integer scale.
+func displayPixelPitch(
+	destination image.Rectangle,
+	sourceWidth, sourceHeight, rotation int,
+) (float32, float32) {
+	if rotation == 90 || rotation == 270 {
+		sourceWidth, sourceHeight = sourceHeight, sourceWidth
+	}
+	if sourceWidth <= 0 || sourceHeight <= 0 {
+		return 1, 1
+	}
+	return float32(destination.Dx()) / float32(sourceWidth),
+		float32(destination.Dy()) / float32(sourceHeight)
+}
+
+var (
+	featurePhoneDisplayShaderOnce sync.Once
+	featurePhoneDisplayShader     *ebiten.Shader
+	featurePhoneDisplayShaderErr  error
+)
+
+func loadFeaturePhoneDisplayShader() (*ebiten.Shader, error) {
+	featurePhoneDisplayShaderOnce.Do(func() {
+		featurePhoneDisplayShader, featurePhoneDisplayShaderErr =
+			ebiten.NewShader([]byte(featurePhoneDisplayShaderSource))
+	})
+	return featurePhoneDisplayShader, featurePhoneDisplayShaderErr
+}
+
+// The panel is intentionally TFT/LCD, not CRT: RGB565 colour depth, a subtle
+// RGB subpixel mask, source-pixel cell seams, slow-response bleed, lifted
+// blacks, and uneven edge illumination. The strengths stay low enough that
+// Hangul and small in-game text remain readable.
+const featurePhoneDisplayShaderSource = `//kage:unit pixels
+
+package main
+
+var PixelPitch vec2
+
+func LCDSample(pos vec2) vec4 {
+	origin := imageSrc0Origin()
+	size := imageSrc0Size()
+	halfPixel := vec2(0.5)
+	return imageSrc0At(clamp(pos, origin+halfPixel, origin+size-halfPixel))
+}
+
+func Fragment(dstPos vec4, src0Pos vec2, color vec4) vec4 {
+	current := LCDSample(src0Pos)
+	responseTrail := LCDSample(src0Pos - vec2(0.7, 0.2))
+	rgb := current.rgb*0.955 + responseTrail.rgb*0.045
+
+	// Mid-2000s colour handsets commonly exposed a 16-bit RGB565 panel.
+	rgb.r = floor(rgb.r*31.0+0.5) / 31.0
+	rgb.g = floor(rgb.g*63.0+0.5) / 63.0
+	rgb.b = floor(rgb.b*31.0+0.5) / 31.0
+
+	// A small black lift and green bias read as a lit LCD instead of OLED.
+	rgb = rgb*0.94 + vec3(0.012, 0.016, 0.009)
+
+	origin := imageSrc0Origin()
+	size := imageSrc0Size()
+	local := src0Pos - origin
+	cellShade := 1.0
+	if PixelPitch.x >= 2.75 && mod(local.x, PixelPitch.x) > PixelPitch.x-0.6 {
+		cellShade *= 0.93
+	}
+	if PixelPitch.y >= 2.75 && mod(local.y, PixelPitch.y) > PixelPitch.y-0.6 {
+		cellShade *= 0.92
+	}
+
+	// The mask is deliberately faint: visible up close without rainbowing text.
+	mask := vec3(0.985)
+	stripe := mod(floor(local.x), 3.0)
+	if stripe < 1.0 {
+		mask.r = 1.015
+	} else if stripe < 2.0 {
+		mask.g = 1.015
+	} else {
+		mask.b = 1.015
+	}
+	rgb *= mask * cellShade
+
+	uv := local / size
+	centered := uv*2.0 - 1.0
+	vignette := 1.0 - 0.045*dot(centered, centered)
+	glare := max(0.0, 1.0-uv.x*0.65-uv.y*1.45) * 0.018
+	rgb = rgb*vignette + vec3(glare, glare, glare*0.82)
+	return vec4(clamp(rgb, vec3(0.0), vec3(1.0)), current.a)
+}
+`
 
 func (s *Shell) frameDestination(viewport image.Rectangle, width, height int) image.Rectangle {
 	if width <= 0 || height <= 0 {

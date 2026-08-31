@@ -42,6 +42,7 @@ func TestGenericEmulatorCommandsRemainPresent(t *testing.T) {
 		"view.rotation":           false,
 		"view.layout":             false,
 		"view.filter":             false,
+		"view.display_effect":     false,
 		"view.screenshot":         false,
 	}
 	for _, menu := range menus {

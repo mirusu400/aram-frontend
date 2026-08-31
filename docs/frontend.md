@@ -38,6 +38,7 @@ mobile hosts should include `application/zip` in their document picker.
 - Rotation
 - Screen Layout
 - Nearest/linear filter
+- Feature-phone LCD display effect
 - Native-resolution Screenshot (`Ctrl+Shift+S`)
 
 The internal canvas follows the actual window size. Application chrome keeps
@@ -202,6 +203,12 @@ sequence into a persistent texture that is rebuilt only when the guest changes
 resolution, so a running title neither re-uploads an unchanged screen nor
 allocates a texture per frame. A backend that hands over tightly packed RGBA is
 uploaded without an intermediate copy.
+
+The feature-phone LCD effect is enabled by default and applied only to the
+presented guest viewport. It simulates an RGB565 panel, subtle LCD cell seams,
+response bleed, lifted blacks, and uneven backlighting. It can be disabled
+independently of nearest/linear texture sampling. Native-resolution screenshots
+remain untouched.
 
 Guest audio is drained from `AudioStreamBackend` on every tick, including ticks
 where a frame batch is still executing. A title heavy enough to keep a batch

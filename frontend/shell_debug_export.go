@@ -65,6 +65,7 @@ func (s *Shell) captureDebugBundleSnapshot(createdAt time.Time) debugBundleSnaps
 			Rotation:       s.settings.Rotation,
 			ScreenLayout:   s.settings.ScreenLayout,
 			Filter:         s.settings.Filter,
+			DisplayEffect:  s.settings.DisplayEffect,
 			Muted:          s.settings.Muted,
 			Volume:         s.settings.Volume,
 			AudioLatencyMS: s.settings.AudioLatencyMS,

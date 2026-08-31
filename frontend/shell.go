@@ -96,6 +96,7 @@ type Shell struct {
 	logs                      []string
 	frame                     VideoFrame
 	frameImage                *ebiten.Image
+	displayEffectImage        *ebiten.Image
 	frameScratch              *image.RGBA
 	latestVideoGuestNS        atomic.Int64
 	latestVideoGeneration     atomic.Uint64

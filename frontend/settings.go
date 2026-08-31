@@ -9,6 +9,11 @@ import (
 
 const recentFileLimit = 10
 
+const (
+	displayEffectOff          = "off"
+	displayEffectFeaturePhone = "feature-phone"
+)
+
 // speedPresets are the emulation speeds the control offers, in slider order.
 var speedPresets = []float64{0.5, 1, 1.5, 2, 2.5, 3, 4}
 
@@ -57,6 +62,7 @@ type Settings struct {
 	Rotation          int                          `json:"rotation"`
 	ScreenLayout      string                       `json:"screen_layout"`
 	Filter            string                       `json:"filter"`
+	DisplayEffect     string                       `json:"display_effect"`
 	StateSlot         int                          `json:"state_slot"`
 	FontChoice        string                       `json:"font_choice"`
 	CustomFontPath    string                       `json:"custom_font_path,omitempty"`
@@ -132,6 +138,7 @@ func defaultSettings() Settings {
 		PreserveAspect:   true,
 		ScreenLayout:     "center",
 		Filter:           "nearest",
+		DisplayEffect:    displayEffectFeaturePhone,
 		StateSlot:        0,
 		FontChoice:       "mulmaru",
 		CPUChoice:        "fastest",
@@ -184,6 +191,10 @@ func (s *Settings) normalize() {
 	}
 	if s.Filter != "nearest" && s.Filter != "linear" {
 		s.Filter = "nearest"
+	}
+	if s.DisplayEffect != displayEffectOff &&
+		s.DisplayEffect != displayEffectFeaturePhone {
+		s.DisplayEffect = displayEffectFeaturePhone
 	}
 	if s.FontChoice != "galmuri9" && s.FontChoice != "neodgm" && s.FontChoice != "mulmaru" && s.FontChoice != "custom" {
 		s.FontChoice = "galmuri9"

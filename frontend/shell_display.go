@@ -66,6 +66,26 @@ func (s *Shell) cycleFilter() {
 	))
 }
 
+func (s *Shell) cycleDisplayEffect() {
+	if s.settings.DisplayEffect == displayEffectFeaturePhone {
+		s.settings.DisplayEffect = displayEffectOff
+	} else {
+		s.settings.DisplayEffect = displayEffectFeaturePhone
+	}
+	_ = s.settings.save()
+	s.setStatus(s.trf(
+		"Display Effect: %s",
+		s.tr(displayEffectValueLabel(s.settings.DisplayEffect)),
+	))
+}
+
+func displayEffectValueLabel(effect string) string {
+	if effect == displayEffectFeaturePhone {
+		return "Feature phone LCD"
+	}
+	return "Off"
+}
+
 func (s *Shell) cycleStateSlot() {
 	s.setStateSlot((s.settings.StateSlot + 1) % 10)
 }
