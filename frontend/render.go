@@ -741,9 +741,13 @@ func SmoothSimilar(a vec4, b vec4) bool {
 }
 
 func Fragment(dstPos vec4, src0Pos vec2, color vec4) vec4 {
-	outputPixel := floor(dstPos.xy)
-	cell := floor(outputPixel/2.0)
-	quadrant := mod(outputPixel, vec2(2.0))
+	// DrawTrianglesShader can place the target inside Ebitengine's texture
+	// atlas, so dstPos is not guaranteed to start at zero. The interpolated
+	// source position is atlas-independent: its integer part selects the guest
+	// cell and its half-cell fraction identifies the 2x output quadrant.
+	sourceLocal := src0Pos - imageSrc0Origin()
+	cell := floor(sourceLocal)
+	quadrant := floor(fract(sourceLocal)*2.0)
 
 	center := SmoothSource(cell)
 	north := SmoothSource(cell+vec2(0.0, -1.0))

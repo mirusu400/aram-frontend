@@ -3,6 +3,7 @@ package frontend
 import (
 	"image"
 	"math"
+	"strings"
 	"testing"
 	"time"
 
@@ -137,6 +138,15 @@ func TestSmoothPixelBuildsAndCachesNative2xSurface(t *testing.T) {
 	}
 	if shell.displayScaleSequence != shell.frame.Sequence {
 		t.Fatalf("cached smooth sequence = %d, want %d", shell.displayScaleSequence, shell.frame.Sequence)
+	}
+}
+
+func TestSmoothPixelCoordinatesAreAtlasIndependent(t *testing.T) {
+	if !strings.Contains(
+		smoothPixelShaderSource,
+		"sourceLocal := src0Pos - imageSrc0Origin()",
+	) || strings.Contains(smoothPixelShaderSource, "floor(dstPos.xy)") {
+		t.Fatal("smooth pixel quadrant selection must use source space, not atlas-relative destination space")
 	}
 }
 
