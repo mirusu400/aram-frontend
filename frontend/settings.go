@@ -15,6 +15,7 @@ const (
 	displayEffectFeaturePhoneTFT    = "feature-phone-tft"
 	displayEffectFeaturePhoneSTN    = "feature-phone-stn"
 	displayEffectSmoothPixel        = "smooth-pixel"
+	displayEffectCRTTV              = "crt-tv"
 	displayEffectFeaturePhoneLegacy = "feature-phone"
 )
 
@@ -25,6 +26,7 @@ func displayEffectChoices() []string {
 		displayEffectFeaturePhoneTFT,
 		displayEffectFeaturePhoneSTN,
 		displayEffectSmoothPixel,
+		displayEffectCRTTV,
 	}
 }
 

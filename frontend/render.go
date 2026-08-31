@@ -183,6 +183,11 @@ func (s *Shell) drawGuestFrame(
 		s.drawFeaturePhonePanel(screen, target, destination, sourceBounds, effect)
 		return
 	}
+	if effect == displayEffectCRTTV {
+		s.resetDisplayHistory()
+		s.drawCRTTV(screen, target, destination, sourceBounds)
+		return
+	}
 
 	s.resetDisplayHistory()
 	drawDisplaySurface(screen, target, destination)
@@ -464,6 +469,33 @@ func (s *Shell) drawFeaturePhonePanel(
 	screen.DrawRectShader(destination.Dx(), destination.Dy(), shader, options)
 }
 
+func (s *Shell) drawCRTTV(
+	screen *ebiten.Image,
+	source *ebiten.Image,
+	destination image.Rectangle,
+	sourceBounds image.Rectangle,
+) {
+	shader, err := loadCRTTVShader()
+	if err != nil {
+		drawDisplaySurface(screen, source, destination)
+		return
+	}
+	pitchX, pitchY := displayPixelPitch(
+		destination,
+		sourceBounds.Dx(),
+		sourceBounds.Dy(),
+		s.settings.Rotation,
+	)
+	options := &ebiten.DrawRectShaderOptions{
+		Uniforms: map[string]any{
+			"PixelPitch": []float32{pitchX, pitchY},
+		},
+	}
+	options.Images[0] = source
+	options.GeoM.Translate(float64(destination.Min.X), float64(destination.Min.Y))
+	screen.DrawRectShader(destination.Dx(), destination.Dy(), shader, options)
+}
+
 func drawDisplaySurface(
 	screen *ebiten.Image,
 	source *ebiten.Image,
@@ -573,6 +605,9 @@ var (
 	featurePhoneSTNShaderOnce     sync.Once
 	featurePhoneSTNShader         *ebiten.Shader
 	featurePhoneSTNShaderErr      error
+	crtTVShaderOnce               sync.Once
+	crtTVShader                   *ebiten.Shader
+	crtTVShaderErr                error
 )
 
 func loadSharpBilinearShader() (*ebiten.Shader, error) {
@@ -613,6 +648,13 @@ func loadFeaturePhoneSTNShader() (*ebiten.Shader, error) {
 			ebiten.NewShader([]byte(featurePhoneSTNShaderSource))
 	})
 	return featurePhoneSTNShader, featurePhoneSTNShaderErr
+}
+
+func loadCRTTVShader() (*ebiten.Shader, error) {
+	crtTVShaderOnce.Do(func() {
+		crtTVShader, crtTVShaderErr = ebiten.NewShader([]byte(crtTVShaderSource))
+	})
+	return crtTVShader, crtTVShaderErr
 }
 
 // Sharp bilinear holds the center of each source pixel flat and confines
@@ -877,6 +919,91 @@ func Fragment(dstPos vec4, src0Pos vec2, color vec4) vec4 {
 	glare := max(0.0, 1.0-uv.x*0.7-uv.y*1.3) * 0.026
 	rgb = rgb*cellShade*backlight*viewingAngle + vec3(glare, glare, glare*0.58)
 	return vec4(clamp(rgb, vec3(0.0), vec3(1.0)), current.a)
+}
+`
+
+// CRT TV runs after the guest has been fitted to the final viewport. Composite
+// video carried much less chroma bandwidth than luma, so the shader preserves
+// centre-pixel luma while low-pass filtering I/Q horizontally with an
+// asymmetric five-tap kernel. Scanline spacing still follows guest rows; the
+// physical 3x2 RGB triad mask follows final display pixels.
+const crtTVShaderSource = `//kage:unit pixels
+
+package main
+
+var PixelPitch vec2
+
+func CRTSample(pos vec2) vec4 {
+	origin := imageSrc0Origin()
+	size := imageSrc0Size()
+	halfPixel := vec2(0.5)
+	return imageSrc0At(clamp(pos, origin+halfPixel, origin+size-halfPixel))
+}
+
+func RGBToYIQ(rgb vec3) vec3 {
+	return vec3(
+		dot(rgb, vec3(0.299, 0.587, 0.114)),
+		dot(rgb, vec3(0.596, -0.274, -0.322)),
+		dot(rgb, vec3(0.211, -0.523, 0.312)),
+	)
+}
+
+func YIQToRGB(yiq vec3) vec3 {
+	return vec3(
+		yiq.x + yiq.y*0.956 + yiq.z*0.621,
+		yiq.x - yiq.y*0.272 - yiq.z*0.647,
+		yiq.x - yiq.y*1.106 + yiq.z*1.703,
+	)
+}
+
+func Fragment(dstPos vec4, src0Pos vec2, color vec4) vec4 {
+	leftFar := RGBToYIQ(CRTSample(src0Pos-vec2(2.4, 0.0)).rgb)
+	left := RGBToYIQ(CRTSample(src0Pos-vec2(1.2, 0.0)).rgb)
+	centerSample := CRTSample(src0Pos)
+	center := RGBToYIQ(centerSample.rgb)
+	right := RGBToYIQ(CRTSample(src0Pos+vec2(1.2, 0.0)).rgb)
+	rightFar := RGBToYIQ(CRTSample(src0Pos+vec2(2.4, 0.0)).rgb)
+
+	// Luma receives only a light unsharp pass. I and Q use deliberately wider,
+	// right-trailing kernels to reproduce composite-video colour bleed.
+	luma := center.x*1.08 - left.x*0.04 - right.x*0.04
+	inPhase := leftFar.y*0.18 + left.y*0.25 + center.y*0.28 +
+		right.y*0.19 + rightFar.y*0.10
+	quadrature := leftFar.z*0.22 + left.z*0.25 + center.z*0.24 +
+		right.z*0.18 + rightFar.z*0.11
+	rgb := YIQToRGB(vec3(clamp(luma, 0.0, 1.0), inPhase, quadrature))
+
+	origin := imageSrc0Origin()
+	size := imageSrc0Size()
+	local := src0Pos - origin
+	rowPitch := max(PixelPitch.y, 1.0)
+	rowPhase := mod(local.y, rowPitch) / rowPitch
+	rowEdge := abs(rowPhase-0.5) * 2.0
+	scanline := 1.0
+	if PixelPitch.y >= 1.35 {
+		scanline = 1.0 - max(0.0, (rowEdge-0.34)/0.66)*0.32
+	} else {
+		scanline = 0.91 + mod(floor(local.y), 2.0)*0.09
+	}
+
+	// Offset alternate mask rows so the phosphors read as shadow-mask dots,
+	// rather than a flat aperture-grille stripe.
+	mask := vec3(0.875)
+	maskPhase := mod(floor(local.x)+mod(floor(local.y/2.0), 2.0), 3.0)
+	if maskPhase < 1.0 {
+		mask.r = 1.12
+	} else if maskPhase < 2.0 {
+		mask.g = 1.12
+	} else {
+		mask.b = 1.12
+	}
+	mask *= 0.965 + mod(floor(local.y), 2.0)*0.035
+
+	uv := local / size
+	centered := uv*2.0 - 1.0
+	vignette := 1.0 - dot(centered, centered)*0.075
+	rgb = rgb*mask*scanline*vignette*1.075 + vec3(0.004)
+	return vec4(clamp(rgb, vec3(0.0), vec3(1.0)), centerSample.a)
 }
 `
 

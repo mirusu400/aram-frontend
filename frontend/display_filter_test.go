@@ -21,6 +21,7 @@ func TestDisplayPresetShadersCompile(t *testing.T) {
 		"LCD persistence":   temporalBlendShaderSource,
 		"smooth pixel 2x":   smoothPixelShaderSource,
 		"feature phone STN": featurePhoneSTNShaderSource,
+		"CRT TV":            crtTVShaderSource,
 	} {
 		if _, err := ebiten.NewShader([]byte(source)); err != nil {
 			t.Fatalf("compile %s shader: %v", name, err)

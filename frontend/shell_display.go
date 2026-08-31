@@ -93,6 +93,8 @@ func displayEffectValueLabel(effect string) string {
 		return "Feature Phone STN"
 	case displayEffectSmoothPixel:
 		return "Smooth Pixel"
+	case displayEffectCRTTV:
+		return "CRT TV"
 	default:
 		return "Original"
 	}

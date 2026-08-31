@@ -39,7 +39,7 @@ mobile hosts should include `application/zip` in their document picker.
 - Screen Layout
 - Nearest/linear filter
 - Display presets: Original, Crisp Fit, Feature Phone TFT, Feature Phone STN,
-  and Smooth Pixel
+  Smooth Pixel, and CRT TV
 - Native-resolution Screenshot (`Ctrl+Shift+S`)
 
 The internal canvas follows the actual window size. Application chrome keeps
@@ -216,8 +216,10 @@ green-yellow cast, and visible cell crosstalk to reproduce older passive-matrix
 panels. Smooth Pixel runs an independently implemented, edge-aware xBRZ-style
 2x pass before fitting the image; isolated pixels and thin glyph strokes are
 protected so small Hangul remains legible. Original keeps the separate
-nearest/linear texture setting. All presets affect presentation only;
-native-resolution screenshots remain untouched.
+nearest/linear texture setting. CRT TV keeps luma detail while low-pass
+filtering NTSC I/Q colour horizontally, then adds guest-row scanlines and a
+3x2 RGB shadow mask at final display resolution. All presets affect
+presentation only; native-resolution screenshots remain untouched.
 
 Guest audio is drained from `AudioStreamBackend` on every tick, including ticks
 where a frame batch is still executing. A title heavy enough to keep a batch
