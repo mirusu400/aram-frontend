@@ -31,6 +31,7 @@ func (s *Shell) releaseCurrentInput() error {
 		s.temporaryPath = ""
 	}
 	s.input = nil
+	s.firmwareSession = false
 	s.selectedPath = ""
 	s.problem = nil
 	s.hostPaused = false

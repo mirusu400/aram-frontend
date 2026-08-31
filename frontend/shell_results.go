@@ -141,6 +141,7 @@ func (s *Shell) consumeBackendResult(result backendResult) {
 	}
 	if result.info.DisplayName != "" {
 		s.input = &result.info
+		s.firmwareSession = result.request.Firmware
 		s.selectedPath = result.request.Path
 		if result.request.Path != "" && !result.request.Temporary {
 			s.settings.addRecent(result.request.Path)

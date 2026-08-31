@@ -74,11 +74,17 @@ type Shell struct {
 	input                *InputInfo
 	selectedPath         string
 	temporaryPath        string
-	dialogOpen           bool
-	loading              bool
-	quitting             bool
-	hostActive           bool
-	hostPaused           bool
+	// firmwareSession records that the open request routed to the whole-phone
+	// adapter rather than the application one. The handset side keys only
+	// exist on a real phone: an application title runs above the firmware that
+	// owns the volume rocker, so offering those keys to one is offering a key
+	// its guest can never read.
+	firmwareSession bool
+	dialogOpen      bool
+	loading         bool
+	quitting        bool
+	hostActive      bool
+	hostPaused      bool
 	// hostActiveRequest is the newest activity the native host reported.
 	// Lifecycle is state, not a stream of events: ebitenmobile suspends the
 	// game loop while the app is in the background, so nothing drains a queue

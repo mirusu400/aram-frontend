@@ -36,7 +36,11 @@ func virtualKeypadReservedWidthFor(width int) int {
 	return virtualKeypadWidthFor(width) + 12
 }
 
-func virtualKeypadButtonsFor(width, height int) []touchButton {
+// virtualKeypadButtonsFor lays out the rail keypad. sideKeys keeps the volume
+// rocker out of an application session without moving anything else: the two
+// cells are left empty so MENU stays where it is and no button changes place
+// when a firmware session opens.
+func virtualKeypadButtonsFor(width, height int, sideKeys bool) []touchButton {
 	panel := virtualKeypadPanelBoundsFor(width, height)
 	const (
 		padding     = 10
@@ -52,12 +56,18 @@ func virtualKeypadButtonsFor(width, height int) []touchButton {
 	x := panel.Min.X + padding
 	y := panel.Min.Y + headerSpace + max(0, (availableHeight-gridHeight)/2)
 
+	sideRow := [columns]touchButton{
+		{Control: "volume-down", Label: "VOL-"},
+		{Control: "menu", Label: "MENU"},
+		{Control: "volume-up", Label: "VOL+"},
+	}
+	if !sideKeys {
+		sideRow[0] = touchButton{}
+		sideRow[2] = touchButton{}
+	}
+
 	layout := [rows][columns]touchButton{
-		{
-			{Control: "volume-down", Label: "VOL-"},
-			{Control: "menu", Label: "MENU"},
-			{Control: "volume-up", Label: "VOL+"},
-		},
+		sideRow,
 		{
 			{Control: "soft-left", Label: "L"},
 			{Control: "up", Label: "UP"},
@@ -119,8 +129,11 @@ func virtualKeypadButtonsFor(width, height int) []touchButton {
 	return buttons
 }
 
-func virtualKeypadControlAtSize(x, y, width, height int) (string, bool) {
-	for _, button := range virtualKeypadButtonsFor(width, height) {
+func virtualKeypadControlAtSize(
+	x, y, width, height int,
+	sideKeys bool,
+) (string, bool) {
+	for _, button := range virtualKeypadButtonsFor(width, height, sideKeys) {
 		if pointInRect(x, y, button.Bounds) {
 			return button.Control, true
 		}
@@ -179,11 +192,15 @@ func (s *Shell) drawVirtualKeypad(screen *ebiten.Image) {
 	}
 	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
 		x, y := ebiten.CursorPosition()
-		if control, ok := virtualKeypadControlAtSize(x, y, width, height); ok {
+		if control, ok := virtualKeypadControlAtSize(
+			x, y, width, height, s.sideKeysAvailable(),
+		); ok {
 			active[control] = true
 		}
 	}
-	for _, button := range virtualKeypadButtonsFor(width, height) {
+	for _, button := range virtualKeypadButtonsFor(
+		width, height, s.sideKeysAvailable(),
+	) {
 		s.drawTouchButton(screen, button, active[button.Control])
 	}
 }

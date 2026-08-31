@@ -105,7 +105,7 @@ func TestVirtualKeypadStaysInRightRailAndMapsEveryButton(t *testing.T) {
 			panel.Max.Y > height-statusHeight {
 			t.Fatalf("virtual keypad panel outside right rail at %dx%d: %v", width, height, panel)
 		}
-		buttons := virtualKeypadButtonsFor(width, height)
+		buttons := virtualKeypadButtonsFor(width, height, true)
 		if len(buttons) != 25 {
 			t.Fatalf("virtual keypad button count = %d, want 25", len(buttons))
 		}
@@ -126,6 +126,7 @@ func TestVirtualKeypadStaysInRightRailAndMapsEveryButton(t *testing.T) {
 				point.Y,
 				width,
 				height,
+				true,
 			)
 			if !ok || control != button.Control {
 				t.Errorf("virtual key %q hit result = %q, %t", button.Control, control, ok)

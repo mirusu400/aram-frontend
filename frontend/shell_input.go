@@ -76,7 +76,32 @@ func (s *Shell) handleMappedInput() {
 		s.collectTouchState(next)
 		s.collectVirtualKeypadState(next)
 	}
+	s.dropUnavailableControls(next)
 	s.queueInputTransitions(backend, next)
+}
+
+// sideKeysAvailable reports whether the guest owns the handset side keys. Only
+// whole-phone firmware reads the volume rocker; an application title is started
+// by a phone that keeps those keys for itself, so the keypad hides them rather
+// than offering a button whose press goes nowhere.
+func (s *Shell) sideKeysAvailable() bool {
+	return s.firmwareSession
+}
+
+// sideKeyControls are the handset side keys a keyboard or gamepad binding can
+// still name while an application title is loaded.
+var sideKeyControls = [...]string{"volume-up", "volume-down"}
+
+// dropUnavailableControls removes controls the current session cannot deliver
+// before the transition pass runs, so a control held when the session changed
+// is released rather than left stuck pressed in the backend.
+func (s *Shell) dropUnavailableControls(next map[string]bool) {
+	if s.sideKeysAvailable() {
+		return
+	}
+	for _, control := range sideKeyControls {
+		delete(next, control)
+	}
 }
 
 func (s *Shell) queueInputTransitions(backend InputBackend, next map[string]bool) {
@@ -270,13 +295,17 @@ func (s *Shell) collectVirtualKeypadState(state map[string]bool) {
 	width, height := s.viewportSize()
 	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
 		x, y := ebiten.CursorPosition()
-		if control, ok := virtualKeypadControlAtSize(x, y, width, height); ok {
+		if control, ok := virtualKeypadControlAtSize(
+			x, y, width, height, s.sideKeysAvailable(),
+		); ok {
 			state[control] = true
 		}
 	}
 	for _, id := range ebiten.AppendTouchIDs(nil) {
 		x, y := ebiten.TouchPosition(id)
-		if control, ok := virtualKeypadControlAtSize(x, y, width, height); ok {
+		if control, ok := virtualKeypadControlAtSize(
+			x, y, width, height, s.sideKeysAvailable(),
+		); ok {
 			state[control] = true
 		}
 	}
