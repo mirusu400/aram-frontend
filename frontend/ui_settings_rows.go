@@ -158,10 +158,11 @@ func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 				description: "Choose nearest or linear sampling.",
 				value:       strings.Title(shell.settings.Filter),
 				action:      func() { shell.dispatchCommand("view.filter") },
+				disabled:    shell.settings.DisplayEffect != displayEffectOff,
 			},
 			{
-				label:       "Display effect",
-				description: "Simulate RGB565 color, LCD cells, response bleed, and uneven backlighting.",
+				label:       "Display preset",
+				description: "Choose original pixels, crisp fractional scaling, or a feature-phone TFT panel.",
 				value:       displayEffectValueLabel(shell.settings.DisplayEffect),
 				action:      func() { shell.dispatchCommand("view.display_effect") },
 			},

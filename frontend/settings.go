@@ -10,9 +10,28 @@ import (
 const recentFileLimit = 10
 
 const (
-	displayEffectOff          = "off"
-	displayEffectFeaturePhone = "feature-phone"
+	displayEffectOff                = "off"
+	displayEffectCrispFit           = "crisp-fit"
+	displayEffectFeaturePhoneTFT    = "feature-phone-tft"
+	displayEffectFeaturePhoneLegacy = "feature-phone"
 )
+
+func displayEffectChoices() []string {
+	return []string{
+		displayEffectOff,
+		displayEffectCrispFit,
+		displayEffectFeaturePhoneTFT,
+	}
+}
+
+func isDisplayEffectChoice(effect string) bool {
+	for _, choice := range displayEffectChoices() {
+		if effect == choice {
+			return true
+		}
+	}
+	return false
+}
 
 // speedPresets are the emulation speeds the control offers, in slider order.
 var speedPresets = []float64{0.5, 1, 1.5, 2, 2.5, 3, 4}
@@ -138,7 +157,7 @@ func defaultSettings() Settings {
 		PreserveAspect:   true,
 		ScreenLayout:     "center",
 		Filter:           "nearest",
-		DisplayEffect:    displayEffectFeaturePhone,
+		DisplayEffect:    displayEffectFeaturePhoneTFT,
 		StateSlot:        0,
 		FontChoice:       "mulmaru",
 		CPUChoice:        "fastest",
@@ -192,9 +211,10 @@ func (s *Settings) normalize() {
 	if s.Filter != "nearest" && s.Filter != "linear" {
 		s.Filter = "nearest"
 	}
-	if s.DisplayEffect != displayEffectOff &&
-		s.DisplayEffect != displayEffectFeaturePhone {
-		s.DisplayEffect = displayEffectFeaturePhone
+	if s.DisplayEffect == displayEffectFeaturePhoneLegacy {
+		s.DisplayEffect = displayEffectFeaturePhoneTFT
+	} else if !isDisplayEffectChoice(s.DisplayEffect) {
+		s.DisplayEffect = displayEffectFeaturePhoneTFT
 	}
 	if s.FontChoice != "galmuri9" && s.FontChoice != "neodgm" && s.FontChoice != "mulmaru" && s.FontChoice != "custom" {
 		s.FontChoice = "galmuri9"

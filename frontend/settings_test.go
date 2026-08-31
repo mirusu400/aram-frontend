@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -48,39 +49,58 @@ func TestSettingsNormalizeRepairsDisplayOptions(t *testing.T) {
 		settings.ThemeMode != "light" ||
 		settings.ScreenLayout != "center" ||
 		settings.Filter != "nearest" ||
-		settings.DisplayEffect != "feature-phone" ||
+		settings.DisplayEffect != displayEffectFeaturePhoneTFT ||
 		settings.StateSlot != 0 ||
 		settings.Speed != 1 {
 		t.Fatalf("normalized settings = %#v", settings)
 	}
 }
 
-func TestFeaturePhoneDisplayEffectDefaultsOnAndCyclesOff(t *testing.T) {
+func TestDisplayEffectPresetsHaveAStableCycleOrder(t *testing.T) {
 	temporary := t.TempDir()
 	t.Setenv("APPDATA", temporary)
 	t.Setenv("XDG_CONFIG_HOME", temporary)
 
 	shell := &Shell{settings: defaultSettings()}
-	if shell.settings.DisplayEffect != "feature-phone" {
-		t.Fatalf("default display effect = %q, want feature-phone", shell.settings.DisplayEffect)
+	if shell.settings.DisplayEffect != displayEffectFeaturePhoneTFT {
+		t.Fatalf("default display effect = %q, want TFT", shell.settings.DisplayEffect)
 	}
-	shell.cycleDisplayEffect()
-	if shell.settings.DisplayEffect != "off" {
-		t.Fatalf("cycled display effect = %q, want off", shell.settings.DisplayEffect)
+	want := []string{
+		displayEffectOff,
+		displayEffectCrispFit,
+		displayEffectFeaturePhoneTFT,
 	}
-	shell.cycleDisplayEffect()
-	if shell.settings.DisplayEffect != "feature-phone" {
-		t.Fatalf("second display effect = %q, want feature-phone", shell.settings.DisplayEffect)
+	for _, effect := range want {
+		shell.cycleDisplayEffect()
+		if shell.settings.DisplayEffect != effect {
+			t.Fatalf("cycled display effect = %q, want %q", shell.settings.DisplayEffect, effect)
+		}
 	}
 }
 
-func TestLegacySettingsReceiveFeaturePhoneDisplayEffect(t *testing.T) {
+func TestDisplayEffectPresetChoicesMatchTheProductOrder(t *testing.T) {
+	want := []string{
+		displayEffectOff,
+		displayEffectCrispFit,
+		displayEffectFeaturePhoneTFT,
+	}
+	if got := displayEffectChoices(); !slices.Equal(got, want) {
+		t.Fatalf("display effect choices = %q, want %q", got, want)
+	}
+	for _, effect := range want {
+		if displayEffectValueLabel(effect) == "" {
+			t.Errorf("display effect %q has no label", effect)
+		}
+	}
+}
+
+func TestLegacySettingsMigrateToFeaturePhoneTFT(t *testing.T) {
 	settings := defaultSettings()
-	if err := json.Unmarshal([]byte(`{"filter":"linear"}`), &settings); err != nil {
+	if err := json.Unmarshal([]byte(`{"filter":"linear","display_effect":"feature-phone"}`), &settings); err != nil {
 		t.Fatal(err)
 	}
 	settings.normalize()
-	if settings.Filter != "linear" || settings.DisplayEffect != "feature-phone" {
+	if settings.Filter != "linear" || settings.DisplayEffect != displayEffectFeaturePhoneTFT {
 		t.Fatalf("legacy display settings = %#v", settings)
 	}
 }

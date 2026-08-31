@@ -38,7 +38,7 @@ mobile hosts should include `application/zip` in their document picker.
 - Rotation
 - Screen Layout
 - Nearest/linear filter
-- Feature-phone LCD display effect
+- Display presets: Original, Crisp Fit, and Feature Phone TFT
 - Native-resolution Screenshot (`Ctrl+Shift+S`)
 
 The internal canvas follows the actual window size. Application chrome keeps
@@ -204,11 +204,14 @@ resolution, so a running title neither re-uploads an unchanged screen nor
 allocates a texture per frame. A backend that hands over tightly packed RGBA is
 uploaded without an intermediate copy.
 
-The feature-phone LCD effect is enabled by default and applied only to the
-presented guest viewport. It simulates an RGB565 panel, subtle LCD cell seams,
-response bleed, lifted blacks, and uneven backlighting. It can be disabled
-independently of nearest/linear texture sampling. Native-resolution screenshots
-remain untouched.
+Feature Phone TFT is the default display preset. Crisp Fit uses sharp bilinear
+sampling: source-pixel centers remain flat while fractional-size boundaries
+blend across one output pixel. The TFT preset adds RGB565 colour, subtle LCD
+cell seams, uneven backlighting, and an exponential response history driven by
+display time, so moving pixels leave a real previous-frame trail and then
+settle even when the guest frame becomes static. Original keeps
+the separate nearest/linear texture setting. All presets affect presentation
+only; native-resolution screenshots remain untouched.
 
 Guest audio is drained from `AudioStreamBackend` on every tick, including ticks
 where a frame batch is still executing. A title heavy enough to keep a batch

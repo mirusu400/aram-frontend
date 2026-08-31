@@ -97,6 +97,12 @@ type Shell struct {
 	frame                     VideoFrame
 	frameImage                *ebiten.Image
 	displayEffectImage        *ebiten.Image
+	displayHistoryImage       *ebiten.Image
+	displayResponseImage      *ebiten.Image
+	displayHistoryKey         displayHistoryKey
+	displayHistorySequence    uint64
+	displayHistoryAt          time.Time
+	displayHistoryValid       bool
 	frameScratch              *image.RGBA
 	latestVideoGuestNS        atomic.Int64
 	latestVideoGeneration     atomic.Uint64

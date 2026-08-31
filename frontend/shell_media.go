@@ -40,6 +40,7 @@ func (s *Shell) releaseCurrentInput() error {
 	s.frame = VideoFrame{}
 	s.frameImage = nil
 	s.frameScratch = nil
+	s.releaseDisplaySurfaces()
 	s.state = FrontendEmpty
 	setPlatformWindowTitle(s.tr("ARAM - Archived Runtime for ARM Mobiles"))
 	return nil

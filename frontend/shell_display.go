@@ -67,23 +67,38 @@ func (s *Shell) cycleFilter() {
 }
 
 func (s *Shell) cycleDisplayEffect() {
-	if s.settings.DisplayEffect == displayEffectFeaturePhone {
-		s.settings.DisplayEffect = displayEffectOff
-	} else {
-		s.settings.DisplayEffect = displayEffectFeaturePhone
+	choices := displayEffectChoices()
+	current := 0
+	for index, effect := range choices {
+		if effect == s.settings.DisplayEffect {
+			current = index
+			break
+		}
 	}
+	s.settings.DisplayEffect = choices[(current+1)%len(choices)]
 	_ = s.settings.save()
 	s.setStatus(s.trf(
-		"Display Effect: %s",
+		"Display Preset: %s",
 		s.tr(displayEffectValueLabel(s.settings.DisplayEffect)),
 	))
 }
 
 func displayEffectValueLabel(effect string) string {
-	if effect == displayEffectFeaturePhone {
-		return "Feature phone LCD"
+	switch effect {
+	case displayEffectCrispFit:
+		return "Crisp Fit"
+	case displayEffectFeaturePhoneTFT:
+		return "Feature Phone TFT"
+	default:
+		return "Original"
 	}
-	return "Off"
+}
+
+func (s *Shell) displayPresentationValueLabel() string {
+	if s.settings.DisplayEffect == displayEffectOff {
+		return settingValueLabel(s.settings.Filter)
+	}
+	return displayEffectValueLabel(s.settings.DisplayEffect)
 }
 
 func (s *Shell) cycleStateSlot() {

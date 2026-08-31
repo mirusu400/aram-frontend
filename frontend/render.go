@@ -6,6 +6,7 @@ import (
 	"math"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -139,35 +140,217 @@ func (s *Shell) drawGuestViewport(screen *ebiten.Image, viewport image.Rectangle
 	s.drawGuestFrame(screen, destination, sourceBounds)
 }
 
-// drawGuestFrame keeps sampling and the optional panel simulation separate.
-// The guest is first rotated and scaled exactly as it is without an effect;
-// the feature-phone pass then models the physical LCD over those final pixels.
-// This also keeps screenshots on the guest-native frame, before presentation.
+// drawGuestFrame keeps the guest-native texture immutable and builds each
+// presentation preset from it. Original preserves the user's texture-filter
+// choice. Crisp Fit and handset panels use sharp bilinear sampling so integer
+// pixels stay flat while fractional window fits blend only at cell boundaries.
 func (s *Shell) drawGuestFrame(
 	screen *ebiten.Image,
 	destination image.Rectangle,
 	sourceBounds image.Rectangle,
 ) {
-	drawDestination := destination
-	target := screen
-	if s.settings.DisplayEffect == displayEffectFeaturePhone {
-		target = s.ensureDisplayEffectImage(destination.Dx(), destination.Dy())
-		target.Clear()
-		drawDestination = image.Rect(0, 0, destination.Dx(), destination.Dy())
-	}
-
-	target.DrawImage(s.frameImage, s.guestFrameDrawOptions(sourceBounds, drawDestination))
-	if target == screen {
+	effect := s.settings.DisplayEffect
+	if effect == displayEffectOff || !isDisplayEffectChoice(effect) {
+		s.resetDisplayHistory()
+		screen.DrawImage(s.frameImage, s.guestFrameDrawOptions(sourceBounds, destination))
 		return
 	}
 
+	target := s.ensureDisplayEffectImage(destination.Dx(), destination.Dy())
+	target.Clear()
+	if err := s.drawSharpBilinear(target, sourceBounds); err != nil {
+		// Fixed shader compilation is tested, but the frame must remain visible
+		// if a platform rejects it at runtime.
+		local := image.Rect(0, 0, destination.Dx(), destination.Dy())
+		target.DrawImage(s.frameImage, s.guestFrameDrawOptions(sourceBounds, local))
+	}
+
+	if effect == displayEffectFeaturePhoneTFT {
+		target = s.updateDisplayPersistence(target)
+		s.drawFeaturePhonePanel(screen, target, destination, sourceBounds)
+		return
+	}
+
+	s.resetDisplayHistory()
+	drawDisplaySurface(screen, target, destination)
+}
+
+var displayQuadIndices = []uint16{0, 1, 2, 1, 3, 2}
+
+func (s *Shell) drawSharpBilinear(
+	target *ebiten.Image,
+	sourceBounds image.Rectangle,
+) error {
+	shader, err := loadSharpBilinearShader()
+	if err != nil {
+		return err
+	}
+	scaleX, scaleY := sharpBilinearScale(
+		target.Bounds(),
+		sourceBounds.Dx(),
+		sourceBounds.Dy(),
+		s.settings.Rotation,
+	)
+	options := &ebiten.DrawTrianglesShaderOptions{
+		Uniforms: map[string]any{
+			"Scale": []float32{scaleX, scaleY},
+		},
+	}
+	options.Images[0] = s.frameImage
+	target.DrawTrianglesShader(
+		displayQuadVertices(target.Bounds(), sourceBounds, s.settings.Rotation),
+		displayQuadIndices,
+		shader,
+		options,
+	)
+	return nil
+}
+
+func displayQuadVertices(
+	destination image.Rectangle,
+	source image.Rectangle,
+	rotation int,
+) []ebiten.Vertex {
+	left, top := float32(source.Min.X), float32(source.Min.Y)
+	right, bottom := float32(source.Max.X), float32(source.Max.Y)
+	sourceCorners := [4][2]float32{
+		{left, top}, {right, top}, {left, bottom}, {right, bottom},
+	}
+	switch rotation {
+	case 90:
+		sourceCorners = [4][2]float32{
+			{left, bottom}, {left, top}, {right, bottom}, {right, top},
+		}
+	case 180:
+		sourceCorners = [4][2]float32{
+			{right, bottom}, {left, bottom}, {right, top}, {left, top},
+		}
+	case 270:
+		sourceCorners = [4][2]float32{
+			{right, top}, {right, bottom}, {left, top}, {left, bottom},
+		}
+	}
+	destinationCorners := [4][2]float32{
+		{float32(destination.Min.X), float32(destination.Min.Y)},
+		{float32(destination.Max.X), float32(destination.Min.Y)},
+		{float32(destination.Min.X), float32(destination.Max.Y)},
+		{float32(destination.Max.X), float32(destination.Max.Y)},
+	}
+	vertices := make([]ebiten.Vertex, 4)
+	for index := range vertices {
+		vertices[index] = ebiten.Vertex{
+			DstX:   destinationCorners[index][0],
+			DstY:   destinationCorners[index][1],
+			SrcX:   sourceCorners[index][0],
+			SrcY:   sourceCorners[index][1],
+			ColorR: 1,
+			ColorG: 1,
+			ColorB: 1,
+			ColorA: 1,
+		}
+	}
+	return vertices
+}
+
+// sharpBilinearScale is expressed in source axes. A quarter-turn swaps which
+// destination edge scales source X and Y.
+func sharpBilinearScale(
+	destination image.Rectangle,
+	sourceWidth, sourceHeight, rotation int,
+) (float32, float32) {
+	if sourceWidth <= 0 || sourceHeight <= 0 {
+		return 1, 1
+	}
+	if rotation == 90 || rotation == 270 {
+		return float32(destination.Dy()) / float32(sourceWidth),
+			float32(destination.Dx()) / float32(sourceHeight)
+	}
+	return float32(destination.Dx()) / float32(sourceWidth),
+		float32(destination.Dy()) / float32(sourceHeight)
+}
+
+type displayHistoryKey struct {
+	Width      int
+	Height     int
+	Rotation   int
+	Effect     string
+	Filter     string
+	Generation uint64
+}
+
+func (s *Shell) updateDisplayPersistence(
+	current *ebiten.Image,
+) *ebiten.Image {
+	width, height := current.Bounds().Dx(), current.Bounds().Dy()
+	history := ensureDisplaySurface(&s.displayHistoryImage, width, height)
+	response := ensureDisplaySurface(&s.displayResponseImage, width, height)
+	key := displayHistoryKey{
+		Width:      width,
+		Height:     height,
+		Rotation:   s.settings.Rotation,
+		Effect:     s.settings.DisplayEffect,
+		Filter:     s.settings.Filter,
+		Generation: s.frame.Generation,
+	}
+	now := s.now()
+	if !s.displayHistoryValid || s.displayHistoryKey != key ||
+		s.frame.Sequence < s.displayHistorySequence {
+		history.Clear()
+		history.DrawImage(current, nil)
+		s.displayHistoryKey = key
+		s.displayHistorySequence = s.frame.Sequence
+		s.displayHistoryAt = now
+		s.displayHistoryValid = true
+		return history
+	}
+	elapsed := now.Sub(s.displayHistoryAt)
+	if s.frame.Sequence == s.displayHistorySequence && elapsed <= 0 {
+		return history
+	}
+
+	shader, err := loadTemporalBlendShader()
+	response.Clear()
+	if err != nil {
+		response.DrawImage(current, nil)
+	} else {
+		weight := displayPersistenceWeight(
+			s.settings.DisplayEffect,
+			elapsed,
+		)
+		options := &ebiten.DrawRectShaderOptions{
+			Uniforms: map[string]any{"HistoryWeight": weight},
+		}
+		options.Images[0] = current
+		options.Images[1] = history
+		response.DrawRectShader(width, height, shader, options)
+	}
+	s.displayHistoryImage, s.displayResponseImage = response, history
+	s.displayHistorySequence = s.frame.Sequence
+	s.displayHistoryAt = now
+	return s.displayHistoryImage
+}
+
+func displayPersistenceWeight(effect string, elapsed time.Duration) float32 {
+	halfLife := 22 * time.Millisecond
+	if effect != displayEffectFeaturePhoneTFT {
+		return 0
+	}
+	if elapsed <= 0 {
+		elapsed = time.Second / 60
+	}
+	weight := math.Pow(0.5, float64(elapsed)/float64(halfLife))
+	return float32(min(0.95, max(0.0, weight)))
+}
+
+func (s *Shell) drawFeaturePhonePanel(
+	screen *ebiten.Image,
+	source *ebiten.Image,
+	destination image.Rectangle,
+	sourceBounds image.Rectangle,
+) {
 	shader, err := loadFeaturePhoneDisplayShader()
 	if err != nil {
-		// A fixed shader compilation failure is covered by a focused test. The
-		// runtime fallback still leaves the guest visible on unusual drivers.
-		options := &ebiten.DrawImageOptions{}
-		options.GeoM.Translate(float64(destination.Min.X), float64(destination.Min.Y))
-		screen.DrawImage(target, options)
+		drawDisplaySurface(screen, source, destination)
 		return
 	}
 	pitchX, pitchY := displayPixelPitch(
@@ -181,9 +364,19 @@ func (s *Shell) drawGuestFrame(
 			"PixelPitch": []float32{pitchX, pitchY},
 		},
 	}
-	options.Images[0] = target
+	options.Images[0] = source
 	options.GeoM.Translate(float64(destination.Min.X), float64(destination.Min.Y))
 	screen.DrawRectShader(destination.Dx(), destination.Dy(), shader, options)
+}
+
+func drawDisplaySurface(
+	screen *ebiten.Image,
+	source *ebiten.Image,
+	destination image.Rectangle,
+) {
+	options := &ebiten.DrawImageOptions{}
+	options.GeoM.Translate(float64(destination.Min.X), float64(destination.Min.Y))
+	screen.DrawImage(source, options)
 }
 
 func (s *Shell) guestFrameDrawOptions(
@@ -222,12 +415,30 @@ func (s *Shell) guestFrameDrawOptions(
 }
 
 func (s *Shell) ensureDisplayEffectImage(width, height int) *ebiten.Image {
-	if s.displayEffectImage == nil ||
-		s.displayEffectImage.Bounds().Dx() != width ||
-		s.displayEffectImage.Bounds().Dy() != height {
-		s.displayEffectImage = ebiten.NewImage(width, height)
+	return ensureDisplaySurface(&s.displayEffectImage, width, height)
+}
+
+func ensureDisplaySurface(surface **ebiten.Image, width, height int) *ebiten.Image {
+	if *surface == nil ||
+		(*surface).Bounds().Dx() != width ||
+		(*surface).Bounds().Dy() != height {
+		*surface = ebiten.NewImage(width, height)
 	}
-	return s.displayEffectImage
+	return *surface
+}
+
+func (s *Shell) resetDisplayHistory() {
+	s.displayHistoryKey = displayHistoryKey{}
+	s.displayHistorySequence = 0
+	s.displayHistoryAt = time.Time{}
+	s.displayHistoryValid = false
+}
+
+func (s *Shell) releaseDisplaySurfaces() {
+	s.displayEffectImage = nil
+	s.displayHistoryImage = nil
+	s.displayResponseImage = nil
+	s.resetDisplayHistory()
 }
 
 // displayPixelPitch reports how many final display pixels represent one guest
@@ -248,10 +459,32 @@ func displayPixelPitch(
 }
 
 var (
+	sharpBilinearShaderOnce       sync.Once
+	sharpBilinearShader           *ebiten.Shader
+	sharpBilinearShaderErr        error
+	temporalBlendShaderOnce       sync.Once
+	temporalBlendShader           *ebiten.Shader
+	temporalBlendShaderErr        error
 	featurePhoneDisplayShaderOnce sync.Once
 	featurePhoneDisplayShader     *ebiten.Shader
 	featurePhoneDisplayShaderErr  error
 )
+
+func loadSharpBilinearShader() (*ebiten.Shader, error) {
+	sharpBilinearShaderOnce.Do(func() {
+		sharpBilinearShader, sharpBilinearShaderErr =
+			ebiten.NewShader([]byte(sharpBilinearShaderSource))
+	})
+	return sharpBilinearShader, sharpBilinearShaderErr
+}
+
+func loadTemporalBlendShader() (*ebiten.Shader, error) {
+	temporalBlendShaderOnce.Do(func() {
+		temporalBlendShader, temporalBlendShaderErr =
+			ebiten.NewShader([]byte(temporalBlendShaderSource))
+	})
+	return temporalBlendShader, temporalBlendShaderErr
+}
 
 func loadFeaturePhoneDisplayShader() (*ebiten.Shader, error) {
 	featurePhoneDisplayShaderOnce.Do(func() {
@@ -261,8 +494,60 @@ func loadFeaturePhoneDisplayShader() (*ebiten.Shader, error) {
 	return featurePhoneDisplayShader, featurePhoneDisplayShaderErr
 }
 
+// Sharp bilinear holds the center of each source pixel flat and confines
+// interpolation to one output pixel around a source-cell boundary. Fractional
+// fits therefore stay crisp without the uneven pixel widths of nearest-neighbor
+// sampling. Downscaling naturally falls back to ordinary bilinear sampling.
+const sharpBilinearShaderSource = `//kage:unit pixels
+
+package main
+
+var Scale vec2
+
+func SafeSource(pos vec2) vec4 {
+	origin := imageSrc0Origin()
+	size := imageSrc0Size()
+	halfPixel := vec2(0.5)
+	return imageSrc0At(clamp(pos, origin+halfPixel, origin+size-halfPixel))
+}
+
+func BilinearSource(pos vec2) vec4 {
+	origin := imageSrc0Origin()
+	texel := pos - origin - vec2(0.5)
+	base := floor(texel)
+	f := fract(texel)
+	p := origin + base + vec2(0.5)
+	top := mix(SafeSource(p), SafeSource(p+vec2(1.0, 0.0)), f.x)
+	bottom := mix(SafeSource(p+vec2(0.0, 1.0)), SafeSource(p+vec2(1.0, 1.0)), f.x)
+	return mix(top, bottom, f.y)
+}
+
+func Fragment(dstPos vec4, src0Pos vec2, color vec4) vec4 {
+	origin := imageSrc0Origin()
+	local := src0Pos - origin
+	scale := max(Scale, vec2(1.0))
+	region := vec2(0.5) - vec2(0.5)/scale
+	distanceFromCenter := fract(local) - vec2(0.5)
+	transition := (distanceFromCenter-clamp(distanceFromCenter, -region, region))*scale + vec2(0.5)
+	return BilinearSource(origin + floor(local) + transition)
+}
+`
+
+const temporalBlendShaderSource = `//kage:unit pixels
+
+package main
+
+var HistoryWeight float
+
+func Fragment(dstPos vec4, src0Pos vec2, color vec4) vec4 {
+	current := imageSrc0At(src0Pos)
+	history := imageSrc1At(src0Pos)
+	return mix(current, history, HistoryWeight)
+}
+`
+
 // The panel is intentionally TFT/LCD, not CRT: RGB565 colour depth, a subtle
-// RGB subpixel mask, source-pixel cell seams, slow-response bleed, lifted
+// RGB subpixel mask, source-pixel cell seams, temporal response, lifted
 // blacks, and uneven edge illumination. The strengths stay low enough that
 // Hangul and small in-game text remain readable.
 const featurePhoneDisplayShaderSource = `//kage:unit pixels
@@ -280,8 +565,7 @@ func LCDSample(pos vec2) vec4 {
 
 func Fragment(dstPos vec4, src0Pos vec2, color vec4) vec4 {
 	current := LCDSample(src0Pos)
-	responseTrail := LCDSample(src0Pos - vec2(0.7, 0.2))
-	rgb := current.rgb*0.955 + responseTrail.rgb*0.045
+	rgb := current.rgb
 
 	// Mid-2000s colour handsets commonly exposed a 16-bit RGB565 panel.
 	rgb.r = floor(rgb.r*31.0+0.5) / 31.0

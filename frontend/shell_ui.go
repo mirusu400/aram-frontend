@@ -129,7 +129,7 @@ func (u *shellUI) sync(shell *Shell) {
 		"%s  •  %s  •  %s",
 		strings.ToUpper(shell.tr(stateValueLabel(string(shell.backend.State())))),
 		shell.speedSettingValue(),
-		strings.ToUpper(shell.tr(settingValueLabel(shell.settings.Filter))),
+		strings.ToUpper(shell.tr(shell.displayPresentationValueLabel())),
 	))
 	if shell.input == nil {
 		u.toolbarTitle.Label = shell.tr("No title loaded")
