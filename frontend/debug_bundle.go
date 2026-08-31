@@ -107,21 +107,22 @@ type debugProblemReport struct {
 }
 
 type debugSettingsReport struct {
-	Language       string  `json:"language"`
-	CPU            string  `json:"cpu"`
-	Speed          float64 `json:"speed"`
-	StateSlot      int     `json:"state_slot"`
-	Theme          string  `json:"theme"`
-	IntegerScaling bool    `json:"integer_scaling"`
-	PreserveAspect bool    `json:"preserve_aspect"`
-	Rotation       int     `json:"rotation"`
-	ScreenLayout   string  `json:"screen_layout"`
-	Filter         string  `json:"filter"`
-	DisplayEffect  string  `json:"display_effect"`
-	Muted          bool    `json:"muted"`
-	Volume         int     `json:"volume"`
-	AudioLatencyMS int     `json:"audio_latency_ms"`
-	AudioMixMode   bool    `json:"audio_mix_mode"`
+	Language              string  `json:"language"`
+	CPU                   string  `json:"cpu"`
+	Speed                 float64 `json:"speed"`
+	StateSlot             int     `json:"state_slot"`
+	Theme                 string  `json:"theme"`
+	IntegerScaling        bool    `json:"integer_scaling"`
+	PreserveAspect        bool    `json:"preserve_aspect"`
+	Rotation              int     `json:"rotation"`
+	ScreenLayout          string  `json:"screen_layout"`
+	Filter                string  `json:"filter"`
+	DisplayEffect         string  `json:"display_effect"`
+	DisplayEffectStrength int     `json:"display_effect_strength"`
+	Muted                 bool    `json:"muted"`
+	Volume                int     `json:"volume"`
+	AudioLatencyMS        int     `json:"audio_latency_ms"`
+	AudioMixMode          bool    `json:"audio_mix_mode"`
 }
 
 type debugFileReport struct {

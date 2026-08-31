@@ -46,6 +46,7 @@ func (s *Shell) captureDebugBundleSnapshot(createdAt time.Time) debugBundleSnaps
 	if frame := s.currentFrame(); frame.Image != nil {
 		screenshot = cloneImage(frame.Image)
 	}
+	display := s.displayProfile()
 
 	return debugBundleSnapshot{
 		CreatedAt:     createdAt,
@@ -55,21 +56,22 @@ func (s *Shell) captureDebugBundleSnapshot(createdAt time.Time) debugBundleSnaps
 		FrontendState: s.state,
 		Problem:       problem,
 		Settings: debugSettingsReport{
-			Language:       s.settings.Language,
-			CPU:            s.settings.CPUChoice,
-			Speed:          s.settings.Speed,
-			StateSlot:      s.settings.StateSlot,
-			Theme:          s.settings.ThemeMode,
-			IntegerScaling: s.settings.IntegerScaling,
-			PreserveAspect: s.settings.PreserveAspect,
-			Rotation:       s.settings.Rotation,
-			ScreenLayout:   s.settings.ScreenLayout,
-			Filter:         s.settings.Filter,
-			DisplayEffect:  s.settings.DisplayEffect,
-			Muted:          s.settings.Muted,
-			Volume:         s.settings.Volume,
-			AudioLatencyMS: s.settings.AudioLatencyMS,
-			AudioMixMode:   s.settings.AudioMixMode,
+			Language:              s.settings.Language,
+			CPU:                   s.settings.CPUChoice,
+			Speed:                 s.settings.Speed,
+			StateSlot:             s.settings.StateSlot,
+			Theme:                 s.settings.ThemeMode,
+			IntegerScaling:        display.IntegerScaling,
+			PreserveAspect:        display.PreserveAspect,
+			Rotation:              display.Rotation,
+			ScreenLayout:          display.ScreenLayout,
+			Filter:                display.Filter,
+			DisplayEffect:         display.DisplayEffect,
+			DisplayEffectStrength: display.DisplayEffectStrength,
+			Muted:                 s.settings.Muted,
+			Volume:                s.settings.Volume,
+			AudioLatencyMS:        s.settings.AudioLatencyMS,
+			AudioMixMode:          s.settings.AudioMixMode,
 		},
 		Build:        build,
 		FrontendLogs: logs,

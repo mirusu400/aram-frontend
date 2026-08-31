@@ -10,6 +10,12 @@ import (
 const recentFileLimit = 10
 
 const (
+	displayEffectStrengthMin     = 0
+	displayEffectStrengthMax     = 100
+	displayEffectStrengthDefault = 100
+)
+
+const (
 	displayEffectOff                = "off"
 	displayEffectCrispFit           = "crisp-fit"
 	displayEffectFeaturePhoneTFT    = "feature-phone-tft"
@@ -76,50 +82,66 @@ type ControllerProfile struct {
 	GamepadBindings  map[string]string `json:"gamepad_bindings,omitempty"`
 }
 
+// DisplayProfile is the complete guest-presentation policy. The top-level
+// Settings fields remain the global defaults for backwards compatibility;
+// identified titles can override them in TitleDisplays without changing what
+// a newly opened title inherits.
+type DisplayProfile struct {
+	IntegerScaling        bool   `json:"integer_scaling"`
+	PreserveAspect        bool   `json:"preserve_aspect"`
+	Rotation              int    `json:"rotation"`
+	ScreenLayout          string `json:"screen_layout"`
+	Filter                string `json:"filter"`
+	DisplayEffect         string `json:"display_effect"`
+	DisplayEffectStrength int    `json:"display_effect_strength"`
+}
+
 type Settings struct {
-	RecentFiles       []string                     `json:"recent_files"`
-	Language          string                       `json:"language"`
-	ThemeMode         string                       `json:"theme_mode"`
-	ThemeFamily       string                       `json:"theme_family"`
-	IntegerScaling    bool                         `json:"integer_scaling"`
-	PreserveAspect    bool                         `json:"preserve_aspect"`
-	LastFirmwarePath  string                       `json:"last_firmware_path,omitempty"`
-	Rotation          int                          `json:"rotation"`
-	ScreenLayout      string                       `json:"screen_layout"`
-	Filter            string                       `json:"filter"`
-	DisplayEffect     string                       `json:"display_effect"`
-	StateSlot         int                          `json:"state_slot"`
-	FontChoice        string                       `json:"font_choice"`
-	CustomFontPath    string                       `json:"custom_font_path,omitempty"`
-	CPUChoice         string                       `json:"cpu_choice"`
-	Speed             float64                      `json:"speed"`
-	Muted             bool                         `json:"muted"`
-	Volume            int                          `json:"volume"`
-	AudioLatencyMS    int                          `json:"audio_latency_ms"`
-	AudioDeviceID     string                       `json:"audio_device_id,omitempty"`
-	AudioMixMode      bool                         `json:"audio_mix_mode"`
-	AudioSoften       bool                         `json:"audio_soften"`
-	CPUProfile        bool                         `json:"cpu_profile"`
-	UIPriority        bool                         `json:"ui_priority"`
-	KeyboardProfile   string                       `json:"keyboard_profile"`
-	KeyboardBindings  map[string]string            `json:"keyboard_bindings,omitempty"`
-	GamepadEnabled    bool                         `json:"gamepad_enabled"`
-	GamepadLayout     string                       `json:"gamepad_layout"`
-	GamepadAnalog     bool                         `json:"gamepad_analog"`
-	GamepadDeadzone   int                          `json:"gamepad_deadzone"`
-	GamepadBindings   map[string]string            `json:"gamepad_bindings,omitempty"`
-	PerTitleControls  bool                         `json:"per_title_controls"`
-	TitleControllers  map[string]ControllerProfile `json:"title_controller_profiles,omitempty"`
-	ShowVirtualKeypad bool                         `json:"show_virtual_keypad"`
-	VibrationEnabled  bool                         `json:"vibration_enabled"`
-	TouchControlScale int                          `json:"touch_control_scale,omitempty"`
-	TouchDeckRatio    int                          `json:"touch_deck_ratio,omitempty"`
-	TouchLayout       map[string]TouchPlacement    `json:"touch_layout,omitempty"`
-	TouchHidden       map[string]bool              `json:"touch_hidden,omitempty"`
-	TouchGridStep     int                          `json:"touch_grid_step,omitempty"`
-	UpdateChannel     string                       `json:"update_channel"`
-	WelcomeCompleted  bool                         `json:"welcome_completed"`
-	IssueReports      []IssueReportRecord          `json:"issue_reports,omitempty"`
+	RecentFiles           []string                     `json:"recent_files"`
+	Language              string                       `json:"language"`
+	ThemeMode             string                       `json:"theme_mode"`
+	ThemeFamily           string                       `json:"theme_family"`
+	IntegerScaling        bool                         `json:"integer_scaling"`
+	PreserveAspect        bool                         `json:"preserve_aspect"`
+	LastFirmwarePath      string                       `json:"last_firmware_path,omitempty"`
+	Rotation              int                          `json:"rotation"`
+	ScreenLayout          string                       `json:"screen_layout"`
+	Filter                string                       `json:"filter"`
+	DisplayEffect         string                       `json:"display_effect"`
+	DisplayEffectStrength int                          `json:"display_effect_strength"`
+	TitleDisplays         map[string]DisplayProfile    `json:"title_display_profiles,omitempty"`
+	StateSlot             int                          `json:"state_slot"`
+	FontChoice            string                       `json:"font_choice"`
+	CustomFontPath        string                       `json:"custom_font_path,omitempty"`
+	CPUChoice             string                       `json:"cpu_choice"`
+	Speed                 float64                      `json:"speed"`
+	Muted                 bool                         `json:"muted"`
+	Volume                int                          `json:"volume"`
+	AudioLatencyMS        int                          `json:"audio_latency_ms"`
+	AudioDeviceID         string                       `json:"audio_device_id,omitempty"`
+	AudioMixMode          bool                         `json:"audio_mix_mode"`
+	AudioSoften           bool                         `json:"audio_soften"`
+	CPUProfile            bool                         `json:"cpu_profile"`
+	UIPriority            bool                         `json:"ui_priority"`
+	KeyboardProfile       string                       `json:"keyboard_profile"`
+	KeyboardBindings      map[string]string            `json:"keyboard_bindings,omitempty"`
+	GamepadEnabled        bool                         `json:"gamepad_enabled"`
+	GamepadLayout         string                       `json:"gamepad_layout"`
+	GamepadAnalog         bool                         `json:"gamepad_analog"`
+	GamepadDeadzone       int                          `json:"gamepad_deadzone"`
+	GamepadBindings       map[string]string            `json:"gamepad_bindings,omitempty"`
+	PerTitleControls      bool                         `json:"per_title_controls"`
+	TitleControllers      map[string]ControllerProfile `json:"title_controller_profiles,omitempty"`
+	ShowVirtualKeypad     bool                         `json:"show_virtual_keypad"`
+	VibrationEnabled      bool                         `json:"vibration_enabled"`
+	TouchControlScale     int                          `json:"touch_control_scale,omitempty"`
+	TouchDeckRatio        int                          `json:"touch_deck_ratio,omitempty"`
+	TouchLayout           map[string]TouchPlacement    `json:"touch_layout,omitempty"`
+	TouchHidden           map[string]bool              `json:"touch_hidden,omitempty"`
+	TouchGridStep         int                          `json:"touch_grid_step,omitempty"`
+	UpdateChannel         string                       `json:"update_channel"`
+	WelcomeCompleted      bool                         `json:"welcome_completed"`
+	IssueReports          []IssueReportRecord          `json:"issue_reports,omitempty"`
 }
 
 // TouchPlacement stores a custom on-screen button position as its center
@@ -156,30 +178,32 @@ func touchScaleFactor(percent int) float64 {
 
 func defaultSettings() Settings {
 	return Settings{
-		Language:         string(systemLanguage()),
-		ThemeMode:        systemThemeMode(),
-		ThemeFamily:      themeFamilyModern,
-		IntegerScaling:   true,
-		PreserveAspect:   true,
-		ScreenLayout:     "center",
-		Filter:           "nearest",
-		DisplayEffect:    displayEffectFeaturePhoneTFT,
-		StateSlot:        0,
-		FontChoice:       "mulmaru",
-		CPUChoice:        "fastest",
-		Speed:            1,
-		Volume:           100,
-		AudioLatencyMS:   60,
-		AudioSoften:      true,
-		KeyboardProfile:  "default",
-		GamepadEnabled:   true,
-		GamepadLayout:    "standard",
-		GamepadAnalog:    true,
-		GamepadDeadzone:  30,
-		TitleControllers: make(map[string]ControllerProfile),
-		UpdateChannel:    string(updateChannelStable),
-		VibrationEnabled: true,
-		CPUProfile:       true,
+		Language:              string(systemLanguage()),
+		ThemeMode:             systemThemeMode(),
+		ThemeFamily:           themeFamilyModern,
+		IntegerScaling:        true,
+		PreserveAspect:        true,
+		ScreenLayout:          "center",
+		Filter:                "nearest",
+		DisplayEffect:         displayEffectFeaturePhoneTFT,
+		DisplayEffectStrength: displayEffectStrengthDefault,
+		TitleDisplays:         make(map[string]DisplayProfile),
+		StateSlot:             0,
+		FontChoice:            "mulmaru",
+		CPUChoice:             "fastest",
+		Speed:                 1,
+		Volume:                100,
+		AudioLatencyMS:        60,
+		AudioSoften:           true,
+		KeyboardProfile:       "default",
+		GamepadEnabled:        true,
+		GamepadLayout:         "standard",
+		GamepadAnalog:         true,
+		GamepadDeadzone:       30,
+		TitleControllers:      make(map[string]ControllerProfile),
+		UpdateChannel:         string(updateChannelStable),
+		VibrationEnabled:      true,
+		CPUProfile:            true,
 	}
 }
 
@@ -206,21 +230,15 @@ func (s *Settings) normalize() {
 	if s.ThemeFamily != themeFamilyModern && !isRetroFamily(s.ThemeFamily) {
 		s.ThemeFamily = themeFamilyModern
 	}
-	switch s.Rotation {
-	case 0, 90, 180, 270:
-	default:
-		s.Rotation = 0
+	display := s.globalDisplayProfile()
+	display.normalize()
+	s.setGlobalDisplayProfile(display)
+	if s.TitleDisplays == nil {
+		s.TitleDisplays = make(map[string]DisplayProfile)
 	}
-	if s.ScreenLayout != "center" && s.ScreenLayout != "stretch" {
-		s.ScreenLayout = "center"
-	}
-	if s.Filter != "nearest" && s.Filter != "linear" {
-		s.Filter = "nearest"
-	}
-	if s.DisplayEffect == displayEffectFeaturePhoneLegacy {
-		s.DisplayEffect = displayEffectFeaturePhoneTFT
-	} else if !isDisplayEffectChoice(s.DisplayEffect) {
-		s.DisplayEffect = displayEffectFeaturePhoneTFT
+	for key, profile := range s.TitleDisplays {
+		profile.normalize()
+		s.TitleDisplays[key] = profile
 	}
 	if s.FontChoice != "galmuri9" && s.FontChoice != "neodgm" && s.FontChoice != "mulmaru" && s.FontChoice != "custom" {
 		s.FontChoice = "galmuri9"
@@ -289,6 +307,53 @@ func (s *Settings) normalize() {
 	}
 }
 
+func (s Settings) globalDisplayProfile() DisplayProfile {
+	return DisplayProfile{
+		IntegerScaling:        s.IntegerScaling,
+		PreserveAspect:        s.PreserveAspect,
+		Rotation:              s.Rotation,
+		ScreenLayout:          s.ScreenLayout,
+		Filter:                s.Filter,
+		DisplayEffect:         s.DisplayEffect,
+		DisplayEffectStrength: s.DisplayEffectStrength,
+	}
+}
+
+func (s *Settings) setGlobalDisplayProfile(profile DisplayProfile) {
+	profile.normalize()
+	s.IntegerScaling = profile.IntegerScaling
+	s.PreserveAspect = profile.PreserveAspect
+	s.Rotation = profile.Rotation
+	s.ScreenLayout = profile.ScreenLayout
+	s.Filter = profile.Filter
+	s.DisplayEffect = profile.DisplayEffect
+	s.DisplayEffectStrength = profile.DisplayEffectStrength
+}
+
+func (profile *DisplayProfile) normalize() {
+	switch profile.Rotation {
+	case 0, 90, 180, 270:
+	default:
+		profile.Rotation = 0
+	}
+	if profile.ScreenLayout != "center" && profile.ScreenLayout != "stretch" {
+		profile.ScreenLayout = "center"
+	}
+	if profile.Filter != "nearest" && profile.Filter != "linear" {
+		profile.Filter = "nearest"
+	}
+	if profile.DisplayEffect == displayEffectFeaturePhoneLegacy {
+		profile.DisplayEffect = displayEffectFeaturePhoneTFT
+	} else if !isDisplayEffectChoice(profile.DisplayEffect) {
+		profile.DisplayEffect = displayEffectFeaturePhoneTFT
+	}
+	profile.DisplayEffectStrength = clampInt(
+		profile.DisplayEffectStrength,
+		displayEffectStrengthMin,
+		displayEffectStrengthMax,
+	)
+}
+
 func (s Settings) globalControllerProfile() ControllerProfile {
 	profile := ControllerProfile{
 		KeyboardProfile:  s.KeyboardProfile,
@@ -341,6 +406,22 @@ func cloneStringMap(source map[string]string) map[string]string {
 		result[key] = value
 	}
 	return result
+}
+
+// titleSettingsKey is shared by every per-title frontend profile. A content
+// hash survives renames and moves; display name is the fallback for backends
+// that cannot identify the input bytes.
+func titleSettingsKey(input *InputInfo) string {
+	if input == nil {
+		return ""
+	}
+	if input.SHA256 != "" {
+		return "sha256:" + strings.ToLower(input.SHA256)
+	}
+	if input.DisplayName != "" {
+		return "title:" + strings.ToLower(input.DisplayName)
+	}
+	return ""
 }
 
 func (s *Settings) addRecent(path string) {

@@ -154,7 +154,7 @@ func defaultMenus() []Menu {
 					ID:     "view.rotation",
 					Action: (*Shell).cycleRotation,
 					DynamicLabel: func(shell *Shell) string {
-						return shell.trf("Rotation: %d°", shell.settings.Rotation)
+						return shell.trf("Rotation: %d°", shell.displayProfile().Rotation)
 					},
 				},
 				{
@@ -163,7 +163,7 @@ func defaultMenus() []Menu {
 					DynamicLabel: func(shell *Shell) string {
 						return shell.trf(
 							"Screen Layout: %s",
-							shell.tr(settingValueLabel(shell.settings.ScreenLayout)),
+							shell.tr(settingValueLabel(shell.displayProfile().ScreenLayout)),
 						)
 					},
 				},
@@ -173,7 +173,7 @@ func defaultMenus() []Menu {
 					DynamicLabel: func(shell *Shell) string {
 						return shell.trf(
 							"Filter: %s",
-							shell.tr(settingValueLabel(shell.settings.Filter)),
+							shell.tr(settingValueLabel(shell.displayProfile().Filter)),
 						)
 					},
 				},
@@ -183,7 +183,7 @@ func defaultMenus() []Menu {
 					DynamicLabel: func(shell *Shell) string {
 						return shell.trf(
 							"Display Preset: %s",
-							shell.tr(displayEffectValueLabel(shell.settings.DisplayEffect)),
+							shell.tr(displayEffectValueLabel(shell.displayProfile().DisplayEffect)),
 						)
 					},
 				},

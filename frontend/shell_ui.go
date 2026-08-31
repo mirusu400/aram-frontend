@@ -152,10 +152,11 @@ func (u *shellUI) sync(shell *Shell) {
 		PressedHover: base.Pressed,
 		Disabled:     base.Disabled,
 	}
+	display := shell.displayProfile()
 	for id, active := range map[string]bool{
 		"view.keypad": shell.settings.ShowVirtualKeypad,
-		"view.layout": shell.settings.ScreenLayout == "stretch",
-		"view.aspect": shell.settings.PreserveAspect,
+		"view.layout": display.ScreenLayout == "stretch",
+		"view.aspect": display.PreserveAspect,
 	} {
 		if button, ok := u.toolbarButtons[id]; ok {
 			if active {

@@ -133,7 +133,8 @@ func (s *Shell) drawGuestViewport(screen *ebiten.Image, viewport image.Rectangle
 	sourceBounds := s.frame.Image.Bounds()
 	sourceWidth, sourceHeight := sourceBounds.Dx(), sourceBounds.Dy()
 	rotatedWidth, rotatedHeight := sourceWidth, sourceHeight
-	if s.settings.Rotation == 90 || s.settings.Rotation == 270 {
+	display := s.displayProfile()
+	if display.Rotation == 90 || display.Rotation == 270 {
 		rotatedWidth, rotatedHeight = sourceHeight, sourceWidth
 	}
 	destination := s.frameDestination(viewport, rotatedWidth, rotatedHeight)
@@ -150,7 +151,8 @@ func (s *Shell) drawGuestFrame(
 	destination image.Rectangle,
 	sourceBounds image.Rectangle,
 ) {
-	effect := s.settings.DisplayEffect
+	display := s.displayProfile()
+	effect := display.DisplayEffect
 	if effect == displayEffectOff || !isDisplayEffectChoice(effect) {
 		s.resetDisplayHistory()
 		screen.DrawImage(s.frameImage, s.guestFrameDrawOptions(sourceBounds, destination))
@@ -180,12 +182,25 @@ func (s *Shell) drawGuestFrame(
 	if effect == displayEffectFeaturePhoneTFT ||
 		effect == displayEffectFeaturePhoneSTN {
 		target = s.updateDisplayPersistence(target)
-		s.drawFeaturePhonePanel(screen, target, destination, sourceBounds, effect)
+		s.drawFeaturePhonePanel(
+			screen,
+			target,
+			destination,
+			sourceBounds,
+			effect,
+			displayEffectStrength(display),
+		)
 		return
 	}
 	if effect == displayEffectCRTTV {
 		s.resetDisplayHistory()
-		s.drawCRTTV(screen, target, destination, sourceBounds)
+		s.drawCRTTV(
+			screen,
+			target,
+			destination,
+			sourceBounds,
+			displayEffectStrength(display),
+		)
 		return
 	}
 
@@ -198,11 +213,12 @@ var displayQuadIndices = []uint16{0, 1, 2, 1, 3, 2}
 func (s *Shell) drawSharpBilinear(
 	target *ebiten.Image,
 ) error {
+	display := s.displayProfile()
 	return drawSharpBilinearImage(
 		target,
 		s.frameImage,
 		s.frameImage.Bounds(),
-		s.settings.Rotation,
+		display.Rotation,
 	)
 }
 
@@ -241,6 +257,8 @@ type displayScaleKey struct {
 	Width      int
 	Height     int
 	Generation uint64
+	GuestNS    int64
+	Strength   int
 }
 
 func (s *Shell) drawSmoothPixel(target *ebiten.Image) error {
@@ -248,11 +266,12 @@ func (s *Shell) drawSmoothPixel(target *ebiten.Image) error {
 	if err != nil {
 		return err
 	}
+	display := s.displayProfile()
 	return drawSharpBilinearImage(
 		target,
 		scaled,
 		scaled.Bounds(),
-		s.settings.Rotation,
+		display.Rotation,
 	)
 }
 
@@ -261,10 +280,13 @@ func (s *Shell) drawSmoothPixel(target *ebiten.Image) error {
 // makes its decisions independent of window size and screen rotation.
 func (s *Shell) smoothPixel2xImage() (*ebiten.Image, error) {
 	width, height := s.frameImage.Bounds().Dx(), s.frameImage.Bounds().Dy()
+	display := s.displayProfile()
 	key := displayScaleKey{
 		Width:      width,
 		Height:     height,
 		Generation: s.frame.Generation,
+		GuestNS:    s.frame.GuestNS,
+		Strength:   display.DisplayEffectStrength,
 	}
 	if s.displayScaleValid && s.displayScaleKey == key &&
 		s.displayScaleSequence == s.frame.Sequence {
@@ -279,7 +301,8 @@ func (s *Shell) smoothPixel2xImage() (*ebiten.Image, error) {
 	scaled.Clear()
 	options := &ebiten.DrawTrianglesShaderOptions{
 		Uniforms: map[string]any{
-			"SourceSize": []float32{float32(width), float32(height)},
+			"SourceSize":     []float32{float32(width), float32(height)},
+			"EffectStrength": displayEffectStrength(display),
 		},
 	}
 	options.Images[0] = s.frameImage
@@ -364,6 +387,7 @@ type displayHistoryKey struct {
 	Rotation   int
 	Effect     string
 	Filter     string
+	Strength   int
 	Generation uint64
 }
 
@@ -371,14 +395,16 @@ func (s *Shell) updateDisplayPersistence(
 	current *ebiten.Image,
 ) *ebiten.Image {
 	width, height := current.Bounds().Dx(), current.Bounds().Dy()
+	display := s.displayProfile()
 	history := ensureDisplaySurface(&s.displayHistoryImage, width, height)
 	response := ensureDisplaySurface(&s.displayResponseImage, width, height)
 	key := displayHistoryKey{
 		Width:      width,
 		Height:     height,
-		Rotation:   s.settings.Rotation,
-		Effect:     s.settings.DisplayEffect,
-		Filter:     s.settings.Filter,
+		Rotation:   display.Rotation,
+		Effect:     display.DisplayEffect,
+		Filter:     display.Filter,
+		Strength:   display.DisplayEffectStrength,
 		Generation: s.frame.Generation,
 	}
 	now := s.now()
@@ -403,9 +429,9 @@ func (s *Shell) updateDisplayPersistence(
 		response.DrawImage(current, nil)
 	} else {
 		weight := displayPersistenceWeight(
-			s.settings.DisplayEffect,
+			display.DisplayEffect,
 			elapsed,
-		)
+		) * displayEffectStrength(display)
 		options := &ebiten.DrawRectShaderOptions{
 			Uniforms: map[string]any{"HistoryWeight": weight},
 		}
@@ -438,12 +464,21 @@ func displayPersistenceWeight(effect string, elapsed time.Duration) float32 {
 	return float32(min(maximum, max(0.0, weight)))
 }
 
+func displayEffectStrength(profile DisplayProfile) float32 {
+	return float32(clampInt(
+		profile.DisplayEffectStrength,
+		displayEffectStrengthMin,
+		displayEffectStrengthMax,
+	)) / displayEffectStrengthMax
+}
+
 func (s *Shell) drawFeaturePhonePanel(
 	screen *ebiten.Image,
 	source *ebiten.Image,
 	destination image.Rectangle,
 	sourceBounds image.Rectangle,
 	effect string,
+	strength float32,
 ) {
 	shader, err := loadFeaturePhoneDisplayShader()
 	if effect == displayEffectFeaturePhoneSTN {
@@ -453,15 +488,17 @@ func (s *Shell) drawFeaturePhonePanel(
 		drawDisplaySurface(screen, source, destination)
 		return
 	}
+	display := s.displayProfile()
 	pitchX, pitchY := displayPixelPitch(
 		destination,
 		sourceBounds.Dx(),
 		sourceBounds.Dy(),
-		s.settings.Rotation,
+		display.Rotation,
 	)
 	options := &ebiten.DrawRectShaderOptions{
 		Uniforms: map[string]any{
-			"PixelPitch": []float32{pitchX, pitchY},
+			"PixelPitch":     []float32{pitchX, pitchY},
+			"EffectStrength": strength,
 		},
 	}
 	options.Images[0] = source
@@ -474,21 +511,24 @@ func (s *Shell) drawCRTTV(
 	source *ebiten.Image,
 	destination image.Rectangle,
 	sourceBounds image.Rectangle,
+	strength float32,
 ) {
 	shader, err := loadCRTTVShader()
 	if err != nil {
 		drawDisplaySurface(screen, source, destination)
 		return
 	}
+	display := s.displayProfile()
 	pitchX, pitchY := displayPixelPitch(
 		destination,
 		sourceBounds.Dx(),
 		sourceBounds.Dy(),
-		s.settings.Rotation,
+		display.Rotation,
 	)
 	options := &ebiten.DrawRectShaderOptions{
 		Uniforms: map[string]any{
-			"PixelPitch": []float32{pitchX, pitchY},
+			"PixelPitch":     []float32{pitchX, pitchY},
+			"EffectStrength": strength,
 		},
 	}
 	options.Images[0] = source
@@ -510,9 +550,10 @@ func (s *Shell) guestFrameDrawOptions(
 	sourceBounds image.Rectangle,
 	destination image.Rectangle,
 ) *ebiten.DrawImageOptions {
+	display := s.displayProfile()
 	sourceWidth, sourceHeight := sourceBounds.Dx(), sourceBounds.Dy()
 	rotatedWidth, rotatedHeight := sourceWidth, sourceHeight
-	if s.settings.Rotation == 90 || s.settings.Rotation == 270 {
+	if display.Rotation == 90 || display.Rotation == 270 {
 		rotatedWidth, rotatedHeight = sourceHeight, sourceWidth
 	}
 	scaleX := float64(destination.Dx()) / float64(rotatedWidth)
@@ -520,7 +561,7 @@ func (s *Shell) guestFrameDrawOptions(
 
 	options := &ebiten.DrawImageOptions{}
 	options.GeoM.Translate(float64(-sourceBounds.Min.X), float64(-sourceBounds.Min.Y))
-	switch s.settings.Rotation {
+	switch display.Rotation {
 	case 90:
 		options.GeoM.Rotate(math.Pi / 2)
 		options.GeoM.Translate(float64(sourceHeight), 0)
@@ -533,7 +574,7 @@ func (s *Shell) guestFrameDrawOptions(
 	}
 	options.GeoM.Scale(scaleX, scaleY)
 	options.GeoM.Translate(float64(destination.Min.X), float64(destination.Min.Y))
-	if s.settings.Filter == "linear" {
+	if display.Filter == "linear" {
 		options.Filter = ebiten.FilterLinear
 	} else {
 		options.Filter = ebiten.FilterNearest
@@ -719,6 +760,7 @@ const smoothPixelShaderSource = `//kage:unit pixels
 package main
 
 var SourceSize vec2
+var EffectStrength float
 
 func SmoothSource(cell vec2) vec4 {
 	origin := imageSrc0Origin()
@@ -805,7 +847,7 @@ func Fragment(dstPos vec4, src0Pos vec2, color vec4) vec4 {
 			SmoothSimilar(diagonal, vertical) {
 			strength = 0.68
 		}
-		return mix(center, candidate, strength)
+		return mix(center, candidate, strength*EffectStrength)
 	}
 	return center
 }
@@ -820,6 +862,7 @@ const featurePhoneDisplayShaderSource = `//kage:unit pixels
 package main
 
 var PixelPitch vec2
+var EffectStrength float
 
 func LCDSample(pos vec2) vec4 {
 	origin := imageSrc0Origin()
@@ -868,7 +911,8 @@ func Fragment(dstPos vec4, src0Pos vec2, color vec4) vec4 {
 	vignette := 1.0 - 0.045*dot(centered, centered)
 	glare := max(0.0, 1.0-uv.x*0.65-uv.y*1.45) * 0.018
 	rgb = rgb*vignette + vec3(glare, glare, glare*0.82)
-	return vec4(clamp(rgb, vec3(0.0), vec3(1.0)), current.a)
+	rgb = mix(current.rgb, clamp(rgb, vec3(0.0), vec3(1.0)), EffectStrength)
+	return vec4(rgb, current.a)
 }
 `
 
@@ -881,6 +925,7 @@ const featurePhoneSTNShaderSource = `//kage:unit pixels
 package main
 
 var PixelPitch vec2
+var EffectStrength float
 
 func STNSample(pos vec2) vec4 {
 	origin := imageSrc0Origin()
@@ -922,7 +967,8 @@ func Fragment(dstPos vec4, src0Pos vec2, color vec4) vec4 {
 	viewingAngle := 1.0 - abs(uv.x-0.42)*0.055
 	glare := max(0.0, 1.0-uv.x*0.7-uv.y*1.3) * 0.026
 	rgb = rgb*cellShade*backlight*viewingAngle + vec3(glare, glare, glare*0.58)
-	return vec4(clamp(rgb, vec3(0.0), vec3(1.0)), current.a)
+	rgb = mix(current.rgb, clamp(rgb, vec3(0.0), vec3(1.0)), EffectStrength)
+	return vec4(rgb, current.a)
 }
 `
 
@@ -936,6 +982,7 @@ const crtTVShaderSource = `//kage:unit pixels
 package main
 
 var PixelPitch vec2
+var EffectStrength float
 
 func CRTSample(pos vec2) vec4 {
 	origin := imageSrc0Origin()
@@ -1007,7 +1054,8 @@ func Fragment(dstPos vec4, src0Pos vec2, color vec4) vec4 {
 	centered := uv*2.0 - 1.0
 	vignette := 1.0 - dot(centered, centered)*0.075
 	rgb = rgb*mask*scanline*vignette*1.075 + vec3(0.004)
-	return vec4(clamp(rgb, vec3(0.0), vec3(1.0)), centerSample.a)
+	rgb = mix(centerSample.rgb, clamp(rgb, vec3(0.0), vec3(1.0)), EffectStrength)
+	return vec4(rgb, centerSample.a)
 }
 `
 
@@ -1015,20 +1063,21 @@ func (s *Shell) frameDestination(viewport image.Rectangle, width, height int) im
 	if width <= 0 || height <= 0 {
 		return viewport
 	}
+	display := s.displayProfile()
 	scaleX := float64(viewport.Dx()) / float64(width)
 	scaleY := float64(viewport.Dy()) / float64(height)
 
-	if s.settings.ScreenLayout == "stretch" && !s.settings.PreserveAspect {
+	if display.ScreenLayout == "stretch" && !display.PreserveAspect {
 		return viewport
 	}
 
 	scale := math.Min(scaleX, scaleY)
-	if s.settings.IntegerScaling && !s.fillGuestViewport && scale >= 1 {
+	if display.IntegerScaling && !s.fillGuestViewport && scale >= 1 {
 		scale = math.Max(1, math.Floor(scale))
 	}
 	targetWidth := max(1, int(math.Round(float64(width)*scale)))
 	targetHeight := max(1, int(math.Round(float64(height)*scale)))
-	if !s.settings.PreserveAspect && s.settings.ScreenLayout == "stretch" {
+	if !display.PreserveAspect && display.ScreenLayout == "stretch" {
 		targetWidth = viewport.Dx()
 		targetHeight = viewport.Dy()
 	}

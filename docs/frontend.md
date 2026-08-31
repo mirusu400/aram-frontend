@@ -40,6 +40,7 @@ mobile hosts should include `application/zip` in their document picker.
 - Nearest/linear filter
 - Display presets: Original, Crisp Fit, Feature Phone TFT, Feature Phone STN,
   Smooth Pixel, and CRT TV
+- Adjustable display-filter strength
 - Native-resolution Screenshot (`Ctrl+Shift+S`)
 
 The internal canvas follows the actual window size. Application chrome keeps
@@ -199,11 +200,13 @@ display name and extension, and are removed when the input closes.
 ## Guest presentation
 
 `VideoBackend` publishes an immutable guest-native frame with a sequence that
-only changes when the pixels change. The shell uploads a frame once per
-sequence into a persistent texture that is rebuilt only when the guest changes
-resolution, so a running title neither re-uploads an unchanged screen nor
-allocates a texture per frame. A backend that hands over tightly packed RGBA is
-uploaded without an intermediate copy.
+only changes when the pixels change. The shell reads it only after frame work
+and timeline commands complete, then keys the upload by sequence, generation,
+and guest time. The extra timeline anchors recover from a reused sequence
+instead of leaving an old picture frozen while guest logic continues. The
+persistent texture is rebuilt only when the guest changes resolution. A
+backend that hands over tightly packed RGBA is uploaded without an intermediate
+copy.
 
 Feature Phone TFT is the default display preset. Crisp Fit uses sharp bilinear
 sampling: source-pixel centers remain flat while fractional-size boundaries
@@ -220,6 +223,13 @@ nearest/linear texture setting. CRT TV keeps luma detail while low-pass
 filtering NTSC I/Q colour horizontally, then adds guest-row scanlines and a
 3x2 RGB shadow mask at final display resolution. All presets affect
 presentation only; native-resolution screenshots remain untouched.
+
+The TFT, STN, Smooth Pixel, and CRT TV presets expose a 0-100% strength. The
+default 100% preserves their authored appearance; lower values blend their
+panel, smoothing, persistence, or CRT characteristics toward the fitted source.
+All guest-presentation settings are saved automatically per identified title
+using its input SHA-256. Changing them with no title open edits the global
+defaults inherited by titles without an override.
 
 Guest audio is drained from `AudioStreamBackend` on every tick, including ticks
 where a frame batch is still executing. A title heavy enough to keep a batch

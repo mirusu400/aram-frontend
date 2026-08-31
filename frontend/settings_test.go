@@ -41,6 +41,7 @@ func TestSettingsNormalizeRepairsDisplayOptions(t *testing.T) {
 	settings.ScreenLayout = "broken"
 	settings.Filter = "broken"
 	settings.DisplayEffect = "broken"
+	settings.DisplayEffectStrength = 140
 	settings.StateSlot = 99
 	settings.Speed = 3.7
 	settings.normalize()
@@ -50,6 +51,7 @@ func TestSettingsNormalizeRepairsDisplayOptions(t *testing.T) {
 		settings.ScreenLayout != "center" ||
 		settings.Filter != "nearest" ||
 		settings.DisplayEffect != displayEffectFeaturePhoneTFT ||
+		settings.DisplayEffectStrength != displayEffectStrengthMax ||
 		settings.StateSlot != 0 ||
 		settings.Speed != 1 {
 		t.Fatalf("normalized settings = %#v", settings)
@@ -100,8 +102,74 @@ func TestLegacySettingsMigrateToFeaturePhoneTFT(t *testing.T) {
 		t.Fatal(err)
 	}
 	settings.normalize()
-	if settings.Filter != "linear" || settings.DisplayEffect != displayEffectFeaturePhoneTFT {
+	if settings.Filter != "linear" ||
+		settings.DisplayEffect != displayEffectFeaturePhoneTFT ||
+		settings.DisplayEffectStrength != displayEffectStrengthDefault {
 		t.Fatalf("legacy display settings = %#v", settings)
+	}
+}
+
+func TestPerTitleDisplayProfileDoesNotChangeGlobalDefaults(t *testing.T) {
+	temporary := t.TempDir()
+	t.Setenv("APPDATA", temporary)
+	t.Setenv("XDG_CONFIG_HOME", temporary)
+	shell := &Shell{
+		settings: defaultSettings(),
+		input:    &InputInfo{DisplayName: "first.dat", SHA256: "ABC123"},
+	}
+	global := shell.settings.globalDisplayProfile()
+
+	shell.cycleRotation()
+	shell.toggleAspectRatio()
+	shell.setDisplayEffectStrength(40)
+
+	first := shell.settings.TitleDisplays["sha256:abc123"]
+	if first.Rotation != 90 || first.PreserveAspect ||
+		first.DisplayEffectStrength != 40 {
+		t.Fatalf("first title display profile = %#v", first)
+	}
+	if got := shell.settings.globalDisplayProfile(); got != global {
+		t.Fatalf("title changes modified global display defaults: got %#v, want %#v", got, global)
+	}
+
+	shell.input = &InputInfo{DisplayName: "second.dat", SHA256: "def456"}
+	if got := shell.displayProfile(); got != global {
+		t.Fatalf("new title inherited %#v, want global %#v", got, global)
+	}
+	shell.cycleScreenLayout()
+
+	shell.input = &InputInfo{DisplayName: "first-renamed.dat", SHA256: "ABC123"}
+	if got := shell.displayProfile(); got != first {
+		t.Fatalf("first title restored %#v, want %#v", got, first)
+	}
+	shell.input = nil
+	if got := shell.displayProfile(); got != global {
+		t.Fatalf("closing the title restored %#v, want global %#v", got, global)
+	}
+	loaded := loadSettings()
+	if got := loaded.TitleDisplays["sha256:abc123"]; got != first {
+		t.Fatalf("persisted first title profile = %#v, want %#v", got, first)
+	}
+}
+
+func TestDisplayProfilesNormalizeTheirOwnValues(t *testing.T) {
+	settings := defaultSettings()
+	settings.TitleDisplays["sha256:broken"] = DisplayProfile{
+		Rotation:              45,
+		ScreenLayout:          "outside",
+		Filter:                "blurred",
+		DisplayEffect:         "unknown",
+		DisplayEffectStrength: -20,
+	}
+	settings.normalize()
+
+	profile := settings.TitleDisplays["sha256:broken"]
+	if profile.Rotation != 0 ||
+		profile.ScreenLayout != "center" ||
+		profile.Filter != "nearest" ||
+		profile.DisplayEffect != displayEffectFeaturePhoneTFT ||
+		profile.DisplayEffectStrength != displayEffectStrengthMin {
+		t.Fatalf("normalized title display profile = %#v", profile)
 	}
 }
 
@@ -265,6 +333,47 @@ func TestSliderSettingSettersClamp(t *testing.T) {
 	shell.setStateSlot(-3)
 	if shell.settings.StateSlot != 0 {
 		t.Fatalf("setStateSlot(-3) = %d, want clamped to 0", shell.settings.StateSlot)
+	}
+	shell.setDisplayEffectStrength(150)
+	if got := shell.displayProfile().DisplayEffectStrength; got != displayEffectStrengthMax {
+		t.Fatalf("setDisplayEffectStrength(150) = %d, want %d", got, displayEffectStrengthMax)
+	}
+	shell.setDisplayEffectStrength(-10)
+	if got := shell.displayProfile().DisplayEffectStrength; got != displayEffectStrengthMin {
+		t.Fatalf("setDisplayEffectStrength(-10) = %d, want %d", got, displayEffectStrengthMin)
+	}
+}
+
+func TestGraphicsSettingsExposePerTitleStrengthSlider(t *testing.T) {
+	temporary := t.TempDir()
+	t.Setenv("APPDATA", temporary)
+	t.Setenv("XDG_CONFIG_HOME", temporary)
+	shell := &Shell{
+		settings: defaultSettings(),
+		input:    &InputInfo{DisplayName: "example.dat", SHA256: "abc123"},
+	}
+	u := &shellUI{settingsSection: "Graphics"}
+	var foundScope, foundStrength bool
+	for _, row := range u.settingsRowModels(shell) {
+		switch row.label {
+		case "Display profile":
+			foundScope = row.value == "This title"
+		case "Filter strength":
+			if row.slider == nil || row.disabled {
+				t.Fatalf("filter strength row = %#v", row)
+			}
+			if row.slider.min != 0 || row.slider.max != 10 || row.slider.value() != 10 {
+				t.Fatalf("filter strength slider = %#v, value %d", row.slider, row.slider.value())
+			}
+			row.slider.apply(6)
+			foundStrength = shell.displayProfile().DisplayEffectStrength == 60
+		}
+	}
+	if !foundScope || !foundStrength {
+		t.Fatalf("graphics rows missing scope=%t strength=%t", foundScope, foundStrength)
+	}
+	if shell.settings.DisplayEffectStrength != displayEffectStrengthDefault {
+		t.Fatal("per-title strength slider changed the global default")
 	}
 }
 

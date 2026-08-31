@@ -115,6 +115,7 @@ func TestSTNPersistenceIsSlowerThanTFT(t *testing.T) {
 
 func TestSmoothPixelBuildsAndCachesNative2xSurface(t *testing.T) {
 	shell := &Shell{
+		settings:   defaultSettings(),
 		frame:      VideoFrame{Sequence: 4, Generation: 2},
 		frameImage: ebiten.NewImage(24, 32),
 	}
@@ -138,6 +139,20 @@ func TestSmoothPixelBuildsAndCachesNative2xSurface(t *testing.T) {
 	}
 	if shell.displayScaleSequence != shell.frame.Sequence {
 		t.Fatalf("cached smooth sequence = %d, want %d", shell.displayScaleSequence, shell.frame.Sequence)
+	}
+	shell.settings.DisplayEffectStrength = 40
+	if _, err := shell.smoothPixel2xImage(); err != nil {
+		t.Fatal(err)
+	}
+	if shell.displayScaleKey.Strength != 40 {
+		t.Fatalf("cached smooth strength = %d, want 40", shell.displayScaleKey.Strength)
+	}
+	shell.frame.GuestNS = 99
+	if _, err := shell.smoothPixel2xImage(); err != nil {
+		t.Fatal(err)
+	}
+	if shell.displayScaleKey.GuestNS != 99 {
+		t.Fatalf("cached smooth guest time = %d, want 99", shell.displayScaleKey.GuestNS)
 	}
 }
 

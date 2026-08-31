@@ -66,6 +66,7 @@ func (u *shellUI) settingsRows(shell *Shell) []*widget.Container {
 func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 	var rows []settingsRowModel
 	profile := shell.controllerProfile()
+	display := shell.displayProfile()
 	switch u.settingsSection {
 	case "Appearance":
 		rows = []settingsRowModel{
@@ -136,40 +137,57 @@ func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 	case "Graphics":
 		rows = []settingsRowModel{
 			{
+				label:       "Display profile",
+				description: "Changes are saved for the loaded title; without one they become global defaults.",
+				value:       shell.displayProfileScopeLabel(),
+			},
+			{
 				label:       "Integer scaling",
 				description: "Use whole-number scale factors when possible.",
-				value:       onOff(shell.settings.IntegerScaling),
+				value:       onOff(display.IntegerScaling),
 				action:      func() { shell.dispatchCommand("view.integer") },
 			},
 			{
 				label:       "Preserve aspect ratio",
 				description: "Prevent the guest image from stretching.",
-				value:       onOff(shell.settings.PreserveAspect),
+				value:       onOff(display.PreserveAspect),
 				action:      func() { shell.dispatchCommand("view.aspect") },
 			},
 			{
 				label:       "Rotation",
 				description: "Rotate the guest display clockwise.",
-				value:       fmt.Sprintf("%d°", shell.settings.Rotation),
+				value:       fmt.Sprintf("%d°", display.Rotation),
 				action:      func() { shell.dispatchCommand("view.rotation") },
 			},
 			{
 				label:       "Texture filter",
 				description: "Choose nearest or linear sampling.",
-				value:       strings.Title(shell.settings.Filter),
+				value:       strings.Title(display.Filter),
 				action:      func() { shell.dispatchCommand("view.filter") },
-				disabled:    shell.settings.DisplayEffect != displayEffectOff,
+				disabled:    display.DisplayEffect != displayEffectOff,
 			},
 			{
 				label:       "Display preset",
 				description: "Choose original pixels, feature-phone panels, xBRZ-style smoothing, or an NTSC CRT TV.",
-				value:       displayEffectValueLabel(shell.settings.DisplayEffect),
+				value:       displayEffectValueLabel(display.DisplayEffect),
 				action:      func() { shell.dispatchCommand("view.display_effect") },
+			},
+			{
+				label:       "Filter strength",
+				description: "Adjust the selected display preset from subtle to full.",
+				disabled:    !displayEffectSupportsStrength(display.DisplayEffect),
+				slider: &settingsSliderModel{
+					min:    displayEffectStrengthMin / 10,
+					max:    displayEffectStrengthMax / 10,
+					value:  func() int { return shell.displayProfile().DisplayEffectStrength / 10 },
+					format: func(v int) string { return fmt.Sprintf("%d%%", v*10) },
+					apply:  func(v int) { shell.setDisplayEffectStrength(v * 10) },
+				},
 			},
 			{
 				label:       "Screen layout",
 				description: "Center or stretch the guest display.",
-				value:       strings.Title(shell.settings.ScreenLayout),
+				value:       strings.Title(display.ScreenLayout),
 				action:      func() { shell.dispatchCommand("view.layout") },
 			},
 		}

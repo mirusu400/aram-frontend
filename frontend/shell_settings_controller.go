@@ -146,16 +146,7 @@ func (s *Shell) updateControllerProfile(update func(*ControllerProfile), status 
 }
 
 func (s *Shell) titleControllerKey() string {
-	if s.input == nil {
-		return ""
-	}
-	if s.input.SHA256 != "" {
-		return "sha256:" + strings.ToLower(s.input.SHA256)
-	}
-	if s.input.DisplayName != "" {
-		return "title:" + strings.ToLower(s.input.DisplayName)
-	}
-	return ""
+	return titleSettingsKey(s.input)
 }
 
 func (s *Shell) controllerProfileKey() string {

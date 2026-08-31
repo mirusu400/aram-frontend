@@ -9,9 +9,10 @@ import (
 )
 
 type videoBackend struct {
-	frame  VideoFrame
-	chunks []AudioChunk
-	drains int
+	frame      VideoFrame
+	chunks     []AudioChunk
+	drains     int
+	videoCalls int
 }
 
 func (*videoBackend) Open(context.Context, OpenRequest) (InputInfo, error) {
@@ -25,7 +26,10 @@ func (*videoBackend) Execute(context.Context, BackendCommand) error { return nil
 
 func (*videoBackend) Close() error { return nil }
 
-func (backend *videoBackend) VideoFrame() VideoFrame { return backend.frame }
+func (backend *videoBackend) VideoFrame() VideoFrame {
+	backend.videoCalls++
+	return backend.frame
+}
 
 func (backend *videoBackend) DrainAudio() AudioChunk {
 	backend.drains++
@@ -93,6 +97,66 @@ func TestGuestFrameUploadIgnoresRepeatedSequences(t *testing.T) {
 	shell.updateVideo()
 	if shell.frame.Image != published {
 		t.Fatal("an unchanged sequence republished the guest frame")
+	}
+}
+
+func TestGuestFrameUploadRecoversFromAReusedSequence(t *testing.T) {
+	temporary := t.TempDir()
+	t.Setenv("APPDATA", temporary)
+	t.Setenv("XDG_CONFIG_HOME", temporary)
+	backend := &videoBackend{}
+	shell := NewShell(backend, nil, "")
+
+	backend.frame = VideoFrame{
+		Image: guestFrame(24, 32, 0x10), Sequence: 4, GuestNS: 10, Generation: 2,
+	}
+	shell.updateVideo()
+	published := shell.frame.Image
+
+	backend.frame = VideoFrame{
+		Image: guestFrame(24, 32, 0x40), Sequence: 4, GuestNS: 20, Generation: 2,
+	}
+	shell.updateVideo()
+	if shell.frame.Image == published || shell.frame.GuestNS != 20 {
+		t.Fatalf("reused sequence did not publish the advanced frame: %#v", shell.frame)
+	}
+
+	published = shell.frame.Image
+	backend.frame = VideoFrame{
+		Image: guestFrame(24, 32, 0x70), Sequence: 4, GuestNS: 20, Generation: 3,
+	}
+	shell.updateVideo()
+	if shell.frame.Image == published || shell.frame.Generation != 3 {
+		t.Fatalf("new generation did not publish the reused sequence: %#v", shell.frame)
+	}
+}
+
+func TestVideoUpdateWaitsForAStableBackendSnapshot(t *testing.T) {
+	temporary := t.TempDir()
+	t.Setenv("APPDATA", temporary)
+	t.Setenv("XDG_CONFIG_HOME", temporary)
+	backend := &videoBackend{frame: VideoFrame{
+		Image: guestFrame(24, 32, 0x10), Sequence: 1,
+	}}
+	shell := NewShell(backend, nil, "")
+
+	shell.frameRunPending = true
+	shell.updateVideo()
+	if backend.videoCalls != 0 || shell.frameImage != nil {
+		t.Fatal("video was read while the frame worker was publishing")
+	}
+
+	shell.frameRunPending = false
+	shell.busyCommands[CommandReset] = true
+	shell.updateVideo()
+	if backend.videoCalls != 0 || shell.frameImage != nil {
+		t.Fatal("video was read while a timeline command was publishing")
+	}
+
+	delete(shell.busyCommands, CommandReset)
+	shell.updateVideo()
+	if backend.videoCalls != 1 || shell.frameImage == nil {
+		t.Fatal("stable video snapshot was not published")
 	}
 }
 

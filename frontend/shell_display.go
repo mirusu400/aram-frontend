@@ -5,11 +5,11 @@ func (s *Shell) toggleFullscreen() {
 }
 
 func (s *Shell) toggleIntegerScaling() {
-	s.settings.IntegerScaling = !s.settings.IntegerScaling
-	_ = s.settings.save()
-	s.setStatus(s.trf(
+	profile := s.displayProfile()
+	profile.IntegerScaling = !profile.IntegerScaling
+	s.saveDisplayProfile(profile, s.trf(
 		"Integer scaling: %s",
-		s.tr(onOff(s.settings.IntegerScaling)),
+		s.tr(onOff(profile.IntegerScaling)),
 	))
 }
 
@@ -22,11 +22,11 @@ func (s *Shell) toggleUIPriority() {
 }
 
 func (s *Shell) toggleAspectRatio() {
-	s.settings.PreserveAspect = !s.settings.PreserveAspect
-	_ = s.settings.save()
-	s.setStatus(s.trf(
+	profile := s.displayProfile()
+	profile.PreserveAspect = !profile.PreserveAspect
+	s.saveDisplayProfile(profile, s.trf(
 		"Preserve aspect ratio: %s",
-		s.tr(onOff(s.settings.PreserveAspect)),
+		s.tr(onOff(profile.PreserveAspect)),
 	))
 }
 
@@ -35,52 +35,115 @@ func (s *Shell) fitWindow() {
 }
 
 func (s *Shell) cycleRotation() {
-	s.settings.Rotation = (s.settings.Rotation + 90) % 360
-	_ = s.settings.save()
-	s.setStatus(s.trf("Rotation: %d°", s.settings.Rotation))
+	profile := s.displayProfile()
+	profile.Rotation = (profile.Rotation + 90) % 360
+	s.saveDisplayProfile(profile, s.trf("Rotation: %d°", profile.Rotation))
 }
 
 func (s *Shell) cycleScreenLayout() {
-	if s.settings.ScreenLayout == "center" {
-		s.settings.ScreenLayout = "stretch"
+	profile := s.displayProfile()
+	if profile.ScreenLayout == "center" {
+		profile.ScreenLayout = "stretch"
 	} else {
-		s.settings.ScreenLayout = "center"
+		profile.ScreenLayout = "center"
 	}
-	_ = s.settings.save()
-	s.setStatus(s.trf(
+	s.saveDisplayProfile(profile, s.trf(
 		"Screen layout: %s",
-		s.tr(settingValueLabel(s.settings.ScreenLayout)),
+		s.tr(settingValueLabel(profile.ScreenLayout)),
 	))
 }
 
 func (s *Shell) cycleFilter() {
-	if s.settings.Filter == "nearest" {
-		s.settings.Filter = "linear"
+	profile := s.displayProfile()
+	if profile.Filter == "nearest" {
+		profile.Filter = "linear"
 	} else {
-		s.settings.Filter = "nearest"
+		profile.Filter = "nearest"
 	}
-	_ = s.settings.save()
-	s.setStatus(s.trf(
+	s.saveDisplayProfile(profile, s.trf(
 		"Filter: %s",
-		s.tr(settingValueLabel(s.settings.Filter)),
+		s.tr(settingValueLabel(profile.Filter)),
 	))
 }
 
 func (s *Shell) cycleDisplayEffect() {
+	profile := s.displayProfile()
 	choices := displayEffectChoices()
 	current := 0
 	for index, effect := range choices {
-		if effect == s.settings.DisplayEffect {
+		if effect == profile.DisplayEffect {
 			current = index
 			break
 		}
 	}
-	s.settings.DisplayEffect = choices[(current+1)%len(choices)]
-	_ = s.settings.save()
-	s.setStatus(s.trf(
+	profile.DisplayEffect = choices[(current+1)%len(choices)]
+	s.saveDisplayProfile(profile, s.trf(
 		"Display Preset: %s",
-		s.tr(displayEffectValueLabel(s.settings.DisplayEffect)),
+		s.tr(displayEffectValueLabel(profile.DisplayEffect)),
 	))
+}
+
+func (s *Shell) setDisplayEffectStrength(strength int) {
+	profile := s.displayProfile()
+	profile.DisplayEffectStrength = clampInt(
+		strength,
+		displayEffectStrengthMin,
+		displayEffectStrengthMax,
+	)
+	s.saveDisplayProfile(profile, s.trf(
+		"Filter strength: %d%%",
+		profile.DisplayEffectStrength,
+	))
+}
+
+func (s *Shell) displayProfile() DisplayProfile {
+	global := s.settings.globalDisplayProfile()
+	key := titleSettingsKey(s.input)
+	if key == "" {
+		return global
+	}
+	profile, ok := s.settings.TitleDisplays[key]
+	if !ok {
+		return global
+	}
+	profile.normalize()
+	return profile
+}
+
+func (s *Shell) saveDisplayProfile(profile DisplayProfile, status string) {
+	profile.normalize()
+	if key := titleSettingsKey(s.input); key != "" {
+		if s.settings.TitleDisplays == nil {
+			s.settings.TitleDisplays = make(map[string]DisplayProfile)
+		}
+		s.settings.TitleDisplays[key] = profile
+	} else {
+		s.settings.setGlobalDisplayProfile(profile)
+	}
+	if err := s.settings.save(); err != nil {
+		s.setStatus(s.tr("Display settings: ") + err.Error())
+		return
+	}
+	s.setStatus(status)
+}
+
+func (s *Shell) displayProfileScopeLabel() string {
+	if titleSettingsKey(s.input) != "" {
+		return "This title"
+	}
+	return "Global"
+}
+
+func displayEffectSupportsStrength(effect string) bool {
+	switch effect {
+	case displayEffectFeaturePhoneTFT,
+		displayEffectFeaturePhoneSTN,
+		displayEffectSmoothPixel,
+		displayEffectCRTTV:
+		return true
+	default:
+		return false
+	}
 }
 
 func displayEffectValueLabel(effect string) string {
@@ -101,10 +164,11 @@ func displayEffectValueLabel(effect string) string {
 }
 
 func (s *Shell) displayPresentationValueLabel() string {
-	if s.settings.DisplayEffect == displayEffectOff {
-		return settingValueLabel(s.settings.Filter)
+	profile := s.displayProfile()
+	if profile.DisplayEffect == displayEffectOff {
+		return settingValueLabel(profile.Filter)
 	}
-	return displayEffectValueLabel(s.settings.DisplayEffect)
+	return displayEffectValueLabel(profile.DisplayEffect)
 }
 
 func (s *Shell) cycleStateSlot() {

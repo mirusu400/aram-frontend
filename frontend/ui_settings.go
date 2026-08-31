@@ -58,23 +58,26 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 		u.settingsSection = "General"
 	}
 	profile := shell.controllerProfile()
-	// Slider-backed values (speed, state slot, volume, latency) are absent on
-	// purpose: rebuilding the panel on every slider tick would destroy the
-	// handle mid-drag. refreshSettingsSliders keeps their widgets in sync.
+	display := shell.displayProfile()
+	// Slider-backed values (speed, state slot, filter strength, volume, and
+	// latency) are absent on purpose: rebuilding the panel on every slider tick
+	// would destroy the handle mid-drag. refreshSettingsSliders keeps their
+	// widgets in sync.
 	signature := fmt.Sprintf(
-		"settings|%s|%dx%d|%s|%s|%s|%t|%t|%d|%s|%s|%s|%t|%s|%s|%s|%s|%s|%s|%t|%s|%s|%s|%s|%s|%s|%s",
+		"settings|%s|%dx%d|%s|%s|%s|%t|%t|%d|%s|%s|%s|%s|%t|%s|%s|%s|%s|%s|%s|%t|%s|%s|%s|%s|%s|%s|%s",
 		shell.settings.Language,
 		u.viewportWidth,
 		u.viewportHeight,
 		u.settingsSection,
 		shell.settings.ThemeMode,
 		shell.settings.ThemeFamily,
-		shell.settings.IntegerScaling,
-		shell.settings.PreserveAspect,
-		shell.settings.Rotation,
-		shell.settings.ScreenLayout,
-		shell.settings.Filter,
-		shell.settings.DisplayEffect,
+		display.IntegerScaling,
+		display.PreserveAspect,
+		display.Rotation,
+		display.ScreenLayout,
+		display.Filter,
+		display.DisplayEffect,
+		shell.displayProfileScopeLabel(),
 		shell.settings.Muted,
 		shell.settings.AudioDeviceID,
 		controllerProfileSignature(profile),

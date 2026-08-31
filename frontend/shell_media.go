@@ -274,6 +274,14 @@ func (s *Shell) currentFrame() VideoFrame {
 }
 
 func (s *Shell) updateVideo() {
+	// RunFrame and timeline commands can publish into the backend's video
+	// buffer. Read only after that producer has completed, so the frontend
+	// cannot cache a new sequence number beside pixels that were still being
+	// written. Audio has its own synchronized drain and deliberately does not
+	// share this guard.
+	if s.frameRunPending || s.loading || len(s.busyCommands) != 0 {
+		return
+	}
 	backend, ok := s.backend.(VideoBackend)
 	if !ok {
 		return
@@ -288,11 +296,25 @@ func (s *Shell) updateVideo() {
 	}
 	s.latestVideoGuestNS.Store(frame.GuestNS)
 	s.latestVideoGeneration.Store(frame.Generation)
-	if s.frameImage != nil && frame.Sequence == s.frame.Sequence {
+	if s.frameImage != nil &&
+		sameVideoFrameVersion(frame, s.frame) &&
+		s.frameImage.Bounds().Dx() == bounds.Dx() &&
+		s.frameImage.Bounds().Dy() == bounds.Dy() {
 		return
 	}
 	s.frame = frame
 	s.uploadGuestFrame(frame.Image)
+}
+
+// sameVideoFrameVersion keeps the fast unchanged-frame path while treating a
+// reused sequence as new after a timeline generation or guest-time advance.
+// Sequence is the primary backend contract, but the extra anchors make a
+// missed increment recover on the next coherent snapshot instead of freezing
+// the display while guest logic continues to run.
+func sameVideoFrameVersion(first, second VideoFrame) bool {
+	return first.Sequence == second.Sequence &&
+		first.Generation == second.Generation &&
+		first.GuestNS == second.GuestNS
 }
 
 // uploadGuestFrame publishes guest pixels into a persistent GPU image.
