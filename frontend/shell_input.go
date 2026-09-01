@@ -247,11 +247,26 @@ func (s *Shell) SetSecondaryKeypadActive(active bool) {
 	}
 }
 
-// secondaryKeypadEnabled reports whether a second-panel keypad currently owns
-// the controls. It only applies to touch-layout platforms; a desktop window
-// keeps its own deck regardless of what a host declares.
-func (s *Shell) secondaryKeypadEnabled() bool {
-	return s.secondaryKeypad.Load() && platformUsesTouchLayout()
+// SetControllerConnected tells the shell whether the host sees a physical
+// controller. On a touch layout the built-in on-screen controls step aside for
+// it (see onScreenControlsHidden), because the player already has real buttons.
+func (s *Shell) SetControllerConnected(connected bool) {
+	s.controllerConnected.Store(connected)
+}
+
+// onScreenControlsHidden reports whether the built-in touch deck and keypad
+// should give way. A second physical panel takes them over entirely; on a
+// single screen a connected controller replaces them unless the player has
+// asked to keep them. It only applies to touch-layout platforms - a desktop
+// window keeps its own deck regardless of what a host declares.
+func (s *Shell) onScreenControlsHidden() bool {
+	if !platformUsesTouchLayout() {
+		return false
+	}
+	if s.secondaryKeypad.Load() {
+		return true
+	}
+	return s.controllerConnected.Load() && !s.settings.ShowControlsWithPad
 }
 
 func (s *Shell) collectGamepadState(state map[string]bool, profile ControllerProfile) {
@@ -316,7 +331,7 @@ func (s *Shell) handleTouch() {
 			}
 		}
 		if s.guestInputAllowed() && s.activeMenu < 0 &&
-			!s.secondaryKeypadEnabled() {
+			!s.onScreenControlsHidden() {
 			if control, ok := s.touchControlAt(x, y); ok {
 				s.touchControls[id] = control
 				continue

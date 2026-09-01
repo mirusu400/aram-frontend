@@ -12,9 +12,9 @@ import (
 // touchDeckHeight reserves the on-screen control deck for the current
 // options, which decides whether the numeric keypad is part of it.
 func (s *Shell) touchDeckHeight(width, height int) int {
-	if s.secondaryKeypadEnabled() {
-		// A second physical panel owns the controls, so the game panel keeps
-		// its whole height with no deck reserved.
+	if s.onScreenControlsHidden() {
+		// A second panel or a connected controller owns the controls, so the
+		// game panel keeps its whole height with no deck reserved.
 		return 0
 	}
 	return touchDeckHeightWithOptions(width, height, s.touchLayoutOptions())

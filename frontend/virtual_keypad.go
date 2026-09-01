@@ -16,7 +16,7 @@ func (s *Shell) virtualKeypadVisible() bool {
 // display. Without it a handset has no way to reach the numeric keys at all.
 func (s *Shell) touchKeypadVisible() bool {
 	return s.settings.ShowVirtualKeypad && platformUsesTouchLayout() &&
-		!s.secondaryKeypadEnabled()
+		!s.onScreenControlsHidden()
 }
 
 func virtualKeypadWidthFor(width int) int {

@@ -48,3 +48,35 @@ func TestSecondaryKeypadDeactivationReleasesHostControls(t *testing.T) {
 		t.Fatalf("host controls must clear when the panel goes away: %v", state)
 	}
 }
+
+// With a controller connected the on-screen controls hide by default, so the
+// handset's physical buttons play without the deck in the way.
+func TestOnScreenControlsHideWithControllerByDefault(t *testing.T) {
+	if defaultSettings().ShowControlsWithPad {
+		t.Fatal("default should hide the on-screen controls with a controller")
+	}
+}
+
+// The setting is a straight toggle the player can flip back and forth.
+func TestToggleShowControlsWithPadFlips(t *testing.T) {
+	shell := NewShell(NullBackend{}, nil, "")
+	before := shell.settings.ShowControlsWithPad
+	shell.toggleShowControlsWithPad()
+	if shell.settings.ShowControlsWithPad == before {
+		t.Fatal("toggle did not flip the setting")
+	}
+	shell.toggleShowControlsWithPad()
+	if shell.settings.ShowControlsWithPad != before {
+		t.Fatal("toggling twice did not restore the setting")
+	}
+}
+
+// The controller rule only touches on-screen layouts; a desktop window keeps
+// its own controls no matter what the host reports.
+func TestControllerConnectionLeavesDesktopControls(t *testing.T) {
+	shell := NewShell(NullBackend{}, nil, "")
+	shell.SetControllerConnected(true)
+	if shell.onScreenControlsHidden() {
+		t.Fatal("desktop must keep its controls when a controller connects")
+	}
+}

@@ -144,6 +144,7 @@ type Settings struct {
 	PerTitleControls      bool                         `json:"per_title_controls"`
 	TitleControllers      map[string]ControllerProfile `json:"title_controller_profiles,omitempty"`
 	ShowVirtualKeypad     bool                         `json:"show_virtual_keypad"`
+	ShowControlsWithPad   bool                         `json:"show_controls_with_pad"`
 	VibrationEnabled      bool                         `json:"vibration_enabled"`
 	TouchControlScale     int                          `json:"touch_control_scale,omitempty"`
 	TouchDeckRatio        int                          `json:"touch_deck_ratio,omitempty"`

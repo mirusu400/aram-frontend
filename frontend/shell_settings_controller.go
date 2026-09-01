@@ -21,6 +21,17 @@ func (s *Shell) toggleVirtualKeypad() {
 	))
 }
 
+// toggleShowControlsWithPad decides whether the on-screen touch controls stay
+// up while a physical controller is connected. Off - the default - hides them
+// so the handset's real buttons play without the deck in the way.
+func (s *Shell) toggleShowControlsWithPad() {
+	s.settings.ShowControlsWithPad = !s.settings.ShowControlsWithPad
+	s.saveControllerSettings(s.trf(
+		"On-screen controls with a controller: %s",
+		s.tr(onOff(s.settings.ShowControlsWithPad)),
+	))
+}
+
 func (s *Shell) toggleVibration() {
 	s.settings.VibrationEnabled = !s.settings.VibrationEnabled
 	if !s.settings.VibrationEnabled {

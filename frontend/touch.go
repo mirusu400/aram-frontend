@@ -252,9 +252,9 @@ func (s *Shell) drawTouchControls(screen *ebiten.Image) {
 	if !platformUsesTouchLayout() {
 		return
 	}
-	if s.secondaryKeypadEnabled() {
-		// The deck lives on the second physical panel; the game panel shows
-		// nothing over the guest screen.
+	if s.onScreenControlsHidden() {
+		// A second panel or a connected controller owns the controls; the game
+		// panel shows nothing over the guest screen.
 		return
 	}
 	active := make(map[string]bool)

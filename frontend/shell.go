@@ -125,6 +125,7 @@ type Shell struct {
 	hostControls              map[string]bool
 	hostControlMu             sync.Mutex
 	secondaryKeypad           atomic.Bool
+	controllerConnected       atomic.Bool
 	directionPressOrder       []string
 	battery                   batteryReading
 	batteryPolledAt           time.Time

@@ -345,6 +345,12 @@ func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 		if platformUsesTouchLayout() {
 			rows = append(rows,
 				settingsRowModel{
+					label:       "On-screen controls with a controller",
+					description: "Keep the touch controls up even when a controller is connected. Off hides them so the physical buttons play alone.",
+					value:       onOff(shell.settings.ShowControlsWithPad),
+					action:      shell.toggleShowControlsWithPad,
+				},
+				settingsRowModel{
 					label:       "Touch button size",
 					description: "Scale of the on-screen touch controls.",
 					slider: &settingsSliderModel{
