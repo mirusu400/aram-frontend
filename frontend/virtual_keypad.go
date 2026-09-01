@@ -15,7 +15,8 @@ func (s *Shell) virtualKeypadVisible() bool {
 // joins the on-screen control deck instead of taking a rail beside the guest
 // display. Without it a handset has no way to reach the numeric keys at all.
 func (s *Shell) touchKeypadVisible() bool {
-	return s.settings.ShowVirtualKeypad && platformUsesTouchLayout()
+	return s.settings.ShowVirtualKeypad && platformUsesTouchLayout() &&
+		!s.secondaryKeypadEnabled()
 }
 
 func virtualKeypadWidthFor(width int) int {

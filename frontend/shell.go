@@ -122,6 +122,9 @@ type Shell struct {
 	audioSuspended            bool
 	cpuProfile                cpuProfileState
 	controlState              map[string]bool
+	hostControls              map[string]bool
+	hostControlMu             sync.Mutex
+	secondaryKeypad           atomic.Bool
 	directionPressOrder       []string
 	battery                   batteryReading
 	batteryPolledAt           time.Time

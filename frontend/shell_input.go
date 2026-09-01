@@ -75,6 +75,7 @@ func (s *Shell) handleMappedInput() {
 		s.collectGamepadState(next, profile)
 		s.collectTouchState(next)
 		s.collectVirtualKeypadState(next)
+		s.collectHostControlState(next)
 	}
 	s.dropUnavailableControls(next)
 	s.queueInputTransitions(backend, next)
@@ -202,6 +203,57 @@ func (s *Shell) collectTouchState(state map[string]bool) {
 	}
 }
 
+// SetHostControl records one control the native host holds or releases, such
+// as a button on a second physical panel driven by its own Activity. The host
+// calls this from its UI thread while handleMappedInput samples it on the game
+// loop, so the held set is mutex-guarded. The control names are the same ones
+// the on-screen deck uses (dpad, soft keys, num0-9, ...), so a host press runs
+// through the identical transition and availability path.
+func (s *Shell) SetHostControl(control string, pressed bool) {
+	if control == "" {
+		return
+	}
+	s.hostControlMu.Lock()
+	defer s.hostControlMu.Unlock()
+	if s.hostControls == nil {
+		s.hostControls = make(map[string]bool)
+	}
+	if pressed {
+		s.hostControls[control] = true
+	} else {
+		delete(s.hostControls, control)
+	}
+}
+
+func (s *Shell) collectHostControlState(state map[string]bool) {
+	s.hostControlMu.Lock()
+	defer s.hostControlMu.Unlock()
+	for control := range s.hostControls {
+		state[control] = true
+	}
+}
+
+// SetSecondaryKeypadActive tells the shell a second physical panel is showing
+// the keypad as its own surface. While active the on-screen control deck and
+// keypad are suppressed so the game panel is unobstructed, and input arrives
+// through SetHostControl. Turning it off releases any control the host still
+// held so nothing is left stuck pressed.
+func (s *Shell) SetSecondaryKeypadActive(active bool) {
+	s.secondaryKeypad.Store(active)
+	if !active {
+		s.hostControlMu.Lock()
+		s.hostControls = nil
+		s.hostControlMu.Unlock()
+	}
+}
+
+// secondaryKeypadEnabled reports whether a second-panel keypad currently owns
+// the controls. It only applies to touch-layout platforms; a desktop window
+// keeps its own deck regardless of what a host declares.
+func (s *Shell) secondaryKeypadEnabled() bool {
+	return s.secondaryKeypad.Load() && platformUsesTouchLayout()
+}
+
 func (s *Shell) collectGamepadState(state map[string]bool, profile ControllerProfile) {
 	if !profile.GamepadEnabled {
 		return
@@ -263,7 +315,8 @@ func (s *Shell) handleTouch() {
 				continue
 			}
 		}
-		if s.guestInputAllowed() && s.activeMenu < 0 {
+		if s.guestInputAllowed() && s.activeMenu < 0 &&
+			!s.secondaryKeypadEnabled() {
 			if control, ok := s.touchControlAt(x, y); ok {
 				s.touchControls[id] = control
 				continue
