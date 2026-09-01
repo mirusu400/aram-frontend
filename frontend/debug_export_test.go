@@ -354,3 +354,45 @@ func TestDebugBundleIncludesCPUCore(t *testing.T) {
 		t.Fatalf("manifest CPU = %q, want native", manifest.Session.Settings.CPU)
 	}
 }
+
+// TestDebugBundleCarriesPacingTelemetry covers aram-core#127: a "too slow"
+// report arrived with a CPU profile but nothing that said how far behind real
+// time the host actually was, so the bundle could not separate a host that
+// cannot keep up from a title that runs at that speed on a handset too.
+func TestDebugBundleCarriesPacingTelemetry(t *testing.T) {
+	isolateSettings(t)
+	shell := NewShell(NullBackend{}, nil, "")
+	shell.settings.Speed = 2
+	shell.settings.UIPriority = true
+	shell.measuredSpeed = 1.5
+
+	report := shell.debugPacingReport()
+	if report.RequestedSpeed != 2 {
+		t.Fatalf("requested speed = %v, want 2", report.RequestedSpeed)
+	}
+	if report.MeasuredSpeed != 1.5 {
+		t.Fatalf("measured speed = %v, want 1.5", report.MeasuredSpeed)
+	}
+	if report.AchievedPercent != 75 {
+		t.Fatalf("achieved = %v%%, want 75%%", report.AchievedPercent)
+	}
+	if !report.UIPriority {
+		t.Fatal("UI priority was not reported")
+	}
+
+	// Before the first pacing window closes there is no measurement, and the
+	// report must not invent one.
+	shell.measuredSpeed = 0
+	if idle := shell.debugPacingReport(); idle.MeasuredSpeed != 0 ||
+		idle.AchievedPercent != 0 {
+		t.Fatalf("unmeasured pacing report = %+v", idle)
+	}
+
+	snapshot := shell.captureDebugBundleSnapshot(time.Unix(0, 0).UTC())
+	if !snapshot.Settings.UIPriority {
+		t.Fatal("the settings report dropped the UI-priority preference")
+	}
+	if snapshot.Pacing.RequestedSpeed != 2 {
+		t.Fatalf("snapshot pacing = %+v", snapshot.Pacing)
+	}
+}

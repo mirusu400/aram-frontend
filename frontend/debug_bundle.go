@@ -52,6 +52,7 @@ type debugBundleSnapshot struct {
 	FrontendState FrontendState
 	Problem       *FrontendProblem
 	Settings      debugSettingsReport
+	Pacing        debugPacingReport
 	Build         debugBuildReport
 	FrontendLogs  []string
 	Audio         AudioQueueTelemetry
@@ -85,6 +86,7 @@ type debugSessionReport struct {
 	FrontendState FrontendState       `json:"frontend_state"`
 	Problem       *debugProblemReport `json:"problem,omitempty"`
 	Settings      debugSettingsReport `json:"settings"`
+	Pacing        debugPacingReport   `json:"pacing"`
 	Audio         AudioQueueTelemetry `json:"audio"`
 }
 
@@ -123,6 +125,24 @@ type debugSettingsReport struct {
 	Volume                int     `json:"volume"`
 	AudioLatencyMS        int     `json:"audio_latency_ms"`
 	AudioMixMode          bool    `json:"audio_mix_mode"`
+	UIPriority            bool    `json:"ui_priority"`
+}
+
+// debugPacingReport answers the first question a "too slow" report raises: is
+// the host keeping up with the guest at all, and by how much is it missing?
+//
+// The settings screen already shows the achieved ratio beside the requested
+// one, but a bundle carried neither, so a report of a slow title could not be
+// separated from a title that is slow by design without asking the reporter to
+// read the number off their own screen (aram-core#127). RequestedSpeed is the
+// ratio of guest time to real time the user asked for; MeasuredSpeed is the
+// ratio the host actually delivered over the pacing window, and is zero before
+// the first window closes. AchievedPercent is the second over the first.
+type debugPacingReport struct {
+	RequestedSpeed  float64 `json:"requested_speed"`
+	MeasuredSpeed   float64 `json:"measured_speed"`
+	AchievedPercent float64 `json:"achieved_percent"`
+	UIPriority      bool    `json:"ui_priority"`
 }
 
 type debugFileReport struct {
@@ -249,6 +269,7 @@ func writeDebugBundle(
 			FrontendState: snapshot.FrontendState,
 			Problem:       debugProblem(snapshot.Problem),
 			Settings:      snapshot.Settings,
+			Pacing:        snapshot.Pacing,
 			Audio:         snapshot.Audio,
 		},
 		Files: make([]debugFileReport, 0, len(files)),

@@ -319,3 +319,21 @@ func (s *Shell) speedSettingValue() string {
 	}
 	return fmt.Sprintf("%s (%.0f%%)", requested, measured/s.framePacingSpeed()*100)
 }
+
+// debugPacingReport captures what the frame pacer achieved, for the debug
+// bundle. Reading it costs nothing and it is the number that separates "the
+// host cannot keep up" from "the title runs at this speed on a handset too".
+func (s *Shell) debugPacingReport() debugPacingReport {
+	requested := s.framePacingSpeed()
+	measured := s.MeasuredSpeed()
+	achieved := float64(0)
+	if requested > 0 && measured > 0 {
+		achieved = measured / requested * 100
+	}
+	return debugPacingReport{
+		RequestedSpeed:  requested,
+		MeasuredSpeed:   measured,
+		AchievedPercent: achieved,
+		UIPriority:      s.settings.UIPriority,
+	}
+}
