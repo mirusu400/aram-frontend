@@ -1,6 +1,8 @@
 package frontend
 
 import (
+	"image"
+	"math"
 	"sort"
 	"strings"
 
@@ -201,6 +203,14 @@ func (s *Shell) collectTouchState(state map[string]bool) {
 	for _, control := range s.touchControls {
 		state[control] = true
 	}
+	// The circular pad tracks its own touch: a live direction while the thumb
+	// steers, and a brief OK pulse after a center tap lifts.
+	if s.padDir != "" {
+		state[s.padDir] = true
+	}
+	if s.padOKPulse > 0 {
+		state["ok"] = true
+	}
 }
 
 // SetHostControl records one control the native host holds or releases, such
@@ -304,7 +314,16 @@ func (s *Shell) handleTouch() {
 		s.handleTouchLayoutEditTouches()
 		return
 	}
+	// Age any pending OK pulse before this tick can top it up on release, so a
+	// tap that lands this frame still reads OK this frame.
+	if s.padOKPulse > 0 {
+		s.padOKPulse--
+	}
 	for _, id := range inpututil.AppendJustReleasedTouchIDs(nil) {
+		if s.padTouchActive && id == s.padTouchID {
+			s.releaseCircularPad()
+			continue
+		}
 		delete(s.touchControls, id)
 	}
 	for _, id := range inpututil.AppendJustPressedTouchIDs(nil) {
@@ -332,6 +351,15 @@ func (s *Shell) handleTouch() {
 		}
 		if s.guestInputAllowed() && s.activeMenu < 0 &&
 			!s.onScreenControlsHidden() {
+			if s.touchDpadCircular() && !s.padTouchActive &&
+				s.circularPadContains(x, y) {
+				s.padTouchActive = true
+				s.padTouchID = id
+				s.padTouchMoved = false
+				s.padDir = ""
+				s.padKnob = image.Point{}
+				continue
+			}
 			if control, ok := s.touchControlAt(x, y); ok {
 				s.touchControls[id] = control
 				continue
@@ -345,6 +373,78 @@ func (s *Shell) handleTouch() {
 			s.handlePointerPress(x, y)
 		}
 	}
+	s.sampleCircularPad()
+}
+
+// circularPadContains reports whether a press falls on the round pad. The whole
+// bounding square of the directional cluster counts, not just the inscribed
+// circle, so a thumb that lands near a corner still steers rather than leaking
+// to whatever sat under the cross.
+func (s *Shell) circularPadContains(x, y int) bool {
+	width, height := s.viewportSize()
+	metrics := touchDeckMetricsFor(width, height, s.touchLayoutOptions())
+	center, radius := circularPadCircle(metrics)
+	return pointInRect(x, y, rectAt(
+		center.X-radius, center.Y-radius, radius*2, radius*2,
+	))
+}
+
+// sampleCircularPad reads the live position of the pad's touch each tick and
+// resolves it to a held direction, tracking whether the thumb ever left the
+// deadzone so a still tap can be told from a drag on release. A touch that
+// ended without a release event (a dropped finger) is released here.
+func (s *Shell) sampleCircularPad() {
+	if !s.padTouchActive {
+		return
+	}
+	if !touchIDActive(s.padTouchID) {
+		s.releaseCircularPad()
+		return
+	}
+	x, y := ebiten.TouchPosition(s.padTouchID)
+	width, height := s.viewportSize()
+	metrics := touchDeckMetricsFor(width, height, s.touchLayoutOptions())
+	center, radius := circularPadCircle(metrics)
+	dx := float64(x - center.X)
+	dy := float64(y - center.Y)
+	dist := math.Hypot(dx, dy)
+	if dist < float64(radius)*circularPadDeadzoneRatio {
+		// Resting at center: no direction, and still a candidate for an OK tap.
+		s.padDir = ""
+		s.padKnob = image.Point{}
+		return
+	}
+	s.padTouchMoved = true
+	s.padDir = resolvePadDirection4(dx, dy)
+	// Keep the drawn knob inside the well however far the thumb travels.
+	limit := float64(radius) * (1 - circularPadKnobRatio)
+	if dist > limit {
+		dx *= limit / dist
+		dy *= limit / dist
+	}
+	s.padKnob = image.Pt(int(dx), int(dy))
+}
+
+// releaseCircularPad ends the pad touch. A release that never left the
+// deadzone was a center tap, so it arms a short OK pulse; a drag just stops.
+func (s *Shell) releaseCircularPad() {
+	if s.padTouchActive && !s.padTouchMoved {
+		s.padOKPulse = circularPadOKPulseFrames
+	}
+	s.padTouchActive = false
+	s.padTouchMoved = false
+	s.padDir = ""
+	s.padKnob = image.Point{}
+}
+
+// touchIDActive reports whether a touch is still down this tick.
+func touchIDActive(id ebiten.TouchID) bool {
+	for _, active := range ebiten.AppendTouchIDs(nil) {
+		if active == id {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Shell) touchControlAt(x, y int) (string, bool) {

@@ -32,6 +32,18 @@ func (s *Shell) toggleShowControlsWithPad() {
 	))
 }
 
+// toggleTouchDpadCircular swaps the on-screen directional cross for a round
+// thumb pad and back. The pad steers by drag and confirms by a center tap;
+// the digital cross stays the default.
+func (s *Shell) toggleTouchDpadCircular() {
+	s.settings.TouchDpadCircular = !s.settings.TouchDpadCircular
+	s.resetCircularPad()
+	s.saveControllerSettings(s.trf(
+		"Circular d-pad: %s",
+		s.tr(onOff(s.settings.TouchDpadCircular)),
+	))
+}
+
 func (s *Shell) toggleVibration() {
 	s.settings.VibrationEnabled = !s.settings.VibrationEnabled
 	if !s.settings.VibrationEnabled {

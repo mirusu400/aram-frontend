@@ -133,6 +133,12 @@ type Shell struct {
 	gamepadMappingsLoaded     bool
 	hapticActive              bool
 	touchControls             map[ebiten.TouchID]string
+	padTouchActive            bool
+	padTouchID                ebiten.TouchID
+	padTouchMoved             bool
+	padDir                    string
+	padKnob                   image.Point
+	padOKPulse                int
 	touchLayoutEditing        bool
 	touchLayoutDraft          map[string]TouchPlacement
 	touchHiddenDraft          map[string]bool

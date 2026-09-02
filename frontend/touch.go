@@ -54,10 +54,24 @@ func touchControlButtonsFor(width, height int) []touchButton {
 	return touchControlButtonsWithOptions(width, height, defaultTouchLayoutOptions())
 }
 
-func touchControlButtonsWithOptions(
-	width, height int,
-	options touchLayoutOptions,
-) []touchButton {
+// touchDeckMetrics holds the derived geometry of the on-screen deck: the
+// button size and gap and the anchor of each cluster. The button builder and
+// the circular pad both read it, so the pad always sits exactly where the
+// directional cross it replaces would.
+type touchDeckMetrics struct {
+	buttonSize int
+	gap        int
+	// scaled is the full user-scaled button size a repositioned button takes,
+	// before the geometric fit clamps the default grid.
+	scaled  int
+	gridTop int
+	dpadX   int
+	dpadY   int
+	actionX int
+	actionY int
+}
+
+func touchDeckMetricsFor(width, height int, options touchLayoutOptions) touchDeckMetrics {
 	deckHeight := touchDeckHeightWithOptions(width, height, options)
 	deckTop := height - statusBarHeight - deckHeight
 	margin := max(12, min(28, width/32))
@@ -90,10 +104,28 @@ func touchControlButtonsWithOptions(
 	gridHeight := buttonSize*rows + gap*(rows-1)
 	gridTop := deckTop + touchDeckPadding +
 		max(0, (deckHeight-touchDeckPadding*2-gridHeight)/2)
-	dpadX := margin + buttonSize
-	dpadY := gridTop + buttonSize + gap
-	actionX := width - margin - buttonSize*3 - gap*2
-	actionY := dpadY
+	return touchDeckMetrics{
+		buttonSize: buttonSize,
+		gap:        gap,
+		scaled:     scaled,
+		gridTop:    gridTop,
+		dpadX:      margin + buttonSize,
+		dpadY:      gridTop + buttonSize + gap,
+		actionX:    width - margin - buttonSize*3 - gap*2,
+		actionY:    gridTop + buttonSize + gap,
+	}
+}
+
+func touchControlButtonsWithOptions(
+	width, height int,
+	options touchLayoutOptions,
+) []touchButton {
+	metrics := touchDeckMetricsFor(width, height, options)
+	buttonSize := metrics.buttonSize
+	gap := metrics.gap
+	scaled := metrics.scaled
+	dpadX, dpadY := metrics.dpadX, metrics.dpadY
+	actionX, actionY := metrics.actionX, metrics.actionY
 
 	buttons := []touchButton{
 		{ID: "up", Control: "up", Label: "UP", Bounds: rectAt(dpadX, dpadY-buttonSize-gap, buttonSize, buttonSize)},
@@ -109,7 +141,7 @@ func touchControlButtonsWithOptions(
 	}
 	if options.Keypad {
 		buttons = append(buttons, numericTouchButtons(
-			width, gridTop+buttonSize*3+gap*3, buttonSize, gap)...)
+			width, metrics.gridTop+buttonSize*3+gap*3, buttonSize, gap)...)
 	}
 	buttons = visibleTouchButtons(buttons, options.Hidden)
 	for index := range buttons {
@@ -262,9 +294,18 @@ func (s *Shell) drawTouchControls(screen *ebiten.Image) {
 		active[control] = true
 	}
 	width, height := screen.Bounds().Dx(), screen.Bounds().Dy()
-	buttons := touchControlButtonsWithOptions(width, height, s.touchLayoutOptions())
+	options := s.touchLayoutOptions()
+	circular := s.touchDpadCircular()
+	buttons := touchControlButtonsWithOptions(width, height, options)
 	for _, button := range buttons {
+		if circular && isCircularPadSlotID(button.ID) {
+			// The round pad stands in for the whole directional cluster.
+			continue
+		}
 		s.drawTouchButton(screen, button, active[button.Control])
+	}
+	if circular {
+		s.drawCircularPad(screen, width, height, options)
 	}
 }
 

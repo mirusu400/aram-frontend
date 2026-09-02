@@ -20,6 +20,26 @@ func (s *Shell) touchDeckHeight(width, height int) int {
 	return touchDeckHeightWithOptions(width, height, s.touchLayoutOptions())
 }
 
+// touchDpadCircular reports whether the on-screen directional cross is drawn
+// and driven as a round thumb pad. It only applies where the touch deck is on
+// screen at all - a hidden deck (second panel or a connected controller) has
+// no pad to swap.
+func (s *Shell) touchDpadCircular() bool {
+	return s.settings.TouchDpadCircular && platformUsesTouchLayout() &&
+		!s.onScreenControlsHidden()
+}
+
+// resetCircularPad drops any in-progress pad touch and its pending OK pulse, so
+// toggling the mode or opening the layout editor never leaves a direction or
+// OK stuck pressed.
+func (s *Shell) resetCircularPad() {
+	s.padTouchActive = false
+	s.padTouchMoved = false
+	s.padDir = ""
+	s.padKnob = image.Point{}
+	s.padOKPulse = 0
+}
+
 func (s *Shell) touchLayoutOptions() touchLayoutOptions {
 	options := touchLayoutOptions{
 		Scale:      touchScaleFactor(s.settings.TouchControlScale),
@@ -151,6 +171,7 @@ func (s *Shell) beginTouchLayoutEdit() {
 	s.panel = nil
 	s.activeMenu = -1
 	s.focusMode = false
+	s.resetCircularPad()
 	s.touchLayoutDraft = copyTouchLayout(s.settings.TouchLayout)
 	s.touchHiddenDraft = copyTouchHidden(s.settings.TouchHidden)
 	s.touchDeckRatioDraft = s.settings.TouchDeckRatio

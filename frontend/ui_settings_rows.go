@@ -351,6 +351,12 @@ func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 					action:      shell.toggleShowControlsWithPad,
 				},
 				settingsRowModel{
+					label:       "Circular d-pad",
+					description: "Replace the directional cross with a round thumb pad. Drag to steer; tap the center for OK.",
+					value:       onOff(shell.settings.TouchDpadCircular),
+					action:      shell.toggleTouchDpadCircular,
+				},
+				settingsRowModel{
 					label:       "Touch button size",
 					description: "Scale of the on-screen touch controls.",
 					slider: &settingsSliderModel{
