@@ -122,6 +122,14 @@ func TestCircularPadStateFeedsControls(t *testing.T) {
 	}
 }
 
+// The round pad is the shipped default on a touch layout: a thumb steers it
+// far more easily than it hits four separate d-pad keys.
+func TestCircularPadDefaultsOn(t *testing.T) {
+	if !defaultSettings().TouchDpadCircular {
+		t.Fatal("the circular d-pad should be on by default")
+	}
+}
+
 // The mode is a plain toggle the player can flip back and forth.
 func TestToggleTouchDpadCircularFlips(t *testing.T) {
 	shell := NewShell(NullBackend{}, nil, "")

@@ -216,6 +216,7 @@ func defaultSettings() Settings {
 		TitleControllers:      make(map[string]ControllerProfile),
 		UpdateChannel:         string(updateChannelStable),
 		VibrationEnabled:      true,
+		TouchDpadCircular:     true,
 		CPUProfile:            true,
 	}
 }
