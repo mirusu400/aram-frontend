@@ -123,9 +123,10 @@ func updateAssetName(
 	case goos == "darwin" && goarch == "arm64":
 		platform = "macos-arm64.tar.gz"
 	case goos == "android" && component == updateComponentProduct:
-		// The product Nightly ships one APK carrying both arm64-v8a and
+		// Each product channel ships one APK carrying both arm64-v8a and
 		// x86_64 native libraries; the developer archives have no Android
-		// build.
+		// build. The channel selects the release (Stable -> latest,
+		// Nightly -> the rolling nightly tag), not the asset name.
 		platform = "android-universal.apk"
 	default:
 		return "", fmt.Errorf(
