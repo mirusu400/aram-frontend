@@ -544,6 +544,18 @@ func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 }
 
 func updateSettingsRowModels(shell *Shell) []settingsRowModel {
+	if selfUpdateDisabled() {
+		// A store build cannot update itself; the store owns updates. Only the
+		// running version stays useful - the channel picker, the download
+		// action, and the download folder all vanish with the updater.
+		return []settingsRowModel{
+			{
+				label:       "Current version",
+				description: "Version of the running ARAM application.",
+				value:       currentApplicationVersion(),
+			},
+		}
+	}
 	channel := normalizeUpdateChannel(shell.settings.UpdateChannel)
 	downloadRoot, downloadRootErr := defaultUpdateDownloadRoot()
 	downloadRootLabel := shorten(downloadRoot, 34)

@@ -14,6 +14,25 @@ var BuildVersion string
 // Builds without it fall back to the VCS commit time.
 var BuildTimestamp string
 
+// SelfUpdateDisabled is set to a non-empty value by store builds - the Google
+// Play flavor, for example - through -ldflags. App-store policy forbids an app
+// from checking for, offering, or installing its own updates outside the
+// store, so those builds switch the whole self-update subsystem off. Sideloaded
+// Stable/Nightly builds leave it empty and keep the in-app updater.
+var SelfUpdateDisabled string
+
+// selfUpdateDisabled reports whether the self-update subsystem is switched off
+// for this build. Any value other than the empty string or an explicit
+// off/false/0/no disables it, so a bare "-X ...SelfUpdateDisabled=1" is enough.
+func selfUpdateDisabled() bool {
+	switch strings.ToLower(strings.TrimSpace(SelfUpdateDisabled)) {
+	case "", "0", "false", "no", "off":
+		return false
+	default:
+		return true
+	}
+}
+
 func currentApplicationVersion() string {
 	return applicationVersion(BuildVersion, currentDebugBuildReport())
 }

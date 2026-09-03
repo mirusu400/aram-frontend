@@ -33,6 +33,9 @@ func (s *Shell) cycleUpdateChannel() {
 // silent. The result flows back through updateCheckResults like every other
 // async result so the shell state is only ever touched on the UI goroutine.
 func (s *Shell) startUpdateCheck() {
+	if selfUpdateDisabled() {
+		return
+	}
 	channel, ok := runningReleaseChannel()
 	if !ok {
 		return
@@ -81,6 +84,10 @@ func (s *Shell) updateNoticeTooltip() string {
 }
 
 func (s *Shell) downloadUpdate(component updateComponent) bool {
+	if selfUpdateDisabled() {
+		s.setStatus(s.tr("Updates are managed by the app store"))
+		return false
+	}
 	if _, err := updateAssetName(component, runtime.GOOS, runtime.GOARCH); err != nil {
 		s.setStatus(s.tr("Update: ") + err.Error())
 		return false

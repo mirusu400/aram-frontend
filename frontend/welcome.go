@@ -26,6 +26,9 @@ func (s *Shell) shouldOpenWelcome() bool {
 // downloads and installs that channel right away. It needs a host that can
 // install the product and a platform whose bundled build is only a bootstrap.
 func (s *Shell) welcomeInstallsProduct() bool {
+	if selfUpdateDisabled() {
+		return false
+	}
 	_, canInstall := s.backend.(ProductUpdateInstaller)
 	return canInstall && platformInstallsProductOnWelcome()
 }
