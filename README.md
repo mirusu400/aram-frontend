@@ -2,6 +2,8 @@
 
 [![ci](https://github.com/mirusu400/aram-frontend/actions/workflows/ci.yml/badge.svg)](https://github.com/mirusu400/aram-frontend/actions/workflows/ci.yml)
 
+[Website](https://aram.mir.sh/en/) · [Usage guide](https://aram.mir.sh/en/guide/) · [Downloads](https://aram.mir.sh/en/releases/)
+
 Cross-platform product frontend for **ARAM, Archived Runtime for ARM
 Mobiles**.
 
