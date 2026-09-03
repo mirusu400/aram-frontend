@@ -316,6 +316,22 @@ type CPUBackendSelector interface {
 	AvailableCPUBackends() []string
 }
 
+// DisplaySettings overrides the guest framebuffer geometry the backend hands to
+// a title. A zero Width and Height keep the device-native size. This is an
+// experimental control: only a title that lays its scene out from the
+// runtime-reported screen size (camera-scrolled titles) fills the extra area;
+// others letterbox or leave margins.
+type DisplaySettings struct {
+	Width  int
+	Height int
+}
+
+// DisplayConfigurator is implemented by backends that can override the guest
+// framebuffer geometry. The size takes effect the next time a title is opened.
+type DisplayConfigurator interface {
+	ConfigureDisplay(DisplaySettings) error
+}
+
 // AudioStreamBackend transfers guest-generated PCM to the host output owned by
 // the frontend. DrainAudio must return quickly and transfer ownership of PCM16
 // to the caller.

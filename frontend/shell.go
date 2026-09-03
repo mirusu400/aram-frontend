@@ -270,6 +270,11 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 			shell.appendLog(shell.tr("CPU core: ") + err.Error())
 		}
 	}
+	if configurator, ok := shell.backend.(DisplayConfigurator); ok {
+		if err := configurator.ConfigureDisplay(shell.currentDisplaySettings()); err != nil {
+			shell.appendLog(shell.tr("Widescreen: ") + err.Error())
+		}
+	}
 	if applied, err := loadCustomGamepadMappings(); err != nil {
 		shell.appendLog(shell.tr("Controller database: ") + err.Error())
 	} else if applied {
