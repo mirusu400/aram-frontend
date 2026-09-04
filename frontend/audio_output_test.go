@@ -445,3 +445,56 @@ func TestALongProducerGapIsNotMaterialized(t *testing.T) {
 		t.Fatalf("queue held %d bytes across a one-second pause, want %d", got, 2*441*4)
 	}
 }
+
+// TestPCMQueueSettlesAtTargetNotCapacity covers #148. The queue used to be
+// bounded only by its capacity, which is three times the latency the player
+// asked for, so a producer running slightly ahead pushed the depth up to the
+// cap and left it there and every sound arrived that late. 리듬스타1's notes
+// were on screen well before the beat was heard.
+func TestPCMQueueSettlesAtTargetNotCapacity(t *testing.T) {
+	const latency = 90 * time.Millisecond
+	capacity := audioQueueBytes(latency)
+	target := audioPrebufferBytes(latency)
+	queue := newPCMQueue(capacity)
+	queue.setTargetBytes(target)
+
+	// A producer running a few percent ahead of the player, which is what makes
+	// the depth creep in practice: the guest hands over a frame's worth while
+	// the device asks for slightly less.
+	chunk := make([]byte, 4*441)
+	destination := make([]byte, 4*430)
+	for step := 0; step < 2000; step++ {
+		queue.enqueue(chunk)
+		if _, err := queue.Read(destination); err != nil {
+			t.Fatal(err)
+		}
+	}
+	settled := queue.availableBytes()
+	if settled > target+target/2 {
+		t.Fatalf("queue settled at %d bytes, above the %d target and its slack",
+			settled, target)
+	}
+	if settled >= capacity {
+		t.Fatalf("queue settled at capacity %d, so nothing pulled it back", capacity)
+	}
+}
+
+// TestPCMQueueLeavesASettledStreamAlone is the other half: a producer that
+// keeps the depth near the target must never be trimmed, or the correction
+// would itself be the defect.
+func TestPCMQueueLeavesASettledStreamAlone(t *testing.T) {
+	const latency = 90 * time.Millisecond
+	queue := newPCMQueue(audioQueueBytes(latency))
+	queue.setTargetBytes(audioPrebufferBytes(latency))
+	chunk := make([]byte, 4*441)
+	destination := make([]byte, 4*441)
+	for step := 0; step < 200; step++ {
+		queue.enqueue(chunk)
+		if _, err := queue.Read(destination); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if dropped := queue.telemetry().DroppedFrames; dropped != 0 {
+		t.Fatalf("a balanced stream lost %d frames", dropped)
+	}
+}

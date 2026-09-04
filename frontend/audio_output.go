@@ -32,10 +32,15 @@ type AudioQueueTelemetry struct {
 // underrun produces silence, while an overrun drops the oldest complete stereo
 // frames so audio stays synchronized with current guest time.
 type pcmQueue struct {
-	mu            sync.Mutex
-	data          []byte
-	offset        int
-	maxBytes      int
+	mu       sync.Mutex
+	data     []byte
+	offset   int
+	maxBytes int
+	// targetBytes is the depth the queue settles at. maxBytes alone only
+	// bounds how bad the lag can get; without a target the queue drifts up to
+	// the cap and stays there, so the player hears everything that far behind.
+	// See trimToTarget.
+	targetBytes   int
 	closed        bool
 	underruns     uint64
 	missingBytes  uint64
@@ -190,6 +195,44 @@ func (q *pcmQueue) enqueue(data []byte) {
 		q.droppedFrames += uint64(dropped / 4)
 		q.spliceNext = true
 	}
+	q.trimToTarget()
+}
+
+// trimToTarget pulls a queue that has drifted above its target back down.
+//
+// The producer generates a frame's worth of audio at a time and the player
+// drains continuously, so the depth wanders upward whenever the guest runs
+// even slightly ahead. Capping it is not enough on its own: the cap is three
+// times the latency the player asked for, so the queue settles near the cap
+// and every sound arrives that late. 리듬스타1 (#148) is where this is
+// audible - its notes are on screen well before the beat is heard - and the
+// report bundle shows the depth sitting at a median of 5 880 frames and
+// peaking at 9 555, against a 90 ms (3 969 frame) target.
+//
+// The correction is deliberately small. Trimming at most a millisecond per
+// enqueue converges over roughly a second, which the ear reads as the sound
+// tightening up rather than as a jump, and the seam goes through the same
+// declick as any other discard. Slack keeps ordinary jitter from trimming at
+// all, so a well-behaved stream is never touched.
+func (q *pcmQueue) trimToTarget() {
+	if q.targetBytes <= 0 {
+		return
+	}
+	available := len(q.data) - q.offset
+	ceiling := q.targetBytes + q.targetBytes/2
+	if available <= ceiling {
+		return
+	}
+	trim := alignStereoFrameUp(available - q.targetBytes)
+	if limit := alignStereoFrameUp(hostAudioSampleRate * 4 / 1000); trim > limit {
+		trim = limit
+	}
+	if trim <= 0 || trim >= available {
+		return
+	}
+	q.offset += trim
+	q.droppedFrames += uint64(trim / 4)
+	q.spliceNext = true
 }
 
 // enqueueSilence appends a pause, easing out of whatever is already queued so
@@ -223,6 +266,12 @@ func (q *pcmQueue) availableBytes() int {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	return len(q.data) - q.offset
+}
+
+func (q *pcmQueue) setTargetBytes(targetBytes int) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.targetBytes = alignStereoFrame(targetBytes)
 }
 
 func (q *pcmQueue) setMaxBytes(maxBytes int) {
@@ -362,6 +411,7 @@ func newAudioOutput(settings AudioSettings) (*audioOutput, error) {
 		return nil, errors.New("the existing host audio context does not use 44.1 kHz")
 	}
 	queue := newPCMQueue(audioQueueBytes(settings.Latency))
+	queue.setTargetBytes(audioPrebufferBytes(settings.Latency))
 	player, err := context.NewPlayer(queue)
 	if err != nil {
 		queue.close()
@@ -387,6 +437,7 @@ func (o *audioOutput) configure(settings AudioSettings) {
 	}
 	latency := normalizedAudioLatency(settings.Latency)
 	o.queue.setMaxBytes(audioQueueBytes(latency))
+	o.queue.setTargetBytes(audioPrebufferBytes(latency))
 	// Requested latency is the actual steady-state start target. Capacity stays
 	// larger so a producer spike can be absorbed without structurally delaying
 	// every sound by a hidden 150 ms floor.
