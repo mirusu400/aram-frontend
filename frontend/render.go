@@ -19,25 +19,16 @@ func (s *Shell) drawWorkspace(screen *ebiten.Image) {
 		palette = s.design.Palette
 	}
 	bounds := screen.Bounds()
-	contentTop := bounds.Min.Y + menuHeight + applicationToolbarHeight + 12
-	contentBottom := bounds.Max.Y - statusHeight - 12
-	if platformUsesTouchLayout() {
-		contentBottom -= s.touchDeckHeight(bounds.Dx(), bounds.Dy())
-	}
-	contentRight := bounds.Max.X - 12
-	if s.virtualKeypadVisible() {
-		contentRight -= virtualKeypadReservedWidthFor(bounds.Dx())
-	}
-	viewportPanel := image.Rect(bounds.Min.X+12, contentTop, contentRight, contentBottom)
+	viewport := s.guestViewportRect(bounds.Dx(), bounds.Dy())
+	viewportPanel := image.Rect(
+		viewport.Min.X-6,
+		viewport.Min.Y-6,
+		viewport.Max.X+6,
+		viewport.Max.Y+6,
+	)
 	if viewportPanel.Dx() < 32 || viewportPanel.Dy() < 32 {
 		return
 	}
-	viewport := image.Rect(
-		viewportPanel.Min.X+6,
-		viewportPanel.Min.Y+6,
-		viewportPanel.Max.X-6,
-		viewportPanel.Max.Y-6,
-	)
 	ebitenutil.DrawRect(
 		screen,
 		float64(viewportPanel.Min.X),
@@ -1087,6 +1078,12 @@ func (s *Shell) frameDestination(viewport image.Rectangle, width, height int) im
 }
 
 func (s *Shell) drawEmptyViewport(screen *ebiten.Image, viewport image.Rectangle) {
+	// The Home launcher (an EbitenUI surface) draws over this rectangle when
+	// the shell is idle, so its own message would sit behind Home. Leave the
+	// guest-surface background (already painted by drawGuestViewport) bare.
+	if s.showHomeSurface() {
+		return
+	}
 	palette := defaultARAMPalette()
 	if s.design != nil {
 		palette = s.design.Palette

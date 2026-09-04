@@ -15,6 +15,7 @@ const (
 	operationFirmware
 	operationRecent
 	operationImportSave
+	operationLibraryFolder
 )
 
 type pickerResult struct {
@@ -42,6 +43,11 @@ func (s *Shell) consumePickerResult(result pickerResult) {
 	if result.operation == operationImportSave {
 		s.state = s.preDialogState
 		s.importSaveDataFromPath(result.path)
+		return
+	}
+	if result.operation == operationLibraryFolder {
+		s.state = s.preDialogState
+		s.addLibraryFolderPath(result.path)
 		return
 	}
 	s.openRequest(OpenRequest{

@@ -25,6 +25,11 @@ func (s *Shell) consumeResults() {
 				s.state = FrontendLoading
 				s.setStatus(s.tr("Loading selected input..."))
 			}
+		case entries := <-s.libraryResults:
+			s.libraryScanning = false
+			s.libraryEntries = entries
+		case result := <-s.iconResults:
+			s.consumeIconResult(result)
 		case result := <-s.pickerResults:
 			s.consumePickerResult(result)
 		case result := <-s.backendResults:

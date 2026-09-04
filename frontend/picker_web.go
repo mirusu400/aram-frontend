@@ -102,6 +102,12 @@ func (webPicker) OpenFirmwareDirectory(string) (string, error) {
 	return "", ErrPickerUnavailable
 }
 
+func (webPicker) OpenGameDirectory(string) (string, error) {
+	// The browser sandbox has no persistent host path to scan, so the Home
+	// library folder picker is unavailable on web.
+	return "", ErrPickerUnavailable
+}
+
 func (webPicker) ChooseRecent([]string) (string, error) {
 	return "", ErrPickerUnavailable
 }

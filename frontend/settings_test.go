@@ -24,6 +24,52 @@ func TestAddRecentDeduplicatesAndLimits(t *testing.T) {
 	}
 }
 
+func TestLibraryFoldersAddAndRemoveDeduplicate(t *testing.T) {
+	settings := defaultSettings()
+	root := filepath.Join("games", "wipi")
+	if !settings.addLibraryFolder(root) {
+		t.Fatal("first add reported no change")
+	}
+	if settings.addLibraryFolder(root) {
+		t.Fatal("duplicate folder was added a second time")
+	}
+	if len(settings.GameLibraryFolders) != 1 {
+		t.Fatalf("library folders = %v", settings.GameLibraryFolders)
+	}
+	if !settings.removeLibraryFolder(root) {
+		t.Fatal("remove reported no change")
+	}
+	if len(settings.GameLibraryFolders) != 0 {
+		t.Fatalf("library folders after remove = %v", settings.GameLibraryFolders)
+	}
+	if settings.removeLibraryFolder(root) {
+		t.Fatal("removing an absent folder reported a change")
+	}
+}
+
+func TestFavoritesToggleAndNormalizeRoundTrip(t *testing.T) {
+	settings := defaultSettings()
+	path := filepath.Join("games", "star.dat")
+	if !settings.toggleFavorite(path) {
+		t.Fatal("first toggle did not star the title")
+	}
+	if !settings.isFavorite(path) {
+		t.Fatal("isFavorite false after starring")
+	}
+	// A hand-edited file with a duplicate must collapse on normalize.
+	settings.FavoriteFiles = append(settings.FavoriteFiles, settings.FavoriteFiles[0])
+	settings.normalize()
+	if len(settings.FavoriteFiles) != 1 {
+		t.Fatalf("normalize left duplicate favorites: %v", settings.FavoriteFiles)
+	}
+	if settings.toggleFavorite(path) {
+		t.Fatal("second toggle did not unstar the title")
+	}
+	if settings.isFavorite(path) {
+		t.Fatal("isFavorite true after unstarring")
+	}
+}
+
 func TestSettingsNormalizePreservesMutedZeroVolume(t *testing.T) {
 	settings := defaultSettings()
 	settings.Volume = 0

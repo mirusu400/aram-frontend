@@ -186,6 +186,24 @@ type Shell struct {
 	updateNoticeReady         bool
 	updateNoticeVersion       string
 	updateNoticeChannel       updateChannel
+	// Home launcher state: the active tab, the recursively-scanned installed
+	// titles, and whether a scan is in flight. libraryResults delivers a
+	// finished scan from its goroutine back to the Update loop.
+	homeTab         string
+	libraryEntries  []LibraryEntry
+	libraryScanning bool
+	libraryResults  chan []LibraryEntry
+	// homeNavHold counts how many consecutive frames each launcher navigation
+	// control (up/down/left/right/ok) has been held, for edge + auto-repeat.
+	homeNavHold map[string]int
+	// Launcher icon cache: decoded per-title icons (main-thread ebiten images),
+	// negative results (no icon / no backend), in-flight requests, the async
+	// delivery channel, and a concurrency limiter for the fetch goroutines.
+	iconImages  map[string]*ebiten.Image
+	iconMissing map[string]bool
+	iconPending map[string]bool
+	iconResults chan iconResult
+	iconSem     chan struct{}
 }
 
 func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
@@ -242,6 +260,13 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		toolResults:               make(chan toolResult, 2),
 		updateResults:             make(chan updateResult, 4),
 		updateCheckResults:        make(chan updateCheckResult, 1),
+		libraryResults:            make(chan []LibraryEntry, 1),
+		homeTab:                   homeTabRecent,
+		iconImages:                make(map[string]*ebiten.Image),
+		iconMissing:               make(map[string]bool),
+		iconPending:               make(map[string]bool),
+		iconResults:               make(chan iconResult, 16),
+		iconSem:                   make(chan struct{}, 4),
 	}
 	shell.hostActiveRequest.Store(true)
 	if shell.settings.CPUProfile {
@@ -285,6 +310,10 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 	shell.startUpdateCheck()
 	if initialPath != "" {
 		shell.openRequest(OpenRequest{Path: initialPath})
+	} else {
+		// Idle launch shows the Home surface; warm the Installed tab so it is
+		// populated by the time the user switches to it.
+		shell.rescanLibrary()
 	}
 	return shell
 }
@@ -365,6 +394,11 @@ func (s *Shell) Update() error {
 		s.handleMouse()
 	}
 	s.handleMappedInput()
+	if s.showHomeSurface() && s.panel == nil && s.activeMenu < 0 && !s.dialogOpen {
+		// The Home launcher is the focus, so directional/confirm input drives
+		// its selection the way a handset's game picker does.
+		s.handleHomeNavigation()
+	}
 	s.scheduleRunningFrame()
 	return nil
 }

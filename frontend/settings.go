@@ -158,6 +158,11 @@ type Settings struct {
 	UpdateChannel       string                       `json:"update_channel"`
 	WelcomeCompleted    bool                         `json:"welcome_completed"`
 	IssueReports        []IssueReportRecord          `json:"issue_reports,omitempty"`
+	// GameLibraryFolders are the roots the Home "Installed" tab scans
+	// recursively for openable titles. FavoriteFiles are the paths starred on
+	// Home. Both are cleaned and de-duplicated by normalize.
+	GameLibraryFolders []string `json:"game_library_folders,omitempty"`
+	FavoriteFiles      []string `json:"favorite_files,omitempty"`
 }
 
 // TouchPlacement stores a custom on-screen button position as its center
@@ -322,6 +327,8 @@ func (s *Settings) normalize() {
 		profile.normalize()
 		s.TitleControllers[key] = profile
 	}
+	s.GameLibraryFolders = cleanPathList(s.GameLibraryFolders)
+	s.FavoriteFiles = cleanPathList(s.FavoriteFiles)
 }
 
 func (s Settings) globalDisplayProfile() DisplayProfile {

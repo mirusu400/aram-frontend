@@ -67,6 +67,18 @@ func (p *platformPicker) OpenFirmwareDirectory(previous string) (string, error) 
 	return path, normalizePickerError(err)
 }
 
+func (p *platformPicker) OpenGameDirectory(previous string) (string, error) {
+	options := []zenity.Option{
+		zenity.Title(translate(p.language, "Select game library folder")),
+		zenity.Directory(),
+	}
+	if previous != "" {
+		options = append(options, zenity.Filename(previous))
+	}
+	path, err := zenity.SelectFile(options...)
+	return path, normalizePickerError(err)
+}
+
 func (p *platformPicker) ChooseRecent(recent []string) (string, error) {
 	labels := make([]string, len(recent))
 	for index, path := range recent {

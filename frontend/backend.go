@@ -249,6 +249,15 @@ type FirmwareBackend interface {
 	SupportsFirmware() bool
 }
 
+// IconBackend extracts a per-title application icon as PNG bytes for a package
+// path, so the launcher can show real handset icons. It is path-keyed and does
+// not require the title to be open. A backend that cannot supply icons (or a
+// format with none) leaves it unimplemented or returns an error, and the
+// launcher falls back to a generated color tile.
+type IconBackend interface {
+	Icon(path string) ([]byte, error)
+}
+
 // CapabilityBackend supplies the reason shown when a persistent command is
 // disabled. Backends that do not implement it fall back to Supports.
 type CapabilityBackend interface {

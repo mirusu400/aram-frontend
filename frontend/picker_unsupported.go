@@ -17,6 +17,9 @@ func (unsupportedPicker) OpenSaveBackupFile() (string, error) {
 func (unsupportedPicker) OpenFirmwareDirectory(string) (string, error) {
 	return "", ErrPickerUnavailable
 }
+func (unsupportedPicker) OpenGameDirectory(string) (string, error) {
+	return "", ErrPickerUnavailable
+}
 func (unsupportedPicker) ChooseRecent([]string) (string, error) {
 	return "", ErrPickerUnavailable
 }

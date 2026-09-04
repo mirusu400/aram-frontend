@@ -55,6 +55,10 @@ func (mobilePicker) OpenFirmwareDirectory(string) (string, error) {
 	return "", requestNativeDocument(true)
 }
 
+func (mobilePicker) OpenGameDirectory(string) (string, error) {
+	return "", ErrPickerUnavailable
+}
+
 func (mobilePicker) ChooseRecent([]string) (string, error) {
 	return "", ErrPickerUnavailable
 }

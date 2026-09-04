@@ -14,6 +14,9 @@ func (s *Shell) closeInput() {
 		return
 	}
 	s.setStatus(s.tr("Title closed"))
+	// Closing a title returns to the Home surface; refresh the Installed tab in
+	// case the library changed while a title was open.
+	s.rescanLibrary()
 }
 
 func (s *Shell) releaseCurrentInput() error {

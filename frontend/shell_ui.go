@@ -48,6 +48,14 @@ type shellUI struct {
 	settingsTouchActive  bool
 	settingsTouchLastY   int
 	recentList           *widget.List
+	homeContainer        *widget.Container
+	homeScroll           *widget.ScrollContainer
+	homeRowPaths         []string
+	homeRowContainers    map[string]*widget.Container
+	homeOpenButton       *widget.Button
+	homeFavButton        *widget.Button
+	homeSelectedPath     string
+	homeSignature        string
 	welcomeStableButton  *widget.Button
 	welcomeNightlyButton *widget.Button
 	welcomeLaterButton   *widget.Button
@@ -78,7 +86,17 @@ func newShellUI(shell *Shell, design *ARAMDesignSystem) *shellUI {
 	)
 	view.scrim.GetWidget().SetVisibility(widget.Visibility_Hide)
 
-	root.AddChild(topBar, toolbar, statusBar, view.scrim)
+	// The Home surface sits in the guest viewport, behind the chrome bars and
+	// the modal scrim, so File/Settings dialogs float over it. It is built
+	// empty here and populated by syncHomeSurface. Its dark feature-phone skin
+	// is its own palette, not the app design system.
+	view.homeContainer = widget.NewContainer(
+		widget.ContainerOpts.BackgroundImage(homeBackgroundImage()),
+		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
+	)
+	view.homeContainer.GetWidget().SetVisibility(widget.Visibility_Hide)
+
+	root.AddChild(view.homeContainer, topBar, toolbar, statusBar, view.scrim)
 	view.ui = &ebitenui.UI{
 		Container:           root,
 		DisableDefaultFocus: false,
@@ -180,6 +198,7 @@ func (u *shellUI) sync(shell *Shell) {
 			button.GetWidget().Disabled = !command.IsEnabled(shell)
 		}
 	}
+	u.syncHomeSurface(shell)
 	u.syncPanel(shell)
 	u.updateSettingsTouchScroll(shell)
 }
