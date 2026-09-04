@@ -16,9 +16,14 @@ func isPreviewBackend(backend Backend) bool {
 // picker is suppressed) on any host, mirroring how BuildVersion is overridden.
 var welcomeSupported = platformSupportsWelcome
 
+// shouldOpenWelcome reports whether the first-run update-channel picker should
+// open. A store build (SelfUpdateDisabled) has nothing for it to configure -
+// the store owns updates and no channel choice takes effect - so it never
+// opens there, matching the update section it already hides in Settings.
 func (s *Shell) shouldOpenWelcome() bool {
 	return !s.settings.WelcomeCompleted &&
 		!isPreviewBackend(s.backend) &&
+		!selfUpdateDisabled() &&
 		welcomeSupported()
 }
 

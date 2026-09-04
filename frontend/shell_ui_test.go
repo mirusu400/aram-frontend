@@ -107,6 +107,21 @@ func TestWebLaunchSkipsWelcomeModal(t *testing.T) {
 	}
 }
 
+// TestStoreBuildSkipsWelcomeModal covers the Play Store flavor: it is built
+// with SelfUpdateDisabled (aram-emu/android/app/build.gradle), so the update
+// channel picker has nothing to configure and must not appear on first launch.
+func TestStoreBuildSkipsWelcomeModal(t *testing.T) {
+	isolateSettings(t)
+	previous := SelfUpdateDisabled
+	SelfUpdateDisabled = "1"
+	t.Cleanup(func() { SelfUpdateDisabled = previous })
+
+	shell := NewShell(integratedWelcomeBackend{}, nil, "")
+	if shell.panel != nil {
+		t.Fatalf("store build launch opened a panel = %#v", shell.panel)
+	}
+}
+
 func TestWelcomeChannelSelectionPersistsAndDoesNotDownloadCoreTools(t *testing.T) {
 	isolateSettings(t)
 	downloader := &fakeUpdateDownloader{
