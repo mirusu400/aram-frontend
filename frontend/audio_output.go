@@ -54,6 +54,10 @@ type pcmQueue struct {
 	residual   [2]int32
 	silent     bool
 	spliceNext bool
+	// trimming latches while the queue is working its way back down to the
+	// target, so a correction finishes instead of stopping at the slack line
+	// and leaving the stream permanently a third of a target late.
+	trimming bool
 }
 
 func newPCMQueue(maxBytes int) *pcmQueue {
@@ -219,8 +223,12 @@ func (q *pcmQueue) trimToTarget() {
 		return
 	}
 	available := len(q.data) - q.offset
-	ceiling := q.targetBytes + q.targetBytes/2
-	if available <= ceiling {
+	if available > q.targetBytes+q.targetBytes/2 {
+		q.trimming = true
+	} else if available <= q.targetBytes {
+		q.trimming = false
+	}
+	if !q.trimming {
 		return
 	}
 	trim := alignStereoFrameUp(available - q.targetBytes)
