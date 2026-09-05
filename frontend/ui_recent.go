@@ -192,6 +192,10 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 	u.recentRowPaths = u.recentRowPaths[:0]
 	for _, entry := range recent {
 		entry := entry
+		name := entry.Name
+		if name == "" {
+			name = filepath.Base(filepath.Clean(entry.Path))
+		}
 		image := unselectedImage
 		if entry.Path == selectedPath {
 			image = selectedImage
@@ -205,7 +209,7 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 			widget.ButtonOpts.TextAndImage(
 				recentEntryLabel(entry.Name, entry.Path, labelWidth),
 				design.Type.Body,
-				&widget.GraphicImage{Idle: recentRowIconImage(shell, entry.Path)},
+				&widget.GraphicImage{Idle: recentRowIconImage(shell, design, entry.Path, name)},
 				textColor,
 			),
 			widget.ButtonOpts.TextPosition(widget.TextPositionStart, widget.TextPositionCenter),
@@ -299,17 +303,15 @@ func recentPanelSignature(shell *Shell, viewportWidth, viewportHeight int, entri
 }
 
 // recentRowIconImage returns the entry's extracted icon when the backend has
-// provided one, otherwise a hash-colored placeholder tile — the same scheme
-// as the Home launcher rows (see ui_home.go), so a title looks the same
+// provided one, otherwise the same monogram placeholder as the Home launcher
+// rows (see homeIconPlaceholder in ui_home.go), so a title looks the same
 // wherever it is listed.
-func recentRowIconImage(shell *Shell, path string) *ebiten.Image {
+func recentRowIconImage(shell *Shell, design *ARAMDesignSystem, path, name string) *ebiten.Image {
 	shell.requestHomeIcon(path)
 	if icon := shell.homeIcon(path); icon != nil {
 		return scaleIconToTile(icon)
 	}
-	tile := ebiten.NewImage(homeIconSize, homeIconSize)
-	tile.Fill(homeIconColor(path))
-	return tile
+	return homeIconPlaceholder(design, path, name)
 }
 
 func recentContainsPath(entries []RecentEntry, path string) bool {

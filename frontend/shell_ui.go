@@ -51,6 +51,8 @@ type shellUI struct {
 	recentRowPaths       []string
 	recentSelectedPath   string
 	homeContainer        *widget.Container
+	homeSearchInput      *imeTextInput
+	homeBody             *widget.Container
 	homeScroll           *widget.ScrollContainer
 	homeRowPaths         []string
 	homeRowContainers    map[string]*widget.Container

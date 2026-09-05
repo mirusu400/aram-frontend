@@ -61,6 +61,78 @@ func TestHomeTabsListTheirOwnEntries(t *testing.T) {
 	}
 }
 
+// TestHomeFilterNarrowsVisibleRows guards the Home search field: typing a
+// query narrows every tab's rows to a case-insensitive name match, and
+// clearing it restores the full list. The field itself lives outside the
+// rebuilt row list (see ensureHomeChrome in ui_home_search.go), so this only
+// exercises the data path (setHomeFilter -> homeTabEntries -> rebuild).
+func TestHomeFilterNarrowsVisibleRows(t *testing.T) {
+	isolateSettledSettings(t)
+	shell := NewShell(NullBackend{}, nil, "")
+	shell.settings.RecentFiles = []RecentEntry{
+		{Path: filepath.Join("games", "a.dat"), Name: "Slime Adventure"},
+		{Path: filepath.Join("games", "b.dat"), Name: "Maple Archer"},
+		{Path: filepath.Join("games", "c.dat"), Name: "Old Game"},
+	}
+	shell.setHomeTab(homeTabRecent)
+	shell.interfaceUI.sync(shell)
+	shell.interfaceUI.ui.Update()
+	if got := len(shell.interfaceUI.homeRowPaths); got != 3 {
+		t.Fatalf("unfiltered Recent tab entries = %d, want 3", got)
+	}
+
+	shell.setHomeFilter("maple")
+	shell.interfaceUI.sync(shell)
+	shell.interfaceUI.ui.Update()
+	if got := len(shell.interfaceUI.homeRowPaths); got != 1 {
+		t.Fatalf("filtered Recent tab entries = %d, want 1", got)
+	}
+	if got := shell.interfaceUI.homeRowPaths[0]; got != filepath.Join("games", "b.dat") {
+		t.Fatalf("filtered entry = %q", got)
+	}
+
+	shell.setHomeFilter("")
+	shell.interfaceUI.sync(shell)
+	shell.interfaceUI.ui.Update()
+	if got := len(shell.interfaceUI.homeRowPaths); got != 3 {
+		t.Fatalf("cleared filter entries = %d, want 3", got)
+	}
+}
+
+// TestMonogramLetterUsesFirstNonSpaceRune guards the Home/Open-Recent icon
+// placeholder's letter derivation.
+func TestMonogramLetterUsesFirstNonSpaceRune(t *testing.T) {
+	cases := map[string]string{
+		"Slime World": "S",
+		"  maple":     "M",
+		"":            "",
+		"   ":         "",
+		"낮은음자리표":      "낮",
+	}
+	for input, want := range cases {
+		if got := monogramLetter(input); got != want {
+			t.Fatalf("monogramLetter(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
+// TestHomeIconPlaceholderAlwaysReturnsATile guards the fallback used when a
+// title has no extracted icon (no backend, not fetched yet, or a format like
+// ktf-wipi whose icon heuristic finds nothing): the tile itself must never be
+// nil, whether or not a name is available to draw a monogram on it.
+func TestHomeIconPlaceholderAlwaysReturnsATile(t *testing.T) {
+	design := newARAMDesignSystem("light", themeFamilyModern)
+	for _, name := range []string{"Slime Adventure", ""} {
+		tile := homeIconPlaceholder(design, filepath.Join("games", "a.dat"), name)
+		if tile == nil {
+			t.Fatalf("homeIconPlaceholder(name=%q) = nil", name)
+		}
+		if w, h := tile.Bounds().Dx(), tile.Bounds().Dy(); w != homeIconSize || h != homeIconSize {
+			t.Fatalf("placeholder size = %dx%d, want %dx%d", w, h, homeIconSize, homeIconSize)
+		}
+	}
+}
+
 func TestHomeSurfaceHiddenWhileTitleLoaded(t *testing.T) {
 	isolateSettledSettings(t)
 	shell := NewShell(NullBackend{}, nil, "")

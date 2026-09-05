@@ -2,6 +2,7 @@ package frontend
 
 import (
 	"image"
+	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -75,6 +76,12 @@ func (s *Shell) setHomeTab(tab string) {
 	}
 }
 
+// setHomeFilter narrows every Home tab to titles whose name contains query
+// (case-insensitive). It applies across tab switches until cleared.
+func (s *Shell) setHomeFilter(query string) {
+	s.homeFilterQuery = query
+}
+
 // homeOpenPath loads a title chosen from any Home tab, mirroring openRecentPath.
 func (s *Shell) homeOpenPath(path string) {
 	if path == "" {
@@ -84,17 +91,37 @@ func (s *Shell) homeOpenPath(path string) {
 	s.openRequest(OpenRequest{Path: path})
 }
 
-// homeTabEntries returns the rows shown for a tab. Recent and Favorites are
-// stored as plain paths; Installed comes from the recursive scan.
+// homeTabEntries returns the rows shown for a tab, narrowed by homeFilterQuery
+// when set. Recent and Favorites are stored as plain paths; Installed comes
+// from the recursive scan.
 func (s *Shell) homeTabEntries(tab string) []LibraryEntry {
+	var entries []LibraryEntry
 	switch tab {
 	case homeTabInstalled:
-		return s.libraryEntries
+		entries = s.libraryEntries
 	case homeTabFavorites:
-		return pathsToLibraryEntries(s.settings.FavoriteFiles)
+		entries = pathsToLibraryEntries(s.settings.FavoriteFiles)
 	default:
-		return recentToLibraryEntries(s.settings.RecentFiles)
+		entries = recentToLibraryEntries(s.settings.RecentFiles)
 	}
+	return filterLibraryEntries(entries, s.homeFilterQuery)
+}
+
+// filterLibraryEntries keeps only entries whose name contains query,
+// case-insensitively. An empty query returns entries unchanged.
+func filterLibraryEntries(entries []LibraryEntry, query string) []LibraryEntry {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return entries
+	}
+	query = strings.ToLower(query)
+	filtered := make([]LibraryEntry, 0, len(entries))
+	for _, entry := range entries {
+		if strings.Contains(strings.ToLower(entry.Name), query) {
+			filtered = append(filtered, entry)
+		}
+	}
+	return filtered
 }
 
 // homeLibraryFolders returns the configured scan roots for the Installed tab.

@@ -190,6 +190,7 @@ type Shell struct {
 	// titles, and whether a scan is in flight. libraryResults delivers a
 	// finished scan from its goroutine back to the Update loop.
 	homeTab         string
+	homeFilterQuery string
 	libraryEntries  []LibraryEntry
 	libraryScanning bool
 	libraryResults  chan []LibraryEntry

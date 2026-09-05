@@ -6,6 +6,7 @@ import (
 	"image"
 	"image/color"
 	"path/filepath"
+	"strings"
 
 	euiimage "github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
@@ -75,6 +76,7 @@ func (u *shellUI) syncHomeSurface(shell *Shell) {
 		return
 	}
 	u.homeContainer.GetWidget().SetVisibility(widget.Visibility_Show)
+	u.ensureHomeChrome(shell)
 
 	rect := shell.guestViewportRect(u.viewportWidth, u.viewportHeight)
 	u.homeContainer.GetWidget().LayoutData = widget.AnchorLayoutData{
@@ -102,7 +104,10 @@ func (u *shellUI) syncHomeSurface(shell *Shell) {
 	u.rebuildHomeContent(shell, tab, entries, folders, rect)
 }
 
-// rebuildHomeContent replaces the launcher widgets inside homeContainer.
+// rebuildHomeContent replaces the launcher widgets inside homeBody, the
+// rebuilt sub-container below the persistent search field (see
+// ensureHomeChrome in ui_home_search.go) — so typing in the search box never
+// tears down and recreates its own IME session.
 func (u *shellUI) rebuildHomeContent(
 	shell *Shell,
 	tab string,
@@ -110,7 +115,7 @@ func (u *shellUI) rebuildHomeContent(
 	folders []string,
 	rect image.Rectangle,
 ) {
-	u.homeContainer.RemoveChildren()
+	u.homeBody.RemoveChildren()
 	u.homeRowContainers = make(map[string]*widget.Container)
 	u.homeRowPaths = u.homeRowPaths[:0]
 
@@ -139,16 +144,16 @@ func (u *shellUI) rebuildHomeContent(
 	}
 	u.homeSelectedPath = selectedPath
 
-	u.homeContainer.AddChild(u.homeTabBar(shell, tab))
-	u.homeContainer.AddChild(homeDivider(homeTabBarHeight))
+	u.homeBody.AddChild(u.homeTabBar(shell, tab))
+	u.homeBody.AddChild(homeDivider(homeTabBarHeight))
 	if installed {
-		u.homeContainer.AddChild(u.homeFolderBar(shell, folders))
+		u.homeBody.AddChild(u.homeFolderBar(shell, folders))
 	}
 
-	u.homeContainer.AddChild(u.homeRowScroll(shell, rows, contentTop, selectedPath))
+	u.homeBody.AddChild(u.homeRowScroll(shell, rows, contentTop, selectedPath))
 
 	if len(rows) == 0 {
-		u.homeContainer.AddChild(homeText(
+		u.homeBody.AddChild(homeText(
 			homeEmptyMessage(shell, tab, folders, shell.libraryScanning),
 			u.design.Type.Body, homeColorMuted,
 			widget.AnchorLayoutData{
@@ -159,7 +164,7 @@ func (u *shellUI) rebuildHomeContent(
 		))
 	}
 
-	u.homeContainer.AddChild(u.homeSoftkeyBar(shell, selectedPath))
+	u.homeBody.AddChild(u.homeSoftkeyBar(shell, selectedPath))
 }
 
 // homeTabBar builds the green-underlined tab strip.
@@ -324,7 +329,7 @@ func (u *shellUI) homeRowWidget(shell *Shell, row homeRow, selected bool) *widge
 		widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}, 0)
 	number.GetWidget().MinWidth = 26
 	left.AddChild(number)
-	left.AddChild(u.homeIconWidget(shell, row.path))
+	left.AddChild(u.homeIconWidget(shell, row.path, row.name))
 	left.AddChild(homeText(shorten(row.name, 48), u.design.Type.Body, homeColorName,
 		widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}, 0))
 	container.AddChild(left)
@@ -444,27 +449,52 @@ func homeIconColor(path string) color.NRGBA {
 }
 
 // homeIconWidget returns the row's icon tile: the extracted game icon when the
-// backend has provided one, otherwise a hash-colored placeholder. Requesting
-// the icon here means only visible rows are fetched.
-func (u *shellUI) homeIconWidget(shell *Shell, path string) widget.PreferredSizeLocateableWidget {
+// backend has provided one, otherwise a monogram placeholder (see
+// homeIconPlaceholder). Requesting the icon here means only visible rows are
+// fetched.
+func (u *shellUI) homeIconWidget(shell *Shell, path, name string) widget.PreferredSizeLocateableWidget {
 	shell.requestHomeIcon(path)
-	center := widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}
-	if icon := shell.homeIcon(path); icon != nil {
-		return widget.NewGraphic(
-			widget.GraphicOpts.Image(scaleIconToTile(icon)),
-			widget.GraphicOpts.WidgetOpts(
-				widget.WidgetOpts.MinSize(homeIconSize, homeIconSize),
-				widget.WidgetOpts.LayoutData(center),
-			),
-		)
+	icon := homeIconPlaceholder(u.design, path, name)
+	if loaded := shell.homeIcon(path); loaded != nil {
+		icon = scaleIconToTile(loaded)
 	}
-	return widget.NewContainer(
-		widget.ContainerOpts.BackgroundImage(euiimage.NewNineSliceColor(homeIconColor(path))),
-		widget.ContainerOpts.WidgetOpts(
+	return widget.NewGraphic(
+		widget.GraphicOpts.Image(icon),
+		widget.GraphicOpts.WidgetOpts(
 			widget.WidgetOpts.MinSize(homeIconSize, homeIconSize),
-			widget.WidgetOpts.LayoutData(center),
+			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}),
 		),
 	)
+}
+
+// homeIconPlaceholder builds a stand-in tile for a title with no extracted
+// icon (not fetched yet, no backend, or the format carries none — e.g. a
+// ktf-wipi title whose resource layout defeats the icon heuristic): a
+// hash-colored square bearing the title's first letter, so the tile reads as
+// an intentional avatar rather than a blank, possibly-broken swatch. Shared
+// with the Open Recent dialog (ui_recent.go) so a title looks the same
+// wherever it is listed.
+func homeIconPlaceholder(design *ARAMDesignSystem, path, name string) *ebiten.Image {
+	tile := ebiten.NewImage(homeIconSize, homeIconSize)
+	tile.Fill(homeIconColor(path))
+	letter := monogramLetter(name)
+	if letter == "" {
+		return tile
+	}
+	face := design.Type.Strong
+	bounds := tile.Bounds()
+	top := centeredTextTop(face, bounds, 0)
+	drawCenteredText(tile, letter, face, color.NRGBA{0xff, 0xff, 0xff, 0xff}, bounds, top)
+	return tile
+}
+
+// monogramLetter is the uppercased first rune of name, or "" for a blank name.
+func monogramLetter(name string) string {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return ""
+	}
+	return strings.ToUpper(string([]rune(trimmed)[0]))
 }
 
 // scaleIconToTile renders icon at the launcher tile size.
@@ -496,8 +526,13 @@ func homeContainsPath(rows []homeRow, path string) bool {
 	return false
 }
 
-// homeEmptyMessage explains an empty tab.
+// homeEmptyMessage explains an empty tab, or an active search filter that
+// matched nothing (checked first: an empty Installed tab with a filter typed
+// should explain the filter, not tell the user to add a library folder).
 func homeEmptyMessage(shell *Shell, tab string, folders []string, scanning bool) string {
+	if query := strings.TrimSpace(shell.homeFilterQuery); query != "" {
+		return shell.trf("No titles match “%s”.", query)
+	}
 	switch tab {
 	case homeTabInstalled:
 		if scanning {
