@@ -49,6 +49,12 @@ space. Compact windows hide secondary toolbar/status metadata, center and
 clamp modal windows, and scroll long settings pages instead of scaling the
 entire 960x720 interface.
 
+The Fill (`stretch`) screen layout uses the largest size that fits the guest
+viewport, even when Integer Scaling is enabled. Preserve Aspect Ratio keeps
+the frame proportional and centers any necessary letterboxing; disabling it
+stretches the frame across the entire viewport. Integer Scaling still applies
+to the centered workspace layout.
+
 ## Tools
 
 - Cheat Manager
@@ -112,7 +118,7 @@ exposes no battery draws no meter.
 On touch layouts, the menu bar, toolbar, and status bar disappear when a
 title enters the running state so the guest screen can fill everything above
 the on-screen control deck at its largest aspect-preserving size; the
-integer-scaling preference applies only to the windowed workspace. A faint
+integer-scaling preference applies only to the centered windowed workspace. A faint
 hamburger toggle floating at the top-right restores the chrome, and a HIDE
 button at the right end of the toolbar strips it again. Open panels, the
 touch layout editor, and focus mode always present their own full surface.

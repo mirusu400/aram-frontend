@@ -66,7 +66,7 @@ func (s *Shell) drawImmersiveWorkspace(screen *ebiten.Image) {
 // aspect-preserving size. Chrome-less play surfaces exist to give the guest
 // the whole screen, so the integer-scaling preference must not floor a
 // fractional fit down to a fraction of that space; it still applies to the
-// windowed workspace.
+// centered windowed workspace.
 func (s *Shell) drawFilledGuestViewport(
 	screen *ebiten.Image,
 	viewport image.Rectangle,
@@ -1063,15 +1063,13 @@ func (s *Shell) frameDestination(viewport image.Rectangle, width, height int) im
 	}
 
 	scale := math.Min(scaleX, scaleY)
-	if display.IntegerScaling && !s.fillGuestViewport && scale >= 1 {
+	// Fill uses the largest fit even when the saved integer-scaling preference
+	// is enabled. Integer steps apply only to the centered workspace.
+	if display.IntegerScaling && display.ScreenLayout != "stretch" && !s.fillGuestViewport && scale >= 1 {
 		scale = math.Max(1, math.Floor(scale))
 	}
 	targetWidth := max(1, int(math.Round(float64(width)*scale)))
 	targetHeight := max(1, int(math.Round(float64(height)*scale)))
-	if !display.PreserveAspect && display.ScreenLayout == "stretch" {
-		targetWidth = viewport.Dx()
-		targetHeight = viewport.Dy()
-	}
 	x := viewport.Min.X + (viewport.Dx()-targetWidth)/2
 	y := viewport.Min.Y + (viewport.Dy()-targetHeight)/2
 	return image.Rect(x, y, x+targetWidth, y+targetHeight)
