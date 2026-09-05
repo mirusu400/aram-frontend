@@ -636,12 +636,12 @@ func TestResponsiveSettingsRenderAtCompactAndLargeSizes(t *testing.T) {
 
 func TestOpenRecentUsesScrollableFilenameFirstList(t *testing.T) {
 	shell := NewShell(NullBackend{}, nil, "")
-	shell.settings.RecentFiles = make([]string, recentFileLimit)
+	shell.settings.RecentFiles = make([]RecentEntry, recentFileLimit)
 	for index := range shell.settings.RecentFiles {
-		shell.settings.RecentFiles[index] = filepath.Join(
+		shell.settings.RecentFiles[index] = RecentEntry{Path: filepath.Join(
 			`C:\very\long\archive\directory\with\identical\prefixes`,
 			fmt.Sprintf("distinct-game-%02d.dat", index),
-		)
+		)}
 	}
 
 	shell.chooseRecent()
@@ -654,18 +654,18 @@ func TestOpenRecentUsesScrollableFilenameFirstList(t *testing.T) {
 	if shell.panel == nil || shell.panel.Kind != "recent" {
 		t.Fatalf("Open Recent panel = %#v", shell.panel)
 	}
-	if shell.interfaceUI.panelWindow == nil || shell.interfaceUI.recentList == nil {
+	if shell.interfaceUI.panelWindow == nil || shell.interfaceUI.recentScroll == nil {
 		t.Fatal("scrollable recent-input list was not created")
 	}
-	if got := len(shell.interfaceUI.recentList.Entries()); got != recentFileLimit {
+	if got := len(shell.interfaceUI.recentRowPaths); got != recentFileLimit {
 		t.Fatalf("recent list entries = %d, want %d", got, recentFileLimit)
 	}
 	first := shell.settings.RecentFiles[0]
-	label := recentEntryLabel(first, 70)
+	label := recentEntryLabel(first.Name, first.Path, 70)
 	if !strings.HasPrefix(label, "distinct-game-00.dat") {
 		t.Fatalf("recent entry does not lead with its filename: %q", label)
 	}
-	details := recentPathDetails(first, 26, 8)
+	details := recentPathDetails(first.Path, 26, 8)
 	if !strings.Contains(strings.ReplaceAll(details, "\n", ""), "distinct-game-00.dat") {
 		t.Fatalf("selected-path details omit the filename: %q", details)
 	}
@@ -677,7 +677,7 @@ func TestOpenRecentListRendersAtMinimumWindowSize(t *testing.T) {
 	for index := 0; index < recentFileLimit; index++ {
 		shell.settings.RecentFiles = append(
 			shell.settings.RecentFiles,
-			filepath.Join("archive", fmt.Sprintf("game-%02d.dat", index)),
+			RecentEntry{Path: filepath.Join("archive", fmt.Sprintf("game-%02d.dat", index))},
 		)
 	}
 	shell.chooseRecent()
@@ -685,7 +685,7 @@ func TestOpenRecentListRendersAtMinimumWindowSize(t *testing.T) {
 	shell.interfaceUI.ui.Update()
 	shell.Draw(ebiten.NewImage(720, 540))
 
-	if shell.interfaceUI.panelWindow == nil || shell.interfaceUI.recentList == nil {
+	if shell.interfaceUI.panelWindow == nil || shell.interfaceUI.recentScroll == nil {
 		t.Fatal("compact Open Recent modal did not render its list")
 	}
 }

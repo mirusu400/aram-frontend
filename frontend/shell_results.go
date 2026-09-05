@@ -149,7 +149,7 @@ func (s *Shell) consumeBackendResult(result backendResult) {
 		s.firmwareSession = result.request.Firmware
 		s.selectedPath = result.request.Path
 		if result.request.Path != "" && !result.request.Temporary {
-			s.settings.addRecent(result.request.Path)
+			s.settings.addRecent(result.request.Path, result.info.DisplayName)
 			_ = s.settings.save()
 		}
 	}

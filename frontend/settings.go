@@ -108,7 +108,7 @@ type DisplayProfile struct {
 }
 
 type Settings struct {
-	RecentFiles           []string                  `json:"recent_files"`
+	RecentFiles           []RecentEntry             `json:"recent_files"`
 	Language              string                    `json:"language"`
 	ThemeMode             string                    `json:"theme_mode"`
 	ThemeFamily           string                    `json:"theme_family"`
@@ -163,6 +163,56 @@ type Settings struct {
 	// Home. Both are cleaned and de-duplicated by normalize.
 	GameLibraryFolders []string `json:"game_library_folders,omitempty"`
 	FavoriteFiles      []string `json:"favorite_files,omitempty"`
+}
+
+// RecentEntry pairs an openable path with the display name it was opened
+// under. The path alone is not readable for every input: a desktop
+// drag-and-drop opens from a private cache copy ("drop-<random>.ext") and an
+// Android document picker hands back an opaque content:// URI, so the name
+// captured at open time is the only readable label either surface has.
+type RecentEntry struct {
+	Path string `json:"path"`
+	Name string `json:"name,omitempty"`
+}
+
+// UnmarshalJSON accepts a bare path string (the format written before this
+// type existed) in addition to the {path, name} object, so an existing
+// settings.json still loads without a migration step.
+func (e *RecentEntry) UnmarshalJSON(data []byte) error {
+	var path string
+	if err := json.Unmarshal(data, &path); err == nil {
+		e.Path = path
+		e.Name = ""
+		return nil
+	}
+	type recentEntryAlias RecentEntry
+	var alias recentEntryAlias
+	if err := json.Unmarshal(data, &alias); err != nil {
+		return err
+	}
+	*e = RecentEntry(alias)
+	return nil
+}
+
+// recentEntriesFromPaths builds recent entries with no explicit display name;
+// display falls back to each path's own basename. Convenience for callers
+// that only have bare paths (tests, legacy migration).
+func recentEntriesFromPaths(paths ...string) []RecentEntry {
+	entries := make([]RecentEntry, 0, len(paths))
+	for _, path := range paths {
+		entries = append(entries, RecentEntry{Path: path})
+	}
+	return entries
+}
+
+// recentEntryPaths extracts the bare paths, for callers (native recent-file
+// pickers) that only accept []string.
+func recentEntryPaths(entries []RecentEntry) []string {
+	paths := make([]string, len(entries))
+	for index, entry := range entries {
+		paths[index] = entry.Path
+	}
+	return paths
 }
 
 // TouchPlacement stores a custom on-screen button position as its center
@@ -448,15 +498,28 @@ func titleSettingsKey(input *InputInfo) string {
 	return ""
 }
 
-func (s *Settings) addRecent(path string) {
+// addRecent records path as the most recent input, deduplicating by path and
+// capping the list at recentFileLimit. name is the display name it was opened
+// under (see RecentEntry); an empty name keeps whatever name a prior entry for
+// the same path already carried, so a caller that cannot supply one does not
+// blank out a good name already on file.
+func (s *Settings) addRecent(path, name string) {
 	absolute, err := filepath.Abs(path)
 	if err == nil {
 		path = absolute
 	}
 	path = filepath.Clean(path)
-	recent := []string{path}
+	if name == "" {
+		for _, existing := range s.RecentFiles {
+			if strings.EqualFold(filepath.Clean(existing.Path), path) {
+				name = existing.Name
+				break
+			}
+		}
+	}
+	recent := []RecentEntry{{Path: path, Name: name}}
 	for _, existing := range s.RecentFiles {
-		if strings.EqualFold(filepath.Clean(existing), path) {
+		if strings.EqualFold(filepath.Clean(existing.Path), path) {
 			continue
 		}
 		recent = append(recent, existing)

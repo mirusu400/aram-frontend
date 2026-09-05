@@ -17,6 +17,13 @@ func (s *Shell) panelLines() []string {
 		if s.input == nil {
 			return []string{s.tr("No input is selected.")}
 		}
+		pathLabel := s.selectedPath
+		if pathLabel != "" && pathLabel == s.temporaryPath {
+			// A temporary copy's path is a private cache filename
+			// ("drop-<random>.ext"), meaningless to the user — show the
+			// name it was opened under instead.
+			pathLabel = s.trf("%s (temporary copy)", s.input.DisplayName)
+		}
 		return []string{
 			s.trf("Name: %s", s.input.DisplayName),
 			s.trf(
@@ -34,7 +41,7 @@ func (s *Shell) panelLines() []string {
 			),
 			s.trf(
 				"Path/handle: %s",
-				emptyFallback(s.selectedPath, s.tr("native document")),
+				emptyFallback(pathLabel, s.tr("native document")),
 			),
 			s.trf("Backend: %s", s.backendName()),
 			s.trf(

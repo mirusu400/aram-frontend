@@ -25,11 +25,11 @@ func TestIdleLaunchShowsHomeSurface(t *testing.T) {
 func TestHomeTabsListTheirOwnEntries(t *testing.T) {
 	isolateSettledSettings(t)
 	shell := NewShell(NullBackend{}, nil, "")
-	shell.settings.RecentFiles = []string{
+	shell.settings.RecentFiles = recentEntriesFromPaths(
 		filepath.Join("games", "a.dat"),
 		filepath.Join("games", "b.dat"),
 		filepath.Join("games", "c.dat"),
-	}
+	)
 	shell.settings.FavoriteFiles = []string{filepath.Join("games", "b.dat")}
 	shell.libraryEntries = []LibraryEntry{
 		{Path: filepath.Join("lib", "x.jar"), Name: "x"},
@@ -115,11 +115,11 @@ func TestHomeNavFiresOnEdgeAndRepeat(t *testing.T) {
 func TestHomeDirectionalNavigationMovesSelection(t *testing.T) {
 	isolateSettledSettings(t)
 	shell := NewShell(NullBackend{}, nil, "")
-	shell.settings.RecentFiles = []string{
+	shell.settings.RecentFiles = recentEntriesFromPaths(
 		filepath.Join("games", "a.dat"),
 		filepath.Join("games", "b.dat"),
 		filepath.Join("games", "c.dat"),
-	}
+	)
 	shell.setHomeTab(homeTabRecent)
 	shell.interfaceUI.sync(shell)
 	shell.interfaceUI.ui.Update()
@@ -166,7 +166,7 @@ func TestHomeConfirmOpensSelection(t *testing.T) {
 	backend := &openRecordingBackend{requests: make(chan OpenRequest, 1)}
 	shell := NewShell(backend, nil, "")
 	want := filepath.Join(t.TempDir(), "pick.dat")
-	shell.settings.RecentFiles = []string{want}
+	shell.settings.RecentFiles = recentEntriesFromPaths(want)
 	shell.setHomeTab(homeTabRecent)
 	shell.interfaceUI.sync(shell)
 	shell.interfaceUI.ui.Update()

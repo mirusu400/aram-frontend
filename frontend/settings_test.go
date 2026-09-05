@@ -13,14 +13,35 @@ import (
 func TestAddRecentDeduplicatesAndLimits(t *testing.T) {
 	settings := defaultSettings()
 	for index := 0; index < recentFileLimit+3; index++ {
-		settings.addRecent(filepath.Join("games", fmt.Sprintf("%02d.dat", index)))
+		settings.addRecent(filepath.Join("games", fmt.Sprintf("%02d.dat", index)), "")
 	}
 	if len(settings.RecentFiles) != recentFileLimit {
 		t.Fatalf("recent count = %d, want %d", len(settings.RecentFiles), recentFileLimit)
 	}
-	settings.addRecent(settings.RecentFiles[4])
+	settings.addRecent(settings.RecentFiles[4].Path, settings.RecentFiles[4].Name)
 	if len(settings.RecentFiles) != recentFileLimit {
 		t.Fatalf("deduplication changed count to %d", len(settings.RecentFiles))
+	}
+}
+
+// TestAddRecentKeepsDisplayNameSeparateFromPath guards the fix for a drop's
+// temporary cache path or an Android content:// URI showing up as the
+// "name": addRecent must store the display name it was opened under
+// alongside the path, and a later re-add with no name must not blank it out.
+func TestAddRecentKeepsDisplayNameSeparateFromPath(t *testing.T) {
+	settings := defaultSettings()
+	cachePath := filepath.Join("cache", "drop-a1b2c3.gba")
+	wantPath, err := filepath.Abs(cachePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings.addRecent(cachePath, "My Game.gba")
+	if got := settings.RecentFiles[0]; got.Path != wantPath || got.Name != "My Game.gba" {
+		t.Fatalf("recent entry = %#v", got)
+	}
+	settings.addRecent(cachePath, "")
+	if got := settings.RecentFiles[0]; got.Name != "My Game.gba" {
+		t.Fatalf("re-add with no name blanked the display name: %#v", got)
 	}
 }
 

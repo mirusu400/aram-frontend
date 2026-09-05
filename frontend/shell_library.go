@@ -93,7 +93,7 @@ func (s *Shell) homeTabEntries(tab string) []LibraryEntry {
 	case homeTabFavorites:
 		return pathsToLibraryEntries(s.settings.FavoriteFiles)
 	default:
-		return pathsToLibraryEntries(s.settings.RecentFiles)
+		return recentToLibraryEntries(s.settings.RecentFiles)
 	}
 }
 
@@ -115,6 +115,29 @@ func pathsToLibraryEntries(paths []string) []LibraryEntry {
 		entries = append(entries, LibraryEntry{Path: path, Name: libraryEntryName(path)})
 	}
 	return entries
+}
+
+// recentToLibraryEntries wraps recent entries as display rows, preferring the
+// display name captured when each was opened (see RecentEntry) over a name
+// derived from the path — the path itself is a private cache copy for a
+// desktop drop or an opaque content:// URI on Android, so it is not always
+// readable on its own.
+func recentToLibraryEntries(entries []RecentEntry) []LibraryEntry {
+	if len(entries) == 0 {
+		return nil
+	}
+	rows := make([]LibraryEntry, 0, len(entries))
+	for _, entry := range entries {
+		if entry.Path == "" {
+			continue
+		}
+		name := entry.Name
+		if name == "" {
+			name = libraryEntryName(entry.Path)
+		}
+		rows = append(rows, LibraryEntry{Path: entry.Path, Name: name})
+	}
+	return rows
 }
 
 // chooseLibraryFolder opens the native folder picker; the chosen folder is

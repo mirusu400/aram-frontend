@@ -82,7 +82,7 @@ func (p *platformPicker) OpenGameDirectory(previous string) (string, error) {
 func (p *platformPicker) ChooseRecent(recent []string) (string, error) {
 	labels := make([]string, len(recent))
 	for index, path := range recent {
-		labels[index] = recentEntryLabel(path, 110)
+		labels[index] = recentEntryLabel("", path, 110)
 	}
 	selected, err := zenity.List(
 		translate(p.language, "Choose a recent input"),

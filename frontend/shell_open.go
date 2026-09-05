@@ -99,7 +99,7 @@ func (s *Shell) chooseRecent() {
 	s.preDialogState = s.state
 	s.state = FrontendSelecting
 	s.dialogOpen = true
-	recent := append([]string(nil), s.settings.RecentFiles...)
+	recent := recentEntryPaths(s.settings.RecentFiles)
 	s.setStatus(s.tr("Choose a recent input..."))
 	go func() {
 		path, err := s.picker.ChooseRecent(recent)

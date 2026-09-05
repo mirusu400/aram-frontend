@@ -47,7 +47,9 @@ type shellUI struct {
 	settingsTouchID      ebiten.TouchID
 	settingsTouchActive  bool
 	settingsTouchLastY   int
-	recentList           *widget.List
+	recentScroll         *widget.ScrollContainer
+	recentRowPaths       []string
+	recentSelectedPath   string
 	homeContainer        *widget.Container
 	homeScroll           *widget.ScrollContainer
 	homeRowPaths         []string
@@ -353,7 +355,9 @@ func (u *shellUI) closePanel() {
 	}
 	u.panelTextInputs = nil
 	u.settingsScroll = nil
-	u.recentList = nil
+	u.recentScroll = nil
+	u.recentRowPaths = nil
+	u.recentSelectedPath = ""
 	u.welcomeStableButton = nil
 	u.welcomeNightlyButton = nil
 	u.welcomeLaterButton = nil

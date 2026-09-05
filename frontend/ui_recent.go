@@ -2,27 +2,23 @@ package frontend
 
 import (
 	"fmt"
+	"image/color"
 	"path/filepath"
 	"strings"
 
 	euiimage "github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 // recentWindowWidth is the fixed preferred width of the Open Recent dialog.
 // Entry labels are budgeted against this width (clamped by the viewport), not
-// the app viewport, so the focused row never overflows its cell and ebitenui's
-// list focus-scroll does not tremble left/right.
+// the app viewport, so the focused row never overflows its cell.
 const recentWindowWidth = 760
 
 func (u *shellUI) syncRecentPanel(shell *Shell) {
-	recent := append([]string(nil), shell.settings.RecentFiles...)
-	signature := fmt.Sprintf(
-		"recent|%dx%d|%s",
-		u.viewportWidth,
-		u.viewportHeight,
-		strings.Join(recent, "\x00"),
-	)
+	recent := append([]RecentEntry(nil), shell.settings.RecentFiles...)
+	signature := recentPanelSignature(shell, u.viewportWidth, u.viewportHeight, recent)
 	if signature == u.panelSignature && u.panelWindow != nil {
 		return
 	}
@@ -54,18 +50,21 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 
 	// The Open Recent list lives inside a fixed-width window (see the
 	// centeredWindowRect call below), not the full app viewport. Budget each
-	// entry label to the list cell width so the widest row can never exceed the
-	// cell: entry buttons size to their own text, and an overflowing row makes
-	// ebitenui's list focus-scroll (scrollVisible) unable to settle, so the row
-	// text trembles left/right every frame. Leave room for the list padding,
-	// entry text padding, and the vertical scrollbar.
+	// entry label to the list cell width, minus room for the icon tile, so
+	// the widest row can never overflow its cell.
 	windowWidth := min(recentWindowWidth, u.viewportWidth-2*centeredWindowMargin)
-	labelWidth := max(28, min(90, (windowWidth-140)/7))
+	labelWidth := max(28, min(90, (windowWidth-174)/7))
 	detailWidth := max(28, min(104, (windowWidth-96)/7))
-	selectedPath := ""
-	if len(recent) > 0 {
-		selectedPath = recent[0]
+
+	selectedPath := u.recentSelectedPath
+	if !recentContainsPath(recent, selectedPath) {
+		selectedPath = ""
+		if len(recent) > 0 {
+			selectedPath = recent[0].Path
+		}
 	}
+	u.recentSelectedPath = selectedPath
+
 	pathText := widget.NewText(
 		widget.TextOpts.Text(
 			recentPathDetails(
@@ -102,7 +101,9 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 		}
 		u.panelWindow = nil
 		u.panelSignature = ""
-		u.recentList = nil
+		u.recentScroll = nil
+		u.recentRowPaths = nil
+		u.recentSelectedPath = ""
 		u.scrim.GetWidget().SetVisibility(widget.Visibility_Hide)
 	}
 	openButton := design.button(
@@ -151,85 +152,103 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 	}
 	contents.AddChild(cancelButton)
 
-	entries := make([]any, len(recent))
-	for index, path := range recent {
-		entries[index] = path
+	// Each row is a real widget.Button (not a plain clickable container) so
+	// it keeps whatever focus/keyboard behavior ebitenui gives buttons
+	// generally; only its background image tracks selection.
+	unselectedImage := &widget.ButtonImage{
+		Idle:    euiimage.NewNineSliceColor(color.NRGBA{}),
+		Hover:   euiimage.NewNineSliceColor(design.Palette.SurfaceHover),
+		Pressed: euiimage.NewNineSliceColor(design.Palette.AccentSoft),
 	}
-	trackIdle := euiimage.NewNineSliceColor(design.Palette.Border)
-	trackHover := euiimage.NewNineSliceColor(design.Palette.BorderStrong)
-	recentList := widget.NewList(
-		widget.ListOpts.ContainerOpts(
-			widget.ContainerOpts.WidgetOpts(
-				widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-					HorizontalPosition: widget.AnchorLayoutPositionStart,
-					VerticalPosition:   widget.AnchorLayoutPositionStart,
-					StretchHorizontal:  true,
-					StretchVertical:    true,
-					Padding: &widget.Insets{
-						Left:   design.Space.XL,
-						Top:    48,
-						Right:  design.Space.XL,
-						Bottom: 172,
-					},
-				}),
-			),
-		),
-		widget.ListOpts.Entries(entries),
-		widget.ListOpts.ScrollContainerImage(design.Components.Scroll),
-		widget.ListOpts.SliderParams(&widget.SliderParams{
-			TrackImage: &widget.SliderTrackImage{
-				Idle:     trackIdle,
-				Hover:    trackHover,
-				Disabled: trackIdle,
-			},
-			HandleImage:   design.Components.TouchButton.Image,
-			MinHandleSize: intPointer(28),
-			TrackPadding:  &widget.Insets{Left: 3, Right: 3},
-		}),
-		widget.ListOpts.ControlWidgetSpacing(design.Space.XS),
-		widget.ListOpts.HideHorizontalSlider(),
-		widget.ListOpts.EntryFontFace(design.Type.Body),
-		widget.ListOpts.EntryColor(&widget.ListEntryColor{
-			Unselected:                 design.Palette.Text,
-			Selected:                   design.Palette.Text,
-			DisabledUnselected:         design.Palette.TextDisabled,
-			DisabledSelected:           design.Palette.TextDisabled,
-			SelectingBackground:        design.Palette.SurfaceHover,
-			SelectedBackground:         design.Palette.AccentSoft,
-			FocusedBackground:          design.Palette.SurfaceHover,
-			SelectingFocusedBackground: design.Palette.AccentSoft,
-			SelectedFocusedBackground:  design.Palette.AccentSoft,
-			DisabledSelectedBackground: design.Palette.Surface,
-		}),
-		widget.ListOpts.EntryLabelFunc(func(entry any) string {
-			path, _ := entry.(string)
-			return recentEntryLabel(path, labelWidth)
-		}),
-		widget.ListOpts.EntryTextPadding(&widget.Insets{
-			Left:   design.Space.S,
-			Top:    11,
-			Right:  design.Space.S,
-			Bottom: 11,
-		}),
-		widget.ListOpts.EntryTextPosition(
-			widget.TextPositionStart,
-			widget.TextPositionCenter,
-		),
-		widget.ListOpts.SelectFocus(),
-		widget.ListOpts.EntrySelectedHandler(func(args *widget.ListEntrySelectedEventArgs) {
-			path, _ := args.Entry.(string)
-			selectedPath = path
-			pathText.Label = recentPathDetails(
-				path,
-				detailWidth,
-				5,
-				shell.language(),
-			)
-			openButton.GetWidget().Disabled = path == ""
-		}),
+	selectedImage := &widget.ButtonImage{
+		Idle:    euiimage.NewNineSliceColor(design.Palette.AccentSoft),
+		Hover:   euiimage.NewNineSliceColor(design.Palette.AccentSoft),
+		Pressed: euiimage.NewNineSliceColor(design.Palette.AccentSoft),
+	}
+	textColor := &widget.ButtonTextColor{
+		Idle:     design.Palette.Text,
+		Disabled: design.Palette.TextDisabled,
+	}
+
+	rowButtons := make(map[string]*widget.Button, len(recent))
+	selectRow := func(path string) {
+		if previous, ok := rowButtons[u.recentSelectedPath]; ok {
+			previous.SetImage(unselectedImage)
+		}
+		u.recentSelectedPath = path
+		selectedPath = path
+		if current, ok := rowButtons[path]; ok {
+			current.SetImage(selectedImage)
+		}
+		pathText.Label = recentPathDetails(path, detailWidth, 5, shell.language())
+		openButton.GetWidget().Disabled = path == ""
+	}
+
+	rowContent := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
+		)),
 	)
-	u.recentList = recentList
-	contents.AddChild(recentList)
+	u.recentRowPaths = u.recentRowPaths[:0]
+	for _, entry := range recent {
+		entry := entry
+		image := unselectedImage
+		if entry.Path == selectedPath {
+			image = selectedImage
+		}
+		row := widget.NewButton(
+			widget.ButtonOpts.WidgetOpts(
+				widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
+				widget.WidgetOpts.MinSize(0, 40),
+			),
+			widget.ButtonOpts.Image(image),
+			widget.ButtonOpts.TextAndImage(
+				recentEntryLabel(entry.Name, entry.Path, labelWidth),
+				design.Type.Body,
+				&widget.GraphicImage{Idle: recentRowIconImage(shell, entry.Path)},
+				textColor,
+			),
+			widget.ButtonOpts.TextPosition(widget.TextPositionStart, widget.TextPositionCenter),
+			widget.ButtonOpts.TextPadding(&widget.Insets{
+				Left:   design.Space.S,
+				Top:    8,
+				Right:  design.Space.S,
+				Bottom: 8,
+			}),
+			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
+				selectRow(entry.Path)
+			}),
+		)
+		rowButtons[entry.Path] = row
+		rowContent.AddChild(row)
+		u.recentRowPaths = append(u.recentRowPaths, entry.Path)
+	}
+
+	var recentScroll *widget.ScrollContainer
+	recentScroll = widget.NewScrollContainer(
+		widget.ScrollContainerOpts.Content(rowContent),
+		widget.ScrollContainerOpts.StretchContentWidth(),
+		widget.ScrollContainerOpts.Image(design.Components.Scroll),
+		widget.ScrollContainerOpts.WidgetOpts(
+			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+				HorizontalPosition: widget.AnchorLayoutPositionStart,
+				VerticalPosition:   widget.AnchorLayoutPositionStart,
+				StretchHorizontal:  true,
+				StretchVertical:    true,
+				Padding: &widget.Insets{
+					Left:   design.Space.XL,
+					Top:    48,
+					Right:  design.Space.XL,
+					Bottom: 172,
+				},
+			}),
+			widget.WidgetOpts.ScrolledHandler(func(args *widget.WidgetScrolledEventArgs) {
+				scrollContainerByWheel(recentScroll, args.Y)
+			}),
+		),
+	)
+	u.recentScroll = recentScroll
+	contents.AddChild(recentScroll)
 
 	titleBar := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(design.Components.DialogTitle),
@@ -259,15 +278,62 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 	)
 	u.panelWindow = recentWindow
 	u.ui.AddWindow(recentWindow)
-	if selectedPath != "" {
-		recentList.SetSelectedEntry(selectedPath)
-	}
 }
 
-func recentEntryLabel(path string, width int) string {
-	name := filepath.Base(filepath.Clean(path))
-	if name == "." || name == string(filepath.Separator) || name == "" {
-		name = path
+// recentPanelSignature encodes everything the Open Recent dialog renders, so a
+// rebuild happens only when something visible changes — including an icon
+// that finishes loading after the dialog is already open.
+func recentPanelSignature(shell *Shell, viewportWidth, viewportHeight int, entries []RecentEntry) string {
+	builder := make([]byte, 0, 128)
+	builder = fmt.Appendf(builder, "recent|%dx%d|", viewportWidth, viewportHeight)
+	for _, entry := range entries {
+		builder = append(builder, entry.Path...)
+		builder = append(builder, 0x1f)
+		builder = append(builder, entry.Name...)
+		if shell.homeIcon(entry.Path) != nil {
+			builder = append(builder, 0x03)
+		}
+		builder = append(builder, 0x00)
+	}
+	return string(builder)
+}
+
+// recentRowIconImage returns the entry's extracted icon when the backend has
+// provided one, otherwise a hash-colored placeholder tile — the same scheme
+// as the Home launcher rows (see ui_home.go), so a title looks the same
+// wherever it is listed.
+func recentRowIconImage(shell *Shell, path string) *ebiten.Image {
+	shell.requestHomeIcon(path)
+	if icon := shell.homeIcon(path); icon != nil {
+		return scaleIconToTile(icon)
+	}
+	tile := ebiten.NewImage(homeIconSize, homeIconSize)
+	tile.Fill(homeIconColor(path))
+	return tile
+}
+
+func recentContainsPath(entries []RecentEntry, path string) bool {
+	if path == "" {
+		return false
+	}
+	for _, entry := range entries {
+		if entry.Path == path {
+			return true
+		}
+	}
+	return false
+}
+
+// recentEntryLabel formats one row as "name — parent directory", preferring
+// the display name captured when the input was opened (see RecentEntry) over
+// one derived from path, since path is not always readable on its own (a
+// temporary drop copy, an Android content:// URI).
+func recentEntryLabel(name, path string, width int) string {
+	if name == "" {
+		name = filepath.Base(filepath.Clean(path))
+		if name == "." || name == string(filepath.Separator) || name == "" {
+			name = path
+		}
 	}
 	parent := filepath.Dir(path)
 	nameLimit := max(12, width*2/5)
