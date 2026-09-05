@@ -489,6 +489,10 @@ func (s *Shell) handleShortcuts() {
 		s.dispatchCommand("view.screenshot")
 	case control && inpututil.IsKeyJustPressed(ebiten.KeyO):
 		s.dispatchCommand("file.open")
+	case control && inpututil.IsKeyJustPressed(ebiten.KeyF):
+		s.dispatchCommand("file.find_title")
+	case !control && inpututil.IsKeyJustPressed(ebiten.KeySlash) && s.showHomeSurface():
+		s.dispatchCommand("file.find_title")
 	case control && inpututil.IsKeyJustPressed(ebiten.KeyR):
 		s.dispatchCommand("emu.reset")
 	case control && inpututil.IsKeyJustPressed(ebiten.KeyDigit0):

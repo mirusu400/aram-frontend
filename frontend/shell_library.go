@@ -82,6 +82,17 @@ func (s *Shell) setHomeFilter(query string) {
 	s.homeFilterQuery = query
 }
 
+// focusHomeSearch moves keyboard focus to the Home search field (Ctrl+F or
+// "/", see handleShortcuts), so a keyboard-only user does not need the mouse
+// to start typing. A no-op before Home has ever been shown (the field is
+// built lazily by ensureHomeChrome in ui_home_search.go).
+func (s *Shell) focusHomeSearch() {
+	if s.interfaceUI == nil || s.interfaceUI.homeSearchInput == nil {
+		return
+	}
+	s.interfaceUI.homeSearchInput.Focus(true)
+}
+
 // homeOpenPath loads a title chosen from any Home tab, mirroring openRecentPath.
 func (s *Shell) homeOpenPath(path string) {
 	if path == "" {

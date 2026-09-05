@@ -61,6 +61,7 @@ type Menu struct {
 func defaultMenus() []Menu {
 	hasInput := func(shell *Shell) bool { return shell.input != nil }
 	hasRecent := func(shell *Shell) bool { return len(shell.settings.RecentFiles) > 0 }
+	homeShown := func(shell *Shell) bool { return shell.showHomeSurface() }
 	hasFrame := func(shell *Shell) bool { return shell.currentFrame().Image != nil }
 	hasFirmware := func(shell *Shell) bool {
 		backend, ok := shell.backend.(FirmwareBackend)
@@ -79,6 +80,14 @@ func defaultMenus() []Menu {
 					Action:         (*Shell).chooseFirmwareDirectory,
 				},
 				{ID: "file.recent", Label: "Open Recent...", Enabled: hasRecent, Action: (*Shell).chooseRecent},
+				{
+					ID:             "file.find_title",
+					Label:          "Find Title...",
+					Shortcut:       "Ctrl+F",
+					Enabled:        homeShown,
+					DisabledReason: "Only searchable from the Home launcher",
+					Action:         (*Shell).focusHomeSearch,
+				},
 				{ID: "file.close", Label: "Close Title", Enabled: hasInput, Action: (*Shell).closeInput},
 				{ID: "file.exit", Label: "Exit", Action: func(shell *Shell) { shell.quitting = true }},
 			},

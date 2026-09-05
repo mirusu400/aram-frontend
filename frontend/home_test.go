@@ -133,6 +133,59 @@ func TestHomeIconPlaceholderAlwaysReturnsATile(t *testing.T) {
 	}
 }
 
+// TestFindTitleCommandFocusesSearchAndRespectsHomeVisibility guards the
+// Ctrl+F / "/" path (handleShortcuts in shell.go dispatches this command):
+// it must focus the Home search field, and only be available while Home is
+// actually shown.
+func TestFindTitleCommandFocusesSearchAndRespectsHomeVisibility(t *testing.T) {
+	isolateSettledSettings(t)
+	shell := NewShell(NullBackend{}, nil, "")
+	shell.interfaceUI.sync(shell)
+	shell.interfaceUI.ui.Update()
+	if shell.interfaceUI.homeSearchInput == nil {
+		t.Fatal("search field was not created")
+	}
+
+	command, found := shell.findCommand("file.find_title")
+	if !found {
+		t.Fatal("file.find_title command not registered")
+	}
+	if !command.IsEnabled(shell) {
+		t.Fatal("file.find_title should be enabled while Home is shown")
+	}
+
+	shell.dispatchCommand("file.find_title")
+	if !shell.interfaceUI.homeSearchInput.IsFocused() {
+		t.Fatal("dispatching file.find_title did not focus the search field")
+	}
+
+	shell.input = &InputInfo{DisplayName: "loaded.dat"}
+	if command.IsEnabled(shell) {
+		t.Fatal("file.find_title should be disabled once a title is loaded")
+	}
+}
+
+// TestClearHomeSearchResetsFieldAndFilter guards the search row's clear (×)
+// button (ui_home_search.go): it must empty both the field's own text and
+// the filter it drives, since SetText alone does not notify Changed.
+func TestClearHomeSearchResetsFieldAndFilter(t *testing.T) {
+	isolateSettledSettings(t)
+	shell := NewShell(NullBackend{}, nil, "")
+	shell.interfaceUI.sync(shell)
+	shell.interfaceUI.ui.Update()
+
+	shell.setHomeFilter("maple")
+	shell.interfaceUI.homeSearchInput.SetText("maple")
+	shell.interfaceUI.clearHomeSearch(shell)
+
+	if shell.homeFilterQuery != "" {
+		t.Fatalf("homeFilterQuery = %q, want empty", shell.homeFilterQuery)
+	}
+	if got := shell.interfaceUI.homeSearchInput.GetText(); got != "" {
+		t.Fatalf("search field text = %q, want empty", got)
+	}
+}
+
 func TestHomeSurfaceHiddenWhileTitleLoaded(t *testing.T) {
 	isolateSettledSettings(t)
 	shell := NewShell(NullBackend{}, nil, "")
