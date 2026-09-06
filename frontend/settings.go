@@ -132,8 +132,12 @@ type Settings struct {
 	AudioDeviceID         string                    `json:"audio_device_id,omitempty"`
 	AudioMixMode          bool                      `json:"audio_mix_mode"`
 	AudioSoften           bool                      `json:"audio_soften"`
-	CPUProfile            bool                      `json:"cpu_profile"`
-	UIPriority            bool                      `json:"ui_priority"`
+	// AudioLowPower trades audio fidelity for CPU on weak hardware by rendering
+	// SMAF FM synthesis at a reduced sample rate. False (the default) renders
+	// at full quality. Baked into the next machine created, like AudioMixMode.
+	AudioLowPower bool `json:"audio_low_power"`
+	CPUProfile    bool `json:"cpu_profile"`
+	UIPriority    bool `json:"ui_priority"`
 	// GuestWidthOverride widens the guest framebuffer (experimental widescreen).
 	// Zero keeps the device-native width. Height stays native.
 	GuestWidthOverride  int                          `json:"guest_width_override,omitempty"`

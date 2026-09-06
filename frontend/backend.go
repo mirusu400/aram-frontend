@@ -147,6 +147,12 @@ type AudioSettings struct {
 	// the guest's FM (Yamaha MA-3) synthesis. It is a pure playback filter, not
 	// a change to the emulated audio, so it takes effect immediately.
 	Soften bool
+	// OutputSampleRate overrides the guest audio render rate (Hz). Zero keeps
+	// the runtime default (44,100). SMAF FM synthesis costs roughly one
+	// operator/envelope tick per output sample, so a lower rate trades quality
+	// for CPU on weak hardware. Like MixMode, it is baked into the next machine
+	// created.
+	OutputSampleRate uint32
 }
 
 type AudioDevice struct {

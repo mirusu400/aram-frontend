@@ -229,6 +229,12 @@ func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 				action:      shell.toggleAudioSoften,
 			},
 			{
+				label:       "Audio quality",
+				description: "Reduced renders FM music at a lower rate, easing CPU load on weak hardware.",
+				value:       shell.audioLowPowerLabel(),
+				action:      shell.toggleAudioLowPower,
+			},
+			{
 				label:       "Volume",
 				description: "Output volume in five-percent steps.",
 				slider: &settingsSliderModel{

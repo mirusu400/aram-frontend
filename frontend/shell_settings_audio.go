@@ -28,14 +28,24 @@ func (s *Shell) applyAudioSettings() {
 	))
 }
 
+// lowPowerOutputSampleRate is the reduced SMAF render rate AudioLowPower
+// selects. Roughly halving the default 44,100Hz roughly halves FM synthesis
+// CPU cost, since it renders one operator/envelope tick per output sample.
+const lowPowerOutputSampleRate = 22_050
+
 func (s *Shell) currentAudioSettings() AudioSettings {
+	var sampleRate uint32
+	if s.settings.AudioLowPower {
+		sampleRate = lowPowerOutputSampleRate
+	}
 	return AudioSettings{
-		Muted:    s.settings.Muted,
-		Volume:   s.settings.Volume,
-		Latency:  time.Duration(s.settings.AudioLatencyMS) * time.Millisecond,
-		DeviceID: s.settings.AudioDeviceID,
-		MixMode:  s.settings.AudioMixMode,
-		Soften:   s.settings.AudioSoften,
+		Muted:            s.settings.Muted,
+		Volume:           s.settings.Volume,
+		Latency:          time.Duration(s.settings.AudioLatencyMS) * time.Millisecond,
+		DeviceID:         s.settings.AudioDeviceID,
+		MixMode:          s.settings.AudioMixMode,
+		Soften:           s.settings.AudioSoften,
+		OutputSampleRate: sampleRate,
 	}
 }
 
@@ -61,6 +71,22 @@ func (s *Shell) audioMixModeLabel() string {
 		return s.tr("Mixed")
 	}
 	return s.tr("Faithful")
+}
+
+// toggleAudioLowPower switches between full-quality (44,100Hz) and reduced
+// (22,050Hz) SMAF FM rendering. The change is baked into the core at creation,
+// so it applies the next time a title is opened.
+func (s *Shell) toggleAudioLowPower() {
+	s.settings.AudioLowPower = !s.settings.AudioLowPower
+	s.applyAudioSettings()
+}
+
+// audioLowPowerLabel names the active audio quality tier for the settings row.
+func (s *Shell) audioLowPowerLabel() string {
+	if s.settings.AudioLowPower {
+		return s.tr("Reduced (low-power)")
+	}
+	return s.tr("Full quality")
 }
 
 func (s *Shell) toggleMuted() {
