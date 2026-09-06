@@ -111,6 +111,11 @@ func (s *Shell) drainAudioOnce(allowCreate bool) {
 		}
 	}
 	if s.audioOutput != nil {
+		if allowCreate {
+			// Only the main thread knows the pacer's current ratio; the pump
+			// goroutine keeps using whatever was last pushed here.
+			s.audioOutput.setSpeed(s.audioSpeed)
+		}
 		now := time.Now()
 		s.audioOutput.startIfReady(now)
 		s.audioOutput.maybeSample(now)

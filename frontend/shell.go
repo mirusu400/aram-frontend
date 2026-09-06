@@ -160,6 +160,8 @@ type Shell struct {
 	pacingGuestAdvanced       time.Duration
 	pacingSampleStartedAt     time.Time
 	measuredSpeed             float64
+	displaySync               displaySyncState
+	audioSpeed                float64
 	nowFunc                   func() time.Time
 	welcomeInstalling         bool
 	updater                   updateDownloader
@@ -308,6 +310,7 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		shell.appendLog(shell.tr("Custom controller database loaded"))
 	}
 	shell.appendLog(shell.status)
+	shell.applyHostLoopSettings()
 	shell.startUpdateCheck()
 	if initialPath != "" {
 		shell.openRequest(OpenRequest{Path: initialPath})

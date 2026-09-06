@@ -443,43 +443,7 @@ func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 			action:      shell.resetControllerBindings,
 		})
 	case "Experiments":
-		rows = []settingsRowModel{
-			{
-				label:       "UI priority",
-				description: "Give the interface CPU priority over the guest, so menus and input stay smooth while a heavy title runs a little slower.",
-				value:       onOff(shell.settings.UIPriority),
-				action:      shell.toggleUIPriority,
-			},
-			{
-				label:       "CPU profiling",
-				description: "Continuously sample the frontend's CPU use so a debug bundle can include a profile. Adds a small runtime cost.",
-				value:       onOff(shell.settings.CPUProfile),
-				action:      shell.toggleCPUProfile,
-			},
-			{
-				label:       "Widescreen",
-				description: "Widen the guest screen. A camera-scrolled title (some RPGs) shows more of the world; other titles leave margins or misplace fixed art. Tuned for 320-tall titles. Takes effect the next time a title is opened.",
-				dropdown: &settingsDropdownModel{
-					count: len(widescreenChoices()),
-					label: func(i int) string {
-						choices := widescreenChoices()
-						if i < 0 || i >= len(choices) {
-							return ""
-						}
-						return shell.widescreenLabel(choices[i])
-					},
-					value: func() int {
-						return shell.widescreenChoiceIndex(widescreenChoices())
-					},
-					apply: func(i int) {
-						choices := widescreenChoices()
-						if i >= 0 && i < len(choices) {
-							shell.setGuestWidthOverride(choices[i])
-						}
-					},
-				},
-			},
-		}
+		rows = experimentSettingsRowModels(shell)
 	case "Updates":
 		rows = updateSettingsRowModels(shell)
 	default:

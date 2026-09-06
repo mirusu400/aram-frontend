@@ -113,10 +113,18 @@ func (s *Shell) accumulateFramePacing(now time.Time, quantum time.Duration) {
 	if delta <= 0 {
 		return
 	}
-	if delta > framePacingCatchUpLimit {
-		delta = framePacingCatchUpLimit
+	if budget, ok := s.displaySyncBudget(quantum); ok {
+		// Under display sync a late tick is a dropped display frame, not a
+		// debt: the guest simply runs that much slower, the way it would on
+		// a handset whose refresh stalled.
+		s.frameAccumulator += budget
+	} else {
+		if delta > framePacingCatchUpLimit {
+			delta = framePacingCatchUpLimit
+		}
+		s.frameAccumulator += time.Duration(float64(delta) * s.framePacingSpeed())
 	}
-	s.frameAccumulator += time.Duration(float64(delta) * s.framePacingSpeed())
+	s.audioSpeed = s.effectivePacingSpeed()
 	if ceiling := framePacingQuantaPerTick * quantum; s.frameAccumulator > ceiling {
 		s.frameAccumulator = ceiling
 	}
@@ -176,6 +184,7 @@ func (s *Shell) MeasuredSpeed() float64 {
 // controls went to the panel. Panels that opted into guest input (a cheat
 // toggled mid-fight) keep the title running exactly as before.
 func (s *Shell) scheduleRunningFrame() {
+	s.recordHostTick(s.now())
 	if debugPacing {
 		reason := "OK"
 		switch {
@@ -311,13 +320,21 @@ func (s *Shell) runFrameWorker() {
 // speedSettingValue labels the speed control with the achieved ratio beside the
 // requested one, so a machine that cannot keep up is visible rather than being
 // mistaken for the title running slowly by design.
+//
+// While display sync is engaged the requested figure carries the display rate
+// it locked to ("1x/60Hz"), and the percentage is against the synchronized
+// speed rather than the setting, so a healthy synchronized title reads 100%
+// instead of a puzzling 96%.
 func (s *Shell) speedSettingValue() string {
 	requested := fmt.Sprintf("%gx", s.framePacingSpeed())
+	if s.displaySync.active {
+		requested = fmt.Sprintf("%s/%.0fHz", requested, s.displaySync.tickRate)
+	}
 	measured := s.MeasuredSpeed()
 	if measured <= 0 {
 		return requested
 	}
-	return fmt.Sprintf("%s (%.0f%%)", requested, measured/s.framePacingSpeed()*100)
+	return fmt.Sprintf("%s (%.0f%%)", requested, measured/s.effectivePacingSpeed()*100)
 }
 
 // debugPacingReport captures what the frame pacer achieved, for the debug
@@ -325,15 +342,21 @@ func (s *Shell) speedSettingValue() string {
 // host cannot keep up" from "the title runs at this speed on a handset too".
 func (s *Shell) debugPacingReport() debugPacingReport {
 	requested := s.framePacingSpeed()
+	effective := s.effectivePacingSpeed()
 	measured := s.MeasuredSpeed()
 	achieved := float64(0)
-	if requested > 0 && measured > 0 {
-		achieved = measured / requested * 100
+	if effective > 0 && measured > 0 {
+		achieved = measured / effective * 100
 	}
 	return debugPacingReport{
-		RequestedSpeed:  requested,
-		MeasuredSpeed:   measured,
-		AchievedPercent: achieved,
-		UIPriority:      s.settings.UIPriority,
+		RequestedSpeed:    requested,
+		EffectiveSpeed:    effective,
+		MeasuredSpeed:     measured,
+		AchievedPercent:   achieved,
+		UIPriority:        s.settings.UIPriority,
+		DisplaySync:       s.settings.DisplaySync,
+		DisplaySyncActive: s.displaySync.active,
+		HostTickRate:      s.displaySync.tickRate,
+		VsyncDisabled:     s.settings.VsyncDisabled,
 	}
 }

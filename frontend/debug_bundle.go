@@ -139,10 +139,17 @@ type debugSettingsReport struct {
 // ratio the host actually delivered over the pacing window, and is zero before
 // the first window closes. AchievedPercent is the second over the first.
 type debugPacingReport struct {
-	RequestedSpeed  float64 `json:"requested_speed"`
-	MeasuredSpeed   float64 `json:"measured_speed"`
-	AchievedPercent float64 `json:"achieved_percent"`
-	UIPriority      bool    `json:"ui_priority"`
+	RequestedSpeed float64 `json:"requested_speed"`
+	// EffectiveSpeed is the ratio the pacer is actually aiming for: the
+	// display-sync rate while engaged, otherwise RequestedSpeed.
+	EffectiveSpeed    float64 `json:"effective_speed"`
+	MeasuredSpeed     float64 `json:"measured_speed"`
+	AchievedPercent   float64 `json:"achieved_percent"`
+	UIPriority        bool    `json:"ui_priority"`
+	DisplaySync       bool    `json:"display_sync"`
+	DisplaySyncActive bool    `json:"display_sync_active"`
+	HostTickRate      float64 `json:"host_tick_rate"`
+	VsyncDisabled     bool    `json:"vsync_disabled"`
 }
 
 type debugFileReport struct {

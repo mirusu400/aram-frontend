@@ -13,6 +13,13 @@ import (
 
 const hostAudioSampleRate = 44_100
 
+// hostAudioMinSampleRate and hostAudioMaxSampleRate bound the guest sample
+// rates the encoder accepts, before and after speed stretching.
+const (
+	hostAudioMinSampleRate = 8_000
+	hostAudioMaxSampleRate = 192_000
+)
+
 // AudioQueueTelemetry exposes host-playback buffering separately from guest
 // audio generation. Counts are cumulative for the life of the output; fill,
 // target, and capacity are current host-rate stereo frames.
@@ -360,6 +367,7 @@ type audioOutput struct {
 	lp             [2]float64 // per-channel one-pole low-pass state
 	trace          *audioTrace
 	lastSample     time.Time
+	speed          audioSpeed
 }
 
 // traceEvent records one pipeline event, snapshotting the current queue
@@ -478,6 +486,7 @@ func (o *audioOutput) enqueue(
 		return nil
 	}
 	o.soften(&chunk)
+	chunk.SampleRate = o.stretchedSampleRate(chunk.SampleRate)
 	encoded, err := encodeHostPCM(chunk)
 	if err != nil {
 		return err
@@ -710,7 +719,7 @@ func encodeHostPCM(chunk AudioChunk) ([]byte, error) {
 	if len(chunk.PCM16) == 0 {
 		return nil, nil
 	}
-	if chunk.SampleRate < 8_000 || chunk.SampleRate > 192_000 {
+	if chunk.SampleRate < hostAudioMinSampleRate || chunk.SampleRate > hostAudioMaxSampleRate {
 		return nil, errors.New("backend returned an invalid audio sample rate")
 	}
 	if chunk.Channels != 1 && chunk.Channels != 2 {

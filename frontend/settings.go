@@ -138,6 +138,16 @@ type Settings struct {
 	AudioLowPower bool `json:"audio_low_power"`
 	CPUProfile    bool `json:"cpu_profile"`
 	UIPriority    bool `json:"ui_priority"`
+	// DisplaySync paces the guest by host ticks instead of wall time whenever
+	// the display refresh is within a few percent of the guest frame rate, so
+	// a 62.5 Hz title on a 60 Hz display shows one guest frame per refresh
+	// instead of a doubled frame every 400 ms. True (the default) enables it;
+	// it only engages while vsync is on, because the tick rate must be the
+	// refresh rate for the plan to mean anything.
+	DisplaySync bool `json:"display_sync"`
+	// VsyncDisabled lets the host draw as fast as it can instead of waiting
+	// for the display, trading tearing and power for lower input latency.
+	VsyncDisabled bool `json:"vsync_disabled"`
 	// GuestWidthOverride widens the guest framebuffer (experimental widescreen).
 	// Zero keeps the device-native width. Height stays native.
 	GuestWidthOverride  int                          `json:"guest_width_override,omitempty"`
@@ -280,6 +290,7 @@ func defaultSettings() Settings {
 		VibrationEnabled:      true,
 		TouchDpadCircular:     true,
 		CPUProfile:            true,
+		DisplaySync:           true,
 	}
 }
 
