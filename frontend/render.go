@@ -172,6 +172,17 @@ func (s *Shell) drawGuestFrame(
 
 	if effect == displayEffectFeaturePhoneTFT ||
 		effect == displayEffectFeaturePhoneSTN {
+		strength := displayEffectStrength(display)
+		if strength == 0 {
+			// Both the temporal-blend and panel shaders mix toward the
+			// unmodified frame at EffectStrength/HistoryWeight 0 (exact
+			// mix(a, b, 0) == a), so skip their render-target switches
+			// entirely instead of dispatching two GPU passes for a
+			// mathematically identical result.
+			s.resetDisplayHistory()
+			drawDisplaySurface(screen, target, destination)
+			return
+		}
 		target = s.updateDisplayPersistence(target)
 		s.drawFeaturePhonePanel(
 			screen,
@@ -179,7 +190,7 @@ func (s *Shell) drawGuestFrame(
 			destination,
 			sourceBounds,
 			effect,
-			displayEffectStrength(display),
+			strength,
 		)
 		return
 	}
