@@ -10,9 +10,12 @@ import (
 	"path/filepath"
 )
 
-// readFirstDroppedFile copies the first regular file from a desktop
-// drag-and-drop into a private cache directory and reports its path. The shell
-// then opens that path and removes the copy once the input is released. The
+// readFirstDroppedFile reports the first regular file from a desktop
+// drag-and-drop. Ebitengine's dropped-file system knows the real path of each
+// file (see realDroppedPath), and that path is what gets opened, so the title
+// lands in the recent list like one chosen through the file dialog. When the
+// real path is unavailable the file is copied into a private cache directory
+// and opened as a temporary input the shell removes once it is released. The
 // web counterpart in drop_web.go returns the bytes in memory instead, because
 // the browser build has no writable cache directory.
 func readFirstDroppedFile(files fs.FS, results chan<- dropResult) {
@@ -30,6 +33,13 @@ func readFirstDroppedFile(files fs.FS, results chan<- dropResult) {
 			return err
 		}
 		defer source.Close()
+
+		if real := realDroppedPath(source); real != "" {
+			result.path = real
+			result.displayName = entry.Name()
+			return errStop
+		}
+		result.temporary = true
 
 		cacheRoot, err := os.UserCacheDir()
 		if err != nil {
@@ -66,4 +76,24 @@ func readFirstDroppedFile(files fs.FS, results chan<- dropResult) {
 	}
 	result.err = err
 	results <- result
+}
+
+// realDroppedPath returns the on-disk path behind a dropped file when the
+// file system exposes one, or "" when it does not. Ebitengine's desktop
+// dropped-file system wraps real files and reports their absolute path
+// through AbsPath; the path is used only when it still names a regular file.
+func realDroppedPath(source fs.File) string {
+	located, ok := source.(interface{ AbsPath() string })
+	if !ok {
+		return ""
+	}
+	path := located.AbsPath()
+	if path == "" {
+		return ""
+	}
+	info, err := os.Stat(path)
+	if err != nil || !info.Mode().IsRegular() {
+		return ""
+	}
+	return path
 }

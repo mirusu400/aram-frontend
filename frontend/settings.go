@@ -187,6 +187,10 @@ type Settings struct {
 type RecentEntry struct {
 	Path string `json:"path"`
 	Name string `json:"name,omitempty"`
+	// SHA256 identifies the input bytes so the same title reached through
+	// another path - a mobile host's fresh import copy, a file dropped from
+	// a second folder - replaces its earlier entry instead of joining it.
+	SHA256 string `json:"sha256,omitempty"`
 }
 
 // UnmarshalJSON accepts a bare path string (the format written before this
@@ -513,28 +517,36 @@ func titleSettingsKey(input *InputInfo) string {
 	return ""
 }
 
-// addRecent records path as the most recent input, deduplicating by path and
-// capping the list at recentFileLimit. name is the display name it was opened
-// under (see RecentEntry); an empty name keeps whatever name a prior entry for
-// the same path already carried, so a caller that cannot supply one does not
-// blank out a good name already on file.
-func (s *Settings) addRecent(path, name string) {
+// addRecent records path as the most recent input, deduplicating by path or
+// by content hash and capping the list at recentFileLimit. name is the
+// display name it was opened under (see RecentEntry); an empty name keeps
+// whatever name a prior entry for the same input already carried, so a
+// caller that cannot supply one does not blank out a good name already on
+// file. sha256 may be empty for a backend that cannot identify the bytes.
+func (s *Settings) addRecent(path, name, sha256 string) {
 	absolute, err := filepath.Abs(path)
 	if err == nil {
 		path = absolute
 	}
 	path = filepath.Clean(path)
+	sha256 = strings.ToLower(strings.TrimSpace(sha256))
+	sameInput := func(existing RecentEntry) bool {
+		if strings.EqualFold(filepath.Clean(existing.Path), path) {
+			return true
+		}
+		return sha256 != "" && strings.EqualFold(existing.SHA256, sha256)
+	}
 	if name == "" {
 		for _, existing := range s.RecentFiles {
-			if strings.EqualFold(filepath.Clean(existing.Path), path) {
+			if sameInput(existing) {
 				name = existing.Name
 				break
 			}
 		}
 	}
-	recent := []RecentEntry{{Path: path, Name: name}}
+	recent := []RecentEntry{{Path: path, Name: name, SHA256: sha256}}
 	for _, existing := range s.RecentFiles {
-		if strings.EqualFold(filepath.Clean(existing.Path), path) {
+		if sameInput(existing) {
 			continue
 		}
 		recent = append(recent, existing)

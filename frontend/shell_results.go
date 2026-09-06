@@ -92,7 +92,7 @@ func (s *Shell) consumeResults() {
 			s.openRequest(OpenRequest{
 				Path:        result.path,
 				DisplayName: result.displayName,
-				Temporary:   true,
+				Temporary:   result.temporary,
 			})
 		case result := <-s.artifactResults:
 			if result.err != nil {
@@ -149,7 +149,7 @@ func (s *Shell) consumeBackendResult(result backendResult) {
 		s.firmwareSession = result.request.Firmware
 		s.selectedPath = result.request.Path
 		if result.request.Path != "" && !result.request.Temporary {
-			s.settings.addRecent(result.request.Path, result.info.DisplayName)
+			s.settings.addRecent(result.request.Path, result.info.DisplayName, result.info.SHA256)
 			_ = s.settings.save()
 		}
 	}

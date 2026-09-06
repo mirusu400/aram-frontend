@@ -13,12 +13,12 @@ import (
 func TestAddRecentDeduplicatesAndLimits(t *testing.T) {
 	settings := defaultSettings()
 	for index := 0; index < recentFileLimit+3; index++ {
-		settings.addRecent(filepath.Join("games", fmt.Sprintf("%02d.dat", index)), "")
+		settings.addRecent(filepath.Join("games", fmt.Sprintf("%02d.dat", index)), "", "")
 	}
 	if len(settings.RecentFiles) != recentFileLimit {
 		t.Fatalf("recent count = %d, want %d", len(settings.RecentFiles), recentFileLimit)
 	}
-	settings.addRecent(settings.RecentFiles[4].Path, settings.RecentFiles[4].Name)
+	settings.addRecent(settings.RecentFiles[4].Path, settings.RecentFiles[4].Name, "")
 	if len(settings.RecentFiles) != recentFileLimit {
 		t.Fatalf("deduplication changed count to %d", len(settings.RecentFiles))
 	}
@@ -35,11 +35,11 @@ func TestAddRecentKeepsDisplayNameSeparateFromPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	settings.addRecent(cachePath, "My Game.gba")
+	settings.addRecent(cachePath, "My Game.gba", "")
 	if got := settings.RecentFiles[0]; got.Path != wantPath || got.Name != "My Game.gba" {
 		t.Fatalf("recent entry = %#v", got)
 	}
-	settings.addRecent(cachePath, "")
+	settings.addRecent(cachePath, "", "")
 	if got := settings.RecentFiles[0]; got.Name != "My Game.gba" {
 		t.Fatalf("re-add with no name blanked the display name: %#v", got)
 	}
@@ -575,5 +575,28 @@ func TestSettingsDefaultCPUIsFastestAvailable(t *testing.T) {
 		if s.CPUChoice != stored {
 			t.Fatalf("explicit CPUChoice %q was rewritten to %q", stored, s.CPUChoice)
 		}
+	}
+}
+
+// TestAddRecentMergesSameContentAcrossPaths covers a mobile host that copies
+// every picked document to a fresh private path, and a desktop drop of the
+// same file from a second folder: one title must not pile up as several
+// recent rows, so an entry whose content hash matches is replaced.
+func TestAddRecentMergesSameContentAcrossPaths(t *testing.T) {
+	settings := defaultSettings()
+	settings.addRecent(filepath.Join("imports", "a1-game.zip"), "Game", "ABCDEF")
+	settings.addRecent(filepath.Join("imports", "b2-game.zip"), "Game", "abcdef")
+	settings.addRecent(filepath.Join("imports", "c3-other.zip"), "Other", "123456")
+	if len(settings.RecentFiles) != 2 {
+		t.Fatalf("recent entries = %#v, want the two distinct titles", settings.RecentFiles)
+	}
+	wantPath, _ := filepath.Abs(filepath.Join("imports", "b2-game.zip"))
+	if got := settings.RecentFiles[1]; got.Path != wantPath || got.SHA256 != "abcdef" {
+		t.Fatalf("merged entry = %#v, want the newest path for the shared hash", got)
+	}
+	// A hash-less add for the same path still merges by path.
+	settings.addRecent(filepath.Join("imports", "b2-game.zip"), "", "")
+	if len(settings.RecentFiles) != 2 || settings.RecentFiles[0].Name != "Game" {
+		t.Fatalf("path-only re-add = %#v", settings.RecentFiles)
 	}
 }

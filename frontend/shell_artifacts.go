@@ -17,7 +17,10 @@ type dropResult struct {
 	path        string
 	data        []byte
 	displayName string
-	err         error
+	// temporary marks path as a private cache copy the shell removes once the
+	// input is released, as opposed to the dropped file's own location.
+	temporary bool
+	err       error
 }
 
 type compatibilityReport struct {
