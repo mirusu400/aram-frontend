@@ -186,6 +186,21 @@ func (s *Shell) executeBackend(command BackendCommand) {
 	}()
 }
 
+// startCurrentTitle begins or resumes the loaded input. A machine sitting in
+// StateStopped - the user's own Stop, or the guest exiting on its own -
+// otherwise resumes through the backend's own soft reset, which reuses the
+// already constructed machine and its original factory settings exactly like
+// the backend's Reset command did. Routing that case through the same full
+// close/reopen as Reset means a plain Stop-then-Start also picks up the
+// current widescreen/font/CPU/audio choices instead of stale ones.
+func (s *Shell) startCurrentTitle() {
+	if s.input != nil && s.backend.State() == StateStopped {
+		s.restartCurrentTitle()
+		return
+	}
+	s.executeBackend(CommandStart)
+}
+
 // restartCurrentTitle fully closes and reopens the input that is currently
 // loaded. A geometry-only change such as the widescreen override is read by
 // the backend's machine factory, so it only takes effect on a fresh Open; the

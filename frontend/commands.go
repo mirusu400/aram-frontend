@@ -95,7 +95,7 @@ func defaultMenus() []Menu {
 		{
 			Label: "Emulation",
 			Commands: []Command{
-				{ID: "emu.start", Label: "Start", Shortcut: "F5", Backend: CommandStart},
+				{ID: "emu.start", Label: "Start", Shortcut: "F5", Backend: CommandStart, Action: (*Shell).startCurrentTitle},
 				{ID: "emu.pause", Label: "Pause / Resume", Shortcut: "F6", Backend: CommandPauseResume},
 				{ID: "emu.frame", Label: "Frame Advance", Shortcut: "F7", Backend: CommandFrame},
 				{ID: "emu.stop", Label: "Stop", Shortcut: "F8", Backend: CommandStop},

@@ -175,6 +175,80 @@ func TestRestartKeepsATemporaryDropUntilTheReopenReadsIt(t *testing.T) {
 	}
 }
 
+type stoppedRestartBackend struct {
+	mu     sync.Mutex
+	state  BackendState
+	opens  chan OpenRequest
+	closes int
+	starts int
+}
+
+func (backend *stoppedRestartBackend) Open(_ context.Context, request OpenRequest) (InputInfo, error) {
+	backend.mu.Lock()
+	backend.state = StateReady
+	backend.mu.Unlock()
+	backend.opens <- request
+	return InputInfo{DisplayName: "synthetic.dat"}, nil
+}
+
+func (backend *stoppedRestartBackend) State() BackendState {
+	backend.mu.Lock()
+	defer backend.mu.Unlock()
+	return backend.state
+}
+
+func (*stoppedRestartBackend) Supports(BackendCommand) bool { return true }
+
+func (backend *stoppedRestartBackend) Execute(_ context.Context, command BackendCommand) error {
+	backend.mu.Lock()
+	defer backend.mu.Unlock()
+	if command == CommandStart {
+		backend.starts++
+		backend.state = StateRunning
+	}
+	return nil
+}
+
+func (backend *stoppedRestartBackend) Close() error {
+	backend.mu.Lock()
+	backend.closes++
+	backend.mu.Unlock()
+	return nil
+}
+
+// TestStartFromStoppedRestartsInsteadOfSoftResuming covers a title that is
+// StateStopped - by the user's own Stop, or by the guest exiting on its own.
+// Start must close and reopen it, the same as Reset, rather than forward a
+// plain "start" the backend would resume with the machine (and its original
+// factory settings) it already has.
+func TestStartFromStoppedRestartsInsteadOfSoftResuming(t *testing.T) {
+	temporary := t.TempDir()
+	t.Setenv("APPDATA", temporary)
+	t.Setenv("XDG_CONFIG_HOME", temporary)
+	backend := &stoppedRestartBackend{state: StateStopped, opens: make(chan OpenRequest, 1)}
+	shell := NewShell(backend, nil, "")
+	shell.consumeBackendResult(backendResult{
+		request: OpenRequest{Path: "synthetic.dat"},
+		info:    InputInfo{DisplayName: "synthetic.dat"},
+	})
+
+	shell.startCurrentTitle()
+
+	reopened := <-backend.opens
+	if reopened.Path != "synthetic.dat" {
+		t.Fatalf("reopened request = %#v, want the original path", reopened)
+	}
+	backend.mu.Lock()
+	closes, starts := backend.closes, backend.starts
+	backend.mu.Unlock()
+	if closes != 1 {
+		t.Fatalf("Close() calls = %d, want 1", closes)
+	}
+	if starts != 0 {
+		t.Fatalf("Execute(start) calls = %d, want 0 (should reopen instead)", starts)
+	}
+}
+
 type autoStartBackend struct {
 	mu       sync.Mutex
 	state    BackendState
