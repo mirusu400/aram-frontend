@@ -3,6 +3,7 @@ package frontend
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -114,7 +115,28 @@ func (s *Shell) openRecentPath(path string) {
 		return
 	}
 	s.panel = nil
-	s.openRequest(OpenRequest{Path: path})
+	s.openRequest(OpenRequest{Path: path, DisplayName: s.rememberedDisplayName(path)})
+}
+
+// rememberedDisplayName recovers the name the recent list already knows for
+// path. A mobile host imports an input into private storage under a generated
+// file name, so the path's own base name is a UUID the user never saw; the
+// name the host reported at import time is kept in the recent entry. Reopening
+// without it would both mislabel the session and, through addRecent, overwrite
+// the good name with the generated one.
+func (s *Shell) rememberedDisplayName(path string) string {
+	// addRecent stores an absolute, cleaned path, so match the way it wrote
+	// the entry rather than the string a caller happened to hold.
+	if absolute, err := filepath.Abs(path); err == nil {
+		path = absolute
+	}
+	path = filepath.Clean(path)
+	for _, entry := range s.settings.RecentFiles {
+		if strings.EqualFold(filepath.Clean(entry.Path), path) {
+			return entry.Name
+		}
+	}
+	return ""
 }
 
 func (s *Shell) openRequest(request OpenRequest) {

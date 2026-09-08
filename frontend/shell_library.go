@@ -99,7 +99,7 @@ func (s *Shell) homeOpenPath(path string) {
 		s.setStatus(s.tr("Home: no title selected"))
 		return
 	}
-	s.openRequest(OpenRequest{Path: path})
+	s.openRequest(OpenRequest{Path: path, DisplayName: s.rememberedDisplayName(path)})
 }
 
 // homeTabEntries returns the rows shown for a tab, narrowed by homeFilterQuery
