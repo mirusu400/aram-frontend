@@ -113,7 +113,11 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          # ebitenmobile generates a temporary module containing its own
+          # x/text imports. Its tidy step resolves the current x/text release,
+          # which requires Go 1.26 even though the app itself still targets
+          # Go 1.25.
+          go-version: 1.26.x
           cache-dependency-path: go.sum
       - name: Resolve build version
         shell: bash
@@ -152,7 +156,9 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          # Keep this aligned with android-binding; both use ebitenmobile's
+          # generated module and therefore the current x/text toolchain floor.
+          go-version: 1.26.x
           cache-dependency-path: go.sum
       - name: Resolve build version
         shell: bash
