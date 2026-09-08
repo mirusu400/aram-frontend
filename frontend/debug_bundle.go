@@ -125,6 +125,8 @@ type debugSettingsReport struct {
 	Volume                int     `json:"volume"`
 	AudioLatencyMS        int     `json:"audio_latency_ms"`
 	AudioMixMode          bool    `json:"audio_mix_mode"`
+	AudioSoften           bool    `json:"audio_soften"`
+	AudioLowPower         bool    `json:"audio_low_power"`
 	UIPriority            bool    `json:"ui_priority"`
 }
 

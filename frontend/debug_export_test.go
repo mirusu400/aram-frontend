@@ -355,6 +355,39 @@ func TestDebugBundleIncludesCPUCore(t *testing.T) {
 	}
 }
 
+// TestDebugBundleIncludesAudioRenderSettings makes low-power reports
+// reproducible: rendering rate and the playback low-pass both affect the CPU
+// headroom and the sound a reporter heard.
+func TestDebugBundleIncludesAudioRenderSettings(t *testing.T) {
+	config := t.TempDir()
+	t.Setenv("APPDATA", config)
+	t.Setenv("XDG_CONFIG_HOME", config)
+	t.Setenv("HOME", config)
+
+	settings := defaultSettings()
+	settings.AudioSoften = true
+	settings.AudioLowPower = true
+	shell := &Shell{backend: NullBackend{}, settings: settings}
+
+	snapshot := shell.captureDebugBundleSnapshot(time.Now().UTC())
+	if !snapshot.Settings.AudioSoften || !snapshot.Settings.AudioLowPower {
+		t.Fatalf("snapshot audio settings = %+v", snapshot.Settings)
+	}
+
+	path, _, err := collectDebugBundle(snapshot, shell.backend)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest debugBundleManifest
+	if err := json.Unmarshal(readDebugZIP(t, path)["manifest.json"], &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if !manifest.Session.Settings.AudioSoften ||
+		!manifest.Session.Settings.AudioLowPower {
+		t.Fatalf("manifest audio settings = %+v", manifest.Session.Settings)
+	}
+}
+
 // TestDebugBundleCarriesPacingTelemetry covers aram-core#127: a "too slow"
 // report arrived with a CPU profile but nothing that said how far behind real
 // time the host actually was, so the bundle could not separate a host that

@@ -182,6 +182,26 @@ func TestAudioOutputFlushDropsAStaleImpulse(t *testing.T) {
 	}
 }
 
+func TestAudioOutputReportsLargestChunkArrivalGap(t *testing.T) {
+	output := &audioOutput{queue: newPCMQueue(64)}
+	start := time.Date(2026, time.September, 9, 1, 2, 3, 0, time.UTC)
+	output.recordChunkArrival(start)
+	output.recordChunkArrival(start.Add(12 * time.Millisecond))
+	output.recordChunkArrival(start.Add(89 * time.Millisecond))
+	// A non-monotonic host clock must not turn into a negative or bogus gap.
+	output.recordChunkArrival(start.Add(80 * time.Millisecond))
+	if got := output.telemetry().MaxChunkArrivalGapMS; got != 77 {
+		t.Fatalf("maximum arrival gap = %dms, want 77ms", got)
+	}
+
+	output.flush()
+	output.recordChunkArrival(start.Add(5 * time.Second))
+	output.recordChunkArrival(start.Add(5*time.Second + 9*time.Millisecond))
+	if got := output.telemetry().MaxChunkArrivalGapMS; got != 77 {
+		t.Fatalf("flush-created pause changed maximum arrival gap to %dms", got)
+	}
+}
+
 func TestAudioDiscontinuityCommandsAreExplicit(t *testing.T) {
 	discontinuous := []BackendCommand{
 		CommandStart,

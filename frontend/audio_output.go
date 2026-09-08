@@ -29,10 +29,16 @@ type AudioQueueTelemetry struct {
 	Overruns       uint64 `json:"overruns"`
 	DroppedFrames  uint64 `json:"dropped_frames"`
 	StaleFrames    uint64 `json:"stale_frames"`
-	FillFrames     int    `json:"fill_frames"`
-	TargetFrames   int    `json:"target_frames"`
-	CapacityFrames int    `json:"capacity_frames"`
-	Started        bool   `json:"started"`
+	// MaxChunkArrivalGapMS is the largest interval between two nonempty guest
+	// PCM chunks accepted during this output's lifetime. It is an arrival measure,
+	// not a claim that the gap was an emulator stall: a title may intentionally
+	// produce silence. A flush breaks the interval so a paused title cannot
+	// inflate it.
+	MaxChunkArrivalGapMS uint64 `json:"max_chunk_arrival_gap_ms"`
+	FillFrames           int    `json:"fill_frames"`
+	TargetFrames         int    `json:"target_frames"`
+	CapacityFrames       int    `json:"capacity_frames"`
+	Started              bool   `json:"started"`
 }
 
 // pcmQueue is an infinite PCM stream from the player's point of view. An
@@ -354,20 +360,22 @@ func alignStereoFrameUp(size int) int {
 }
 
 type audioOutput struct {
-	queue          *pcmQueue
-	player         *audio.Player
-	prebufferBytes int
-	prebufferWait  time.Duration
-	lastEnqueue    time.Time
-	started        bool
-	generation     uint64
-	nextSample     uint64
-	staleFrames    uint64
-	softenEnabled  bool
-	lp             [2]float64 // per-channel one-pole low-pass state
-	trace          *audioTrace
-	lastSample     time.Time
-	speed          audioSpeed
+	queue              *pcmQueue
+	player             *audio.Player
+	prebufferBytes     int
+	prebufferWait      time.Duration
+	lastEnqueue        time.Time
+	started            bool
+	generation         uint64
+	nextSample         uint64
+	staleFrames        uint64
+	lastChunkArrival   time.Time
+	maxChunkArrivalGap time.Duration
+	softenEnabled      bool
+	lp                 [2]float64 // per-channel one-pole low-pass state
+	trace              *audioTrace
+	lastSample         time.Time
+	speed              audioSpeed
 }
 
 // traceEvent records one pipeline event, snapshotting the current queue
@@ -491,6 +499,9 @@ func (o *audioOutput) enqueue(
 	if err != nil {
 		return err
 	}
+	if len(encoded) != 0 {
+		o.recordChunkArrival(time.Now())
+	}
 	o.queue.enqueue(encoded)
 	if len(encoded) != 0 {
 		o.lastEnqueue = time.Now()
@@ -499,6 +510,26 @@ func (o *audioOutput) enqueue(
 		o.start()
 	}
 	return nil
+}
+
+// recordChunkArrival records the time between successfully accepted nonempty
+// chunks. The value is deliberately bounded to one scalar rather than a trace
+// of every arrival, and the timestamp parameter keeps its behaviour testable
+// without depending on host scheduling.
+func (o *audioOutput) recordChunkArrival(arrivedAt time.Time) {
+	if o == nil || arrivedAt.IsZero() {
+		return
+	}
+	if !o.lastChunkArrival.IsZero() {
+		gap := arrivedAt.Sub(o.lastChunkArrival)
+		if gap <= 0 {
+			return
+		}
+		if gap > o.maxChunkArrivalGap {
+			o.maxChunkArrivalGap = gap
+		}
+	}
+	o.lastChunkArrival = arrivedAt
 }
 
 func (o *audioOutput) synchronizeChunk(
@@ -657,6 +688,7 @@ func (o *audioOutput) flushInternal(reason string) {
 	o.lp = [2]float64{}
 	o.generation = 0
 	o.nextSample = 0
+	o.lastChunkArrival = time.Time{}
 	o.traceEvent("flush", reason)
 }
 
@@ -668,6 +700,7 @@ func (o *audioOutput) telemetry() AudioQueueTelemetry {
 	telemetry.TargetFrames = o.prebufferBytes / 4
 	telemetry.Started = o.started
 	telemetry.StaleFrames = o.staleFrames
+	telemetry.MaxChunkArrivalGapMS = uint64(o.maxChunkArrivalGap / time.Millisecond)
 	return telemetry
 }
 
