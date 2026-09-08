@@ -63,9 +63,15 @@ keys included, is a placement slot: `Touch button layout` drags them into
 custom positions stored normalized in `touch_layout`, so a saved arrangement
 survives rotation and resizes.
 
-That editor owns the whole trade between picture and controls. Steppers set
-how much height the deck takes (`touch_deck_ratio`, 20-65% of the screen; the
-guest display keeps the rest) and how large the buttons are
+`Touch controls overlay` defaults on and lets the guest keep the full display
+area while the touch deck is painted above it. Turning the option off restores
+the docked layout that reserves space below the guest. This presentation choice
+is independent of `Virtual keypad` and of the controller-connected visibility
+rule.
+
+The layout editor owns the size and placement of the controls. Steppers set
+how much height the deck footprint takes (`touch_deck_ratio`, 20-65% of the
+screen; the docked guest keeps the rest) and how large the buttons are
 (`touch_control_scale`). Dragging a button into the tray puts it away
 (`touch_hidden`) and dragging it back out restores it where it is dropped, so
 a title that needs only a D-pad can clear everything else off the screen.

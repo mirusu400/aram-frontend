@@ -137,17 +137,17 @@ carries the right-anchored control out of view — the state the pixel ramp
 first exposed.
 
 Persistent runtime metadata must not consume a sidebar beside the guest
-display. The user-enabled virtual keypad is the sole right-rail exception and
-reserves space rather than covering the guest image. Configuration belongs in
-the category-based `Configure ARAM` modal, opened from
+display. The user-enabled desktop virtual keypad is the sole right-rail
+exception and reserves space rather than covering the guest image.
+Configuration belongs in the category-based `Configure ARAM` modal, opened from
 `Emulation > Configure...` or the application toolbar.
 
 The shell uses the current Ebitengine layout dimensions rather than a fixed
 internal canvas. Modal bounds are centered and clamped to the viewport, long
 configuration categories scroll, and secondary metadata is hidden at compact
 desktop widths. The optional desktop virtual keypad scales within its right
-rail. On mobile, the touch deck reserves layout space below the guest viewport
-instead of covering it.
+rail. On mobile, the touch deck overlays the guest viewport by default; its
+Controls option can switch back to a reserved dock below the guest.
 
 ## Interaction contract
 

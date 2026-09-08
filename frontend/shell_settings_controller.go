@@ -32,6 +32,18 @@ func (s *Shell) toggleShowControlsWithPad() {
 	))
 }
 
+// toggleTouchControlsOverlay switches between a deck that reserves space
+// below the guest and controls painted over the full-height guest viewport.
+// Visibility remains governed independently by the virtual-keypad and
+// connected-controller settings.
+func (s *Shell) toggleTouchControlsOverlay() {
+	s.settings.TouchControlsOverlay = !s.settings.TouchControlsOverlay
+	s.saveControllerSettings(s.trf(
+		"Touch controls overlay: %s",
+		s.tr(onOff(s.settings.TouchControlsOverlay)),
+	))
+}
+
 // toggleTouchDpadCircular swaps the on-screen directional cross for a round
 // thumb pad and back. The pad steers by drag and confirms by a center tap;
 // the digital cross stays the default.

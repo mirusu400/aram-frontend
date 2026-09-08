@@ -351,6 +351,12 @@ func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 		if platformUsesTouchLayout() {
 			rows = append(rows,
 				settingsRowModel{
+					label:       "Touch controls overlay",
+					description: "Draw the touch controls over the guest display instead of shrinking it.",
+					value:       onOff(shell.settings.TouchControlsOverlay),
+					action:      shell.toggleTouchControlsOverlay,
+				},
+				settingsRowModel{
 					label:       "On-screen controls with a controller",
 					description: "Keep the touch controls up even when a controller is connected. Off hides them so the physical buttons play alone.",
 					value:       onOff(shell.settings.ShowControlsWithPad),

@@ -150,28 +150,29 @@ type Settings struct {
 	VsyncDisabled bool `json:"vsync_disabled"`
 	// GuestWidthOverride widens the guest framebuffer (experimental widescreen).
 	// Zero keeps the device-native width. Height stays native.
-	GuestWidthOverride  int                          `json:"guest_width_override,omitempty"`
-	KeyboardProfile     string                       `json:"keyboard_profile"`
-	KeyboardBindings    map[string]string            `json:"keyboard_bindings,omitempty"`
-	GamepadEnabled      bool                         `json:"gamepad_enabled"`
-	GamepadLayout       string                       `json:"gamepad_layout"`
-	GamepadAnalog       bool                         `json:"gamepad_analog"`
-	GamepadDeadzone     int                          `json:"gamepad_deadzone"`
-	GamepadBindings     map[string]string            `json:"gamepad_bindings,omitempty"`
-	PerTitleControls    bool                         `json:"per_title_controls"`
-	TitleControllers    map[string]ControllerProfile `json:"title_controller_profiles,omitempty"`
-	ShowVirtualKeypad   bool                         `json:"show_virtual_keypad"`
-	ShowControlsWithPad bool                         `json:"show_controls_with_pad"`
-	TouchDpadCircular   bool                         `json:"touch_dpad_circular"`
-	VibrationEnabled    bool                         `json:"vibration_enabled"`
-	TouchControlScale   int                          `json:"touch_control_scale,omitempty"`
-	TouchDeckRatio      int                          `json:"touch_deck_ratio,omitempty"`
-	TouchLayout         map[string]TouchPlacement    `json:"touch_layout,omitempty"`
-	TouchHidden         map[string]bool              `json:"touch_hidden,omitempty"`
-	TouchGridStep       int                          `json:"touch_grid_step,omitempty"`
-	UpdateChannel       string                       `json:"update_channel"`
-	WelcomeCompleted    bool                         `json:"welcome_completed"`
-	IssueReports        []IssueReportRecord          `json:"issue_reports,omitempty"`
+	GuestWidthOverride   int                          `json:"guest_width_override,omitempty"`
+	KeyboardProfile      string                       `json:"keyboard_profile"`
+	KeyboardBindings     map[string]string            `json:"keyboard_bindings,omitempty"`
+	GamepadEnabled       bool                         `json:"gamepad_enabled"`
+	GamepadLayout        string                       `json:"gamepad_layout"`
+	GamepadAnalog        bool                         `json:"gamepad_analog"`
+	GamepadDeadzone      int                          `json:"gamepad_deadzone"`
+	GamepadBindings      map[string]string            `json:"gamepad_bindings,omitempty"`
+	PerTitleControls     bool                         `json:"per_title_controls"`
+	TitleControllers     map[string]ControllerProfile `json:"title_controller_profiles,omitempty"`
+	ShowVirtualKeypad    bool                         `json:"show_virtual_keypad"`
+	ShowControlsWithPad  bool                         `json:"show_controls_with_pad"`
+	TouchControlsOverlay bool                         `json:"touch_controls_overlay"`
+	TouchDpadCircular    bool                         `json:"touch_dpad_circular"`
+	VibrationEnabled     bool                         `json:"vibration_enabled"`
+	TouchControlScale    int                          `json:"touch_control_scale,omitempty"`
+	TouchDeckRatio       int                          `json:"touch_deck_ratio,omitempty"`
+	TouchLayout          map[string]TouchPlacement    `json:"touch_layout,omitempty"`
+	TouchHidden          map[string]bool              `json:"touch_hidden,omitempty"`
+	TouchGridStep        int                          `json:"touch_grid_step,omitempty"`
+	UpdateChannel        string                       `json:"update_channel"`
+	WelcomeCompleted     bool                         `json:"welcome_completed"`
+	IssueReports         []IssueReportRecord          `json:"issue_reports,omitempty"`
 	// GameLibraryFolders are the roots the Home "Installed" tab scans
 	// recursively for openable titles. FavoriteFiles are the paths starred on
 	// Home. Both are cleaned and de-duplicated by normalize.
@@ -292,6 +293,7 @@ func defaultSettings() Settings {
 		TitleControllers:      make(map[string]ControllerProfile),
 		UpdateChannel:         string(updateChannelStable),
 		VibrationEnabled:      true,
+		TouchControlsOverlay:  true,
 		TouchDpadCircular:     true,
 		CPUProfile:            true,
 		DisplaySync:           true,

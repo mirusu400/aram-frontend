@@ -106,18 +106,19 @@ remain global or be stored per title using the input SHA-256 identity.
 Connection support and live mapped input are visible in the Controls page.
 Additional SDL-compatible mappings can be placed at
 `ARAM/gamecontrollerdb.txt` beside `settings.json` and reloaded without
-restarting. The optional virtual keypad reserves a responsive rail to the
-right of the guest display and exposes direction, soft, action, menu, and
-phone-number controls to mouse or touch input. Direction keys carry an arrow
-rather than a localized word, on the keypad and on the touch deck alike.
+restarting. On desktop, the optional virtual keypad reserves a responsive rail
+to the right of the guest display and exposes direction, soft, action, menu,
+and phone-number controls to mouse or touch input. Direction keys carry an
+arrow rather than a localized word, on the keypad and on the touch deck alike.
 
 The status bar ends with a machine-state signal glyph and, where the host
 reports one, the battery charge. Neither is decorative: a platform that
 exposes no battery draws no meter.
 
 On touch layouts, the menu bar, toolbar, and status bar disappear when a
-title enters the running state so the guest screen can fill everything above
-the on-screen control deck at its largest aspect-preserving size; the
+title enters the running state. The on-screen control deck overlays the guest
+by default, with a Controls option to dock it below the guest instead. The
+guest uses its largest aspect-preserving size in either available area; the
 integer-scaling preference applies only to the centered windowed workspace. A faint
 hamburger toggle floating at the top-right restores the chrome, and a HIDE
 button at the right end of the toolbar strips it again. Open panels, the

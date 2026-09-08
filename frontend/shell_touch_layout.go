@@ -17,6 +17,12 @@ func (s *Shell) touchDeckHeight(width, height int) int {
 		// game panel keeps its whole height with no deck reserved.
 		return 0
 	}
+	if s.settings.TouchControlsOverlay {
+		// Overlay mode leaves the guest viewport at full height. The controls
+		// keep their normal bottom-deck geometry, but Draw paints them over the
+		// already-rendered guest instead of seating them below it.
+		return 0
+	}
 	return touchDeckHeightWithOptions(width, height, s.touchLayoutOptions())
 }
 

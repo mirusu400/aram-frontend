@@ -1,6 +1,10 @@
 package frontend
 
-import "testing"
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+)
 
 // A second physical panel presses controls through SetHostControl, and the
 // game loop samples the held set with collectHostControlState. A press stays
@@ -68,6 +72,61 @@ func TestToggleShowControlsWithPadFlips(t *testing.T) {
 	shell.toggleShowControlsWithPad()
 	if shell.settings.ShowControlsWithPad != before {
 		t.Fatal("toggling twice did not restore the setting")
+	}
+}
+
+// Touch controls cover the guest by default instead of shrinking it. Loading
+// a settings file written before the option existed must inherit that default,
+// while an explicit off must still survive serialization and loading.
+func TestTouchControlsOverlayDefaultsOnAndPersistsOff(t *testing.T) {
+	if !defaultSettings().TouchControlsOverlay {
+		t.Fatal("touch controls overlay should default on")
+	}
+	legacy := defaultSettings()
+	if err := json.Unmarshal([]byte(`{"theme_mode":"dark"}`), &legacy); err != nil {
+		t.Fatal(err)
+	}
+	if !legacy.TouchControlsOverlay {
+		t.Fatal("legacy settings did not inherit the on default")
+	}
+
+	blob, err := json.Marshal(Settings{TouchControlsOverlay: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(blob), `"touch_controls_overlay":false`) {
+		t.Fatalf("touch_controls_overlay was omitted from %s", blob)
+	}
+	loaded := defaultSettings()
+	if err := json.Unmarshal(blob, &loaded); err != nil {
+		t.Fatal(err)
+	}
+	if loaded.TouchControlsOverlay {
+		t.Fatal("an explicit off did not survive a load over the on default")
+	}
+}
+
+func TestTouchControlsOverlayToggleAndDeckReservation(t *testing.T) {
+	isolateSettings(t)
+	shell := &Shell{settings: defaultSettings()}
+	shell.settings.ShowVirtualKeypad = true
+	const width, height = 1080, 2280
+	if got := shell.touchDeckHeight(width, height); got != 0 {
+		t.Fatalf("overlay deck reserved %d pixels, want 0", got)
+	}
+
+	shell.toggleTouchControlsOverlay()
+	if shell.settings.TouchControlsOverlay {
+		t.Fatal("overlay toggle did not turn the option off")
+	}
+	want := touchDeckHeightWithOptions(width, height, shell.touchLayoutOptions())
+	if got := shell.touchDeckHeight(width, height); got != want {
+		t.Fatalf("docked deck height = %d, want %d", got, want)
+	}
+
+	shell.toggleTouchControlsOverlay()
+	if !shell.settings.TouchControlsOverlay {
+		t.Fatal("second overlay toggle did not restore the option")
 	}
 }
 
