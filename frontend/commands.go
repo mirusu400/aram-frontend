@@ -99,7 +99,7 @@ func defaultMenus() []Menu {
 				{ID: "emu.pause", Label: "Pause / Resume", Shortcut: "F6", Backend: CommandPauseResume},
 				{ID: "emu.frame", Label: "Frame Advance", Shortcut: "F7", Backend: CommandFrame},
 				{ID: "emu.stop", Label: "Stop", Shortcut: "F8", Backend: CommandStop},
-				{ID: "emu.reset", Label: "Reset", Shortcut: "Ctrl+R", Backend: CommandReset},
+				{ID: "emu.reset", Label: "Reset", Shortcut: "Ctrl+R", Enabled: hasInput, Action: (*Shell).restartCurrentTitle},
 				{ID: "emu.fast_forward", Label: "Fast Forward", Backend: CommandFastForward},
 				{ID: "emu.load_state", Label: "Load State", Shortcut: "F9", Backend: CommandLoadState},
 				{ID: "emu.save_state", Label: "Save State", Shortcut: "F10", Backend: CommandSaveState},

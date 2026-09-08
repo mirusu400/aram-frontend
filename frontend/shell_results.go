@@ -148,6 +148,7 @@ func (s *Shell) consumeBackendResult(result backendResult) {
 		s.input = &result.info
 		s.firmwareSession = result.request.Firmware
 		s.selectedPath = result.request.Path
+		s.lastOpenRequest = result.request
 		if result.request.Path != "" && !result.request.Temporary {
 			s.settings.addRecent(result.request.Path, result.info.DisplayName, result.info.SHA256)
 			_ = s.settings.save()

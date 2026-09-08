@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"image"
+	"os"
 	"strings"
 	"sync"
 	"testing"
+	"testing/fstest"
 	"time"
 )
 
@@ -110,30 +112,66 @@ func TestParameterizedCommandCarriesSlotAndSpeed(t *testing.T) {
 	}
 }
 
-func TestResetStopsWaitsThenStarts(t *testing.T) {
-	backend := &recordingBackend{requests: make(chan CommandRequest, 2)}
+func TestRestartClosesAndReopensTheSameInput(t *testing.T) {
+	temporary := t.TempDir()
+	t.Setenv("APPDATA", temporary)
+	t.Setenv("XDG_CONFIG_HOME", temporary)
+	backend := &recordingBackend{requests: make(chan CommandRequest, 1)}
 	shell := NewShell(backend, nil, "")
-	shell.input = &InputInfo{DisplayName: "synthetic.dat"}
+	shell.consumeBackendResult(backendResult{
+		request: OpenRequest{Path: "synthetic.dat"},
+		info:    InputInfo{DisplayName: "synthetic.dat"},
+	})
 
-	shell.executeBackend(CommandReset)
+	shell.restartCurrentTitle()
 
-	stop := <-backend.requests
-	stoppedAt := time.Now()
-	if stop.Command != CommandStop {
-		t.Fatalf("first command = %q, want %q", stop.Command, CommandStop)
+	if shell.input != nil {
+		t.Fatal("restart left the closed input in place")
+	}
+	if !shell.loading {
+		t.Fatal("restart did not start reopening the input")
 	}
 
-	start := <-backend.requests
-	if start.Command != CommandStart {
-		t.Fatalf("second command = %q, want %q", start.Command, CommandStart)
+	result := <-shell.backendResults
+	if result.request.Path != "synthetic.dat" {
+		t.Fatalf("reopened request = %#v, want the original path", result.request)
 	}
-	if elapsed := time.Since(stoppedAt); elapsed < resetSettleDelay {
-		t.Fatalf("start followed stop after %s, want at least %s", elapsed, resetSettleDelay)
-	}
+}
 
-	result := <-shell.commandResults
-	if result.command != CommandReset || result.err != nil {
-		t.Fatalf("reset result = %#v", result)
+func TestRestartKeepsATemporaryDropUntilTheReopenReadsIt(t *testing.T) {
+	cache := t.TempDir()
+	t.Setenv("LOCALAPPDATA", cache)
+	t.Setenv("XDG_CACHE_HOME", cache)
+	t.Setenv("HOME", cache)
+	appData := t.TempDir()
+	t.Setenv("APPDATA", appData)
+	t.Setenv("XDG_CONFIG_HOME", appData)
+
+	dropResults := make(chan dropResult, 1)
+	readFirstDroppedFile(fstest.MapFS{
+		"dropped.dat": &fstest.MapFile{Data: []byte("synthetic")},
+	}, dropResults)
+	dropped := <-dropResults
+	if dropped.err != nil {
+		t.Fatal(dropped.err)
+	}
+	defer removeTemporaryDrop(dropped.path)
+
+	backend := &recordingBackend{requests: make(chan CommandRequest, 1)}
+	shell := NewShell(backend, nil, "")
+	shell.consumeBackendResult(backendResult{
+		request: OpenRequest{Path: dropped.path, Temporary: true},
+		info:    InputInfo{DisplayName: dropped.displayName},
+	})
+
+	shell.restartCurrentTitle()
+
+	if _, err := os.Stat(dropped.path); err != nil {
+		t.Fatalf("restart deleted the temporary drop before reopening it: %v", err)
+	}
+	result := <-shell.backendResults
+	if result.request.Path != dropped.path || !result.request.Temporary {
+		t.Fatalf("reopened request = %#v, want the original temporary path", result.request)
 	}
 }
 

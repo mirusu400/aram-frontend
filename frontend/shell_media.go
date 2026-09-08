@@ -9,7 +9,7 @@ import (
 )
 
 func (s *Shell) closeInput() {
-	if err := s.releaseCurrentInput(); err != nil {
+	if err := s.releaseCurrentInput(true); err != nil {
 		s.setStatus(s.tr("Close: ") + err.Error())
 		return
 	}
@@ -19,7 +19,10 @@ func (s *Shell) closeInput() {
 	s.rescanLibrary()
 }
 
-func (s *Shell) releaseCurrentInput() error {
+// releaseCurrentInput tears down the loaded input. deleteTemporary removes a
+// dropped file's temp copy; a restart that is about to reopen the same
+// request keeps it, since the request still points at that path.
+func (s *Shell) releaseCurrentInput(deleteTemporary bool) error {
 	if err := s.backend.Close(); err != nil {
 		return err
 	}
@@ -29,7 +32,7 @@ func (s *Shell) releaseCurrentInput() error {
 		s.audioOutput.flush()
 	}
 	s.audioMu.Unlock()
-	if s.temporaryPath != "" {
+	if deleteTemporary && s.temporaryPath != "" {
 		removeTemporaryDrop(s.temporaryPath)
 		s.temporaryPath = ""
 	}

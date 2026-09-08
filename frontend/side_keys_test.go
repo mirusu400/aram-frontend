@@ -139,7 +139,7 @@ func TestSideKeysFollowTheOpenedInput(t *testing.T) {
 	if !shell.sideKeysAvailable() {
 		t.Fatal("firmware session does not offer side keys")
 	}
-	if err := shell.releaseCurrentInput(); err != nil {
+	if err := shell.releaseCurrentInput(true); err != nil {
 		t.Fatal(err)
 	}
 	if shell.sideKeysAvailable() {

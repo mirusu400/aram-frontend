@@ -74,6 +74,10 @@ type Shell struct {
 	input                *InputInfo
 	selectedPath         string
 	temporaryPath        string
+	// lastOpenRequest is the request that produced the current input, kept so
+	// a restart can reopen the exact same input (including in-band Data for a
+	// host with no filesystem path) rather than only its resolved path.
+	lastOpenRequest OpenRequest
 	// firmwareSession records that the open request routed to the whole-phone
 	// adapter rather than the application one. The handset side keys only
 	// exist on a real phone: an application title runs above the firmware that
