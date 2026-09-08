@@ -4,9 +4,14 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
+
+// resetSettleDelay separates the stop and start halves of a Reset command so
+// the backend observes a real teardown instead of a same-tick restart.
+const resetSettleDelay = 300 * time.Millisecond
 
 type operation uint8
 
@@ -177,13 +182,35 @@ func (s *Shell) executeBackend(command BackendCommand) {
 	}
 	go func() {
 		var err error
-		if backend, ok := s.backend.(CommandBackend); ok {
-			err = backend.ExecuteCommand(context.Background(), request)
+		if command == CommandReset {
+			err = s.runResetSequence(request)
 		} else {
-			err = s.backend.Execute(context.Background(), command)
+			err = s.executeCommandRequest(context.Background(), request)
 		}
 		s.commandResults <- commandResult{command: command, err: err}
 	}()
+}
+
+// runResetSequence turns Reset into an explicit stop, a settle delay, then a
+// start - a full teardown/boot cycle rather than the backend's own reset,
+// which otherwise leaves the title in the same state a plain Stop would.
+func (s *Shell) runResetSequence(request CommandRequest) error {
+	stop := request
+	stop.Command = CommandStop
+	if err := s.executeCommandRequest(context.Background(), stop); err != nil {
+		return err
+	}
+	time.Sleep(resetSettleDelay)
+	start := request
+	start.Command = CommandStart
+	return s.executeCommandRequest(context.Background(), start)
+}
+
+func (s *Shell) executeCommandRequest(ctx context.Context, request CommandRequest) error {
+	if backend, ok := s.backend.(CommandBackend); ok {
+		return backend.ExecuteCommand(ctx, request)
+	}
+	return s.backend.Execute(ctx, request.Command)
 }
 
 func (s *Shell) handleDroppedFiles() {

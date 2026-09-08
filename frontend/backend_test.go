@@ -110,6 +110,33 @@ func TestParameterizedCommandCarriesSlotAndSpeed(t *testing.T) {
 	}
 }
 
+func TestResetStopsWaitsThenStarts(t *testing.T) {
+	backend := &recordingBackend{requests: make(chan CommandRequest, 2)}
+	shell := NewShell(backend, nil, "")
+	shell.input = &InputInfo{DisplayName: "synthetic.dat"}
+
+	shell.executeBackend(CommandReset)
+
+	stop := <-backend.requests
+	stoppedAt := time.Now()
+	if stop.Command != CommandStop {
+		t.Fatalf("first command = %q, want %q", stop.Command, CommandStop)
+	}
+
+	start := <-backend.requests
+	if start.Command != CommandStart {
+		t.Fatalf("second command = %q, want %q", start.Command, CommandStart)
+	}
+	if elapsed := time.Since(stoppedAt); elapsed < resetSettleDelay {
+		t.Fatalf("start followed stop after %s, want at least %s", elapsed, resetSettleDelay)
+	}
+
+	result := <-shell.commandResults
+	if result.command != CommandReset || result.err != nil {
+		t.Fatalf("reset result = %#v", result)
+	}
+}
+
 type autoStartBackend struct {
 	mu       sync.Mutex
 	state    BackendState
