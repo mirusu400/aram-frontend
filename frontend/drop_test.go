@@ -14,9 +14,7 @@ import (
 // Backend.Open through OpenRequest.Data, mirroring the web picker, rather than
 // as a temporary filesystem path the browser build cannot produce.
 func TestDroppedBytesOpenThroughDataRequest(t *testing.T) {
-	config := t.TempDir()
-	t.Setenv("APPDATA", config)
-	t.Setenv("XDG_CONFIG_HOME", config)
+	isolateSettings(t)
 
 	backend := &openRecordingBackend{requests: make(chan OpenRequest, 1)}
 	shell := NewShell(backend, fixedPicker{}, "")
@@ -78,9 +76,7 @@ func (l locatedFS) ReadDir(name string) ([]fs.DirEntry, error) {
 // temporary), so the title is recorded in the recent list like one chosen
 // through the file dialog.
 func TestDroppedFileWithRealPathOpensInPlace(t *testing.T) {
-	config := t.TempDir()
-	t.Setenv("APPDATA", config)
-	t.Setenv("XDG_CONFIG_HOME", config)
+	isolateSettings(t)
 	root := t.TempDir()
 	dropped := filepath.Join(root, "dropped.dat")
 	if err := os.WriteFile(dropped, []byte("synthetic input"), 0o644); err != nil {
