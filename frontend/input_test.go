@@ -199,9 +199,6 @@ func TestKeyboardBindingCaptureUsesThePressedKey(t *testing.T) {
 	if swapped := assignKeyboardBinding(&profile, "left", ebiten.KeyJ); swapped != "" {
 		t.Fatalf("unexpected first swap with %q", swapped)
 	}
-	if profile.KeyboardProfile != "custom" {
-		t.Fatalf("keyboard profile = %q, want custom", profile.KeyboardProfile)
-	}
 	keys := keyboardBindingIDsForProfile(profile)
 	if keys["left"] != ebiten.KeyJ.String() {
 		t.Fatalf("left binding = %q, want J", keys["left"])
@@ -214,6 +211,43 @@ func TestKeyboardBindingCaptureUsesThePressedKey(t *testing.T) {
 	if keys["right"] != ebiten.KeyJ.String() ||
 		keys["left"] != ebiten.KeyArrowRight.String() {
 		t.Fatalf("swapped keyboard bindings = %#v", keys)
+	}
+}
+
+func TestKeyboardDirectionsAcceptArrowsAndWASDTogether(t *testing.T) {
+	profile := defaultSettings().globalControllerProfile()
+	bindings := keyboardInputBindingsForProfile(profile)
+	want := map[ebiten.Key]string{
+		ebiten.KeyArrowUp:    "up",
+		ebiten.KeyW:          "up",
+		ebiten.KeyArrowDown:  "down",
+		ebiten.KeyS:          "down",
+		ebiten.KeyArrowLeft:  "left",
+		ebiten.KeyA:          "left",
+		ebiten.KeyArrowRight: "right",
+		ebiten.KeyD:          "right",
+	}
+	for key, control := range want {
+		found := false
+		for _, binding := range bindings {
+			if binding.Key == key && binding.Control == control {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("%s does not drive %s in %#v", key, control, bindings)
+		}
+	}
+}
+
+func TestKeyboardDirectionAliasYieldsToCustomAction(t *testing.T) {
+	profile := defaultSettings().globalControllerProfile()
+	assignKeyboardBinding(&profile, "ok", ebiten.KeyW)
+	for _, binding := range keyboardInputBindingsForProfile(profile) {
+		if binding.Key == ebiten.KeyW && binding.Control == "up" {
+			t.Fatal("W still drove up after it was explicitly assigned to confirm")
+		}
 	}
 }
 

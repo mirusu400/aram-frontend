@@ -277,40 +277,10 @@ func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 				action:      shell.togglePerTitleControls,
 			},
 			{
-				label:       "Keyboard profile",
-				description: "Apply the arrow-key or WASD preset, replacing custom keyboard bindings.",
-				value:       keyboardProfileLabel(profile.KeyboardProfile),
-				action:      shell.cycleKeyboardProfile,
-			},
-			{
 				label:       "Virtual keypad",
 				description: virtualKeypadDescription(),
 				value:       onOff(shell.settings.ShowVirtualKeypad),
 				action:      shell.toggleVirtualKeypad,
-			},
-			{
-				label:       "Gamepad input",
-				description: "Accept input from standard-layout controllers.",
-				value:       onOff(profile.GamepadEnabled),
-				action:      shell.toggleGamepadEnabled,
-			},
-			{
-				label:       "Confirm / back layout",
-				description: "Choose the south or east face button for confirm.",
-				value:       gamepadLayoutLabel(profile.GamepadLayout),
-				action:      shell.cycleGamepadLayout,
-			},
-			{
-				label:       "Analog directions",
-				description: "Map the left stick to normalized directions.",
-				value:       onOff(profile.GamepadAnalog),
-				action:      shell.toggleGamepadAnalog,
-			},
-			{
-				label:       "Stick dead zone",
-				description: "Ignore small left-stick movement.",
-				value:       fmt.Sprintf("%d%%", profile.GamepadDeadzone),
-				action:      shell.cycleGamepadDeadzone,
 			},
 			{
 				label:       "Vibration",
@@ -318,36 +288,10 @@ func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 				value:       onOff(shell.settings.VibrationEnabled),
 				action:      shell.toggleVibration,
 			},
-			{
-				label:       "Connected gamepads",
-				description: "Detected devices and standard-layout support.",
-				value:       gamepadConnectionLabel(shell.language()),
-			},
-			{
-				label:       "Controller database",
-				description: "Reload ARAM/gamecontrollerdb.txt for unsupported devices.",
-				value: func() string {
-					if shell.gamepadMappingsLoaded {
-						return "Custom"
-					}
-					return "Built-in"
-				}(),
-				action: shell.reloadGamepadMappings,
-			},
-			{
-				label:       "Live input test",
-				description: "Press controller buttons to verify the active mapping.",
-				value:       shorten(shell.gamepadActivityLabel(), 22),
-			},
-			{
-				label:       "Button bindings",
-				description: "Capture keyboard keys or physical gamepad buttons.",
-				value:       "Edit",
-				action: func() {
-					u.selectSettingsSection(shell, "Bindings")
-				},
-			},
 		}
+		// Phone-facing controls come before the advanced physical-controller
+		// rows so a small touch screen reaches its overlay and layout choices
+		// without first scrolling through desktop/gamepad diagnostics.
 		if platformUsesTouchLayout() {
 			rows = append(rows,
 				settingsRowModel{
@@ -387,6 +331,61 @@ func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 				},
 			)
 		}
+		rows = append(rows, []settingsRowModel{
+			{
+				label:       "Gamepad input",
+				description: "Accept input from standard-layout controllers.",
+				value:       onOff(profile.GamepadEnabled),
+				action:      shell.toggleGamepadEnabled,
+			},
+			{
+				label:       "Confirm / back layout",
+				description: "Choose the south or east face button for confirm.",
+				value:       gamepadLayoutLabel(profile.GamepadLayout),
+				action:      shell.cycleGamepadLayout,
+			},
+			{
+				label:       "Analog directions",
+				description: "Map the left stick to normalized directions.",
+				value:       onOff(profile.GamepadAnalog),
+				action:      shell.toggleGamepadAnalog,
+			},
+			{
+				label:       "Stick dead zone",
+				description: "Ignore small left-stick movement.",
+				value:       fmt.Sprintf("%d%%", profile.GamepadDeadzone),
+				action:      shell.cycleGamepadDeadzone,
+			},
+			{
+				label:       "Connected gamepads",
+				description: "Detected devices and standard-layout support.",
+				value:       gamepadConnectionLabel(shell.language()),
+			},
+			{
+				label:       "Controller database",
+				description: "Reload ARAM/gamecontrollerdb.txt for unsupported devices.",
+				value: func() string {
+					if shell.gamepadMappingsLoaded {
+						return "Custom"
+					}
+					return "Built-in"
+				}(),
+				action: shell.reloadGamepadMappings,
+			},
+			{
+				label:       "Live input test",
+				description: "Press controller buttons to verify the active mapping.",
+				value:       shorten(shell.gamepadActivityLabel(), 22),
+			},
+			{
+				label:       "Button bindings",
+				description: "Capture keyboard keys or physical gamepad buttons.",
+				value:       "Edit",
+				action: func() {
+					u.selectSettingsSection(shell, "Bindings")
+				},
+			},
+		}...)
 	case "Bindings":
 		if u.bindingDevice != bindingDeviceKeyboard &&
 			u.bindingDevice != bindingDeviceGamepad {

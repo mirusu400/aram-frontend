@@ -25,21 +25,22 @@ func (s *Shell) updateHaptics() {
 		s.stopHapticsIfActive()
 		return
 	}
-	magnitude, active := hapticMagnitude(source.Haptics())
+	state := source.Haptics()
+	magnitude, active := hapticMagnitude(state)
 	if !active {
 		s.stopHapticsIfActive()
 		return
 	}
-	rising := !s.hapticActive
+	newPulse := startsHapticPulse(s.hapticActive, s.hapticRemaining, state.Duration)
 	s.driveGamepadRumble(magnitude)
-	if rising {
-		state := source.Haptics()
+	if newPulse {
 		ebiten.Vibrate(&ebiten.VibrateOptions{
 			Duration:  state.Duration,
 			Magnitude: magnitude,
 		})
 	}
 	s.hapticActive = true
+	s.hapticRemaining = state.Duration
 }
 
 func (s *Shell) stopHapticsIfActive() {
@@ -48,6 +49,7 @@ func (s *Shell) stopHapticsIfActive() {
 	}
 	s.driveGamepadRumble(0)
 	s.hapticActive = false
+	s.hapticRemaining = 0
 }
 
 // driveGamepadRumble sets both motors on every connected standard-layout pad. A
@@ -73,6 +75,14 @@ func (s *Shell) driveGamepadRumble(magnitude float64) {
 			WeakMagnitude:   magnitude,
 		})
 	}
+}
+
+// startsHapticPulse identifies a fresh guest request even when it immediately
+// follows the previous request without an idle frame. Remaining time normally
+// falls every tick, so an increase means the guest restarted or extended the
+// pulse and the phone vibrator must be triggered again.
+func startsHapticPulse(active bool, previousRemaining, remaining time.Duration) bool {
+	return !active || remaining > previousRemaining
 }
 
 // hapticMagnitude maps a vibration request to a 0..1 motor magnitude and

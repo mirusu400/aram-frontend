@@ -206,7 +206,6 @@ func assignKeyboardBinding(
 		break
 	}
 	bindings[control] = nextID
-	profile.KeyboardProfile = "custom"
 	profile.KeyboardBindings = bindings
 	return swapped
 }

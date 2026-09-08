@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/hajimehoshi/ebiten/v2"
 )
 
 func TestAddRecentDeduplicatesAndLimits(t *testing.T) {
@@ -298,12 +300,10 @@ func TestIssueReportHistoryDeduplicatesValidEntriesAndLimitsSize(t *testing.T) {
 
 func TestSettingsNormalizeRepairsControllerOptions(t *testing.T) {
 	settings := defaultSettings()
-	settings.KeyboardProfile = "broken"
 	settings.GamepadLayout = "broken"
 	settings.GamepadDeadzone = 5
 	settings.normalize()
-	if settings.KeyboardProfile != "default" ||
-		settings.GamepadLayout != "standard" ||
+	if settings.GamepadLayout != "standard" ||
 		settings.GamepadDeadzone != 30 {
 		t.Fatalf("normalized controller settings = %#v", settings)
 	}
@@ -319,12 +319,45 @@ func TestLegacySettingsReceiveControllerDefaults(t *testing.T) {
 	}
 	settings.normalize()
 
-	if settings.KeyboardProfile != "wasd" ||
-		!settings.GamepadEnabled ||
+	if !settings.GamepadEnabled ||
 		settings.GamepadLayout != "standard" ||
 		!settings.GamepadAnalog ||
 		settings.GamepadDeadzone != 30 {
 		t.Fatalf("legacy controller settings = %#v", settings)
+	}
+	// keyboard_profile is intentionally ignored now: both historical presets
+	// are built-in aliases, so a legacy WASD preference needs no migration.
+	bindings := keyboardInputBindingsForProfile(settings.globalControllerProfile())
+	for _, key := range []ebiten.Key{ebiten.KeyArrowUp, ebiten.KeyW} {
+		found := false
+		for _, binding := range bindings {
+			if binding.Control == "up" && binding.Key == key {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("legacy settings did not enable %s for up", key)
+		}
+	}
+}
+
+func TestSettingsNoLongerWriteKeyboardProfile(t *testing.T) {
+	data, err := json.Marshal(defaultSettings())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), `"keyboard_profile"`) {
+		t.Fatalf("removed keyboard profile was still persisted: %s", data)
+	}
+}
+
+func TestControlsSettingsOmitKeyboardProfile(t *testing.T) {
+	shell := &Shell{settings: defaultSettings()}
+	u := &shellUI{settingsSection: "Controls"}
+	for _, row := range u.settingsRowModels(shell) {
+		if row.label == "Keyboard profile" {
+			t.Fatal("Controls still exposes the removed keyboard profile")
+		}
 	}
 }
 

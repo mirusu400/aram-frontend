@@ -83,15 +83,16 @@ directly by the frontend.
 
 ## Windows input
 
-The default keyboard profile maps arrows, Enter, Backspace for cancel/back,
-Home/End for call/end-call, Q/E soft keys, Page Up/Down handset volume keys,
-Space, digits, comma/star, and period/hash into backend-neutral controls. The
+The default keyboard mapping accepts both arrows and WASD for directions,
+plus Enter, Backspace for cancel/back, Home/End for call/end-call, Q/E soft
+keys, Page Up/Down handset volume keys, Space, digits, comma/star, and
+period/hash into backend-neutral controls. The
 optional desktop virtual keypad exposes those phone actions as CALL, END,
 CANCEL, VOL-, and VOL+ buttons alongside the navigation and number keys. A
-WASD direction preset is also supported. Every keyboard action can be
-remapped by clicking its binding row and pressing the desired physical key;
-Escape cancels capture. Assigning an already-used key swaps the two actions
-instead of creating an ambiguous duplicate. Standard-layout gamepads use the
+Every keyboard action can be remapped by clicking its binding row and
+pressing the desired physical key; Escape cancels capture. Assigning an
+already-used key swaps the two actions instead of creating an ambiguous
+duplicate. Standard-layout gamepads use the
 same press-to-capture interaction and can be enabled independently, swap the
 south/east confirm and back buttons, and map the left analog stick to
 directions with a configurable dead zone.

@@ -64,7 +64,7 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 	// would destroy the handle mid-drag. refreshSettingsSliders keeps their
 	// widgets in sync.
 	signature := fmt.Sprintf(
-		"settings|%s|%dx%d|%s|%s|%s|%t|%t|%d|%s|%s|%s|%s|%t|%s|%s|%s|%s|%s|%s|%t|%s|%s|%s|%s|%s|%s|%s",
+		"settings|%s|%dx%d|%s|%s|%s|%t|%t|%d|%s|%s|%s|%s|%t|%s|%s|%s|%s|%s|%s|%t|%t|%t|%t|%t|%s|%s|%s|%s|%s|%s|%s",
 		shell.settings.Language,
 		u.viewportWidth,
 		u.viewportHeight,
@@ -86,6 +86,10 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 		shell.gamepadActivityLabel(),
 		shell.backendName(),
 		shell.settings.ShowVirtualKeypad,
+		shell.settings.VibrationEnabled,
+		shell.settings.TouchControlsOverlay,
+		shell.settings.ShowControlsWithPad,
+		shell.settings.TouchDpadCircular,
 		u.bindingDevice,
 		bindingCaptureSignature(shell.bindingCapture),
 		shell.settings.UpdateChannel,

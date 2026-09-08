@@ -81,20 +81,12 @@ var gamepadControlOrder = append(
 // falls back to the layout default.
 const gamepadButtonUnassigned = "none"
 
-func keyboardBindings(profile string) []keyBinding {
+func keyboardBindings() []keyBinding {
 	directions := []keyBinding{
 		{Control: "up", Key: ebiten.KeyArrowUp, Label: "Arrow Up"},
 		{Control: "down", Key: ebiten.KeyArrowDown, Label: "Arrow Down"},
 		{Control: "left", Key: ebiten.KeyArrowLeft, Label: "Arrow Left"},
 		{Control: "right", Key: ebiten.KeyArrowRight, Label: "Arrow Right"},
-	}
-	if profile == "wasd" {
-		directions = []keyBinding{
-			{Control: "up", Key: ebiten.KeyW, Label: "W"},
-			{Control: "down", Key: ebiten.KeyS, Label: "S"},
-			{Control: "left", Key: ebiten.KeyA, Label: "A"},
-			{Control: "right", Key: ebiten.KeyD, Label: "D"},
-		}
 	}
 	bindings := append(directions,
 		keyBinding{Control: "ok", Key: ebiten.KeyEnter, Label: "Enter"},
@@ -120,7 +112,7 @@ func keyboardBindings(profile string) []keyBinding {
 }
 
 func keyboardBindingsForProfile(profile ControllerProfile) []keyBinding {
-	bindings := keyboardBindings(profile.KeyboardProfile)
+	bindings := keyboardBindings()
 	for index, binding := range bindings {
 		id := profile.KeyboardBindings[binding.Control]
 		key, ok := keyboardKeyByID(id)
@@ -129,6 +121,41 @@ func keyboardBindingsForProfile(profile ControllerProfile) []keyBinding {
 		}
 		bindings[index].Key = key
 		bindings[index].Label = keyboardKeyLabel(key)
+	}
+	return bindings
+}
+
+// keyboardInputBindingsForProfile expands the single binding shown in the
+// editor with the two built-in direction sets. Arrow keys and WASD therefore
+// work together without a profile switch. A user assignment still wins when
+// it deliberately claims one of those keys for another control, avoiding an
+// ambiguous press that would send two guest actions at once.
+func keyboardInputBindingsForProfile(profile ControllerProfile) []keyBinding {
+	bindings := keyboardBindingsForProfile(profile)
+	owners := make(map[ebiten.Key]string, len(bindings))
+	for _, binding := range bindings {
+		owners[binding.Key] = binding.Control
+	}
+	aliases := []keyBinding{
+		{Control: "up", Key: ebiten.KeyArrowUp, Label: "Arrow Up"},
+		{Control: "up", Key: ebiten.KeyW, Label: "W"},
+		{Control: "down", Key: ebiten.KeyArrowDown, Label: "Arrow Down"},
+		{Control: "down", Key: ebiten.KeyS, Label: "S"},
+		{Control: "left", Key: ebiten.KeyArrowLeft, Label: "Arrow Left"},
+		{Control: "left", Key: ebiten.KeyA, Label: "A"},
+		{Control: "right", Key: ebiten.KeyArrowRight, Label: "Arrow Right"},
+		{Control: "right", Key: ebiten.KeyD, Label: "D"},
+	}
+	for _, alias := range aliases {
+		if owner, claimed := owners[alias.Key]; claimed {
+			if owner != alias.Control {
+				continue
+			}
+			// The exact control/key pair is already the primary binding.
+			continue
+		}
+		bindings = append(bindings, alias)
+		owners[alias.Key] = alias.Control
 	}
 	return bindings
 }
@@ -338,7 +365,6 @@ func normalizeGamepadBindingIDs(bindings map[string]string) map[string]string {
 
 func controllerProfileSignature(profile ControllerProfile) string {
 	parts := []string{
-		profile.KeyboardProfile,
 		fmt.Sprintf("%t", profile.GamepadEnabled),
 		profile.GamepadLayout,
 		fmt.Sprintf("%t", profile.GamepadAnalog),

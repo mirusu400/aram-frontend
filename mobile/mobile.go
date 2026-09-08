@@ -21,7 +21,9 @@ var game = frontend.NewShell(
 // window; the host presents its own editor and answers with SubmitTextInput
 // or CancelTextInput.
 type Host interface {
-	RequestDocument(firmware bool)
+	// RequestDocument receives one of frontend.DocumentKindInput,
+	// frontend.DocumentKindFirmware, or frontend.DocumentKindSaveBackup.
+	RequestDocument(kind string)
 	RequestTextInput(requestID int64, label, hint, text string)
 }
 

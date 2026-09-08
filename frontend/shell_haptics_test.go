@@ -44,3 +44,15 @@ func TestHapticMagnitude(t *testing.T) {
 		})
 	}
 }
+
+func TestStartsHapticPulse(t *testing.T) {
+	if !startsHapticPulse(false, 0, 100*time.Millisecond) {
+		t.Fatal("an inactive-to-active request did not start a phone pulse")
+	}
+	if startsHapticPulse(true, 100*time.Millisecond, 84*time.Millisecond) {
+		t.Fatal("a continuing request restarted the phone pulse")
+	}
+	if !startsHapticPulse(true, 20*time.Millisecond, 100*time.Millisecond) {
+		t.Fatal("a back-to-back request with a renewed duration was missed")
+	}
+}

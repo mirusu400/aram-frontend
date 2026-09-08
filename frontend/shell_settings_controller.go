@@ -2,17 +2,6 @@ package frontend
 
 import "strings"
 
-func (s *Shell) cycleKeyboardProfile() {
-	s.updateControllerProfile(func(profile *ControllerProfile) {
-		if profile.KeyboardProfile == "default" {
-			profile.KeyboardProfile = "wasd"
-		} else {
-			profile.KeyboardProfile = "default"
-		}
-		profile.KeyboardBindings = nil
-	}, "Keyboard profile updated")
-}
-
 func (s *Shell) toggleVirtualKeypad() {
 	s.settings.ShowVirtualKeypad = !s.settings.ShowVirtualKeypad
 	s.saveControllerSettings(s.trf(
@@ -226,17 +215,6 @@ func gamepadLayoutLabel(layout string) string {
 		return "Custom"
 	default:
 		return "South confirm"
-	}
-}
-
-func keyboardProfileLabel(profile string) string {
-	switch profile {
-	case "wasd":
-		return "WASD"
-	case "custom":
-		return "Custom"
-	default:
-		return "Arrow keys"
 	}
 }
 

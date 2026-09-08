@@ -84,7 +84,6 @@ func isSpeedPreset(speed float64) bool {
 }
 
 type ControllerProfile struct {
-	KeyboardProfile  string            `json:"keyboard_profile"`
 	KeyboardBindings map[string]string `json:"keyboard_bindings,omitempty"`
 	GamepadEnabled   bool              `json:"gamepad_enabled"`
 	GamepadLayout    string            `json:"gamepad_layout"`
@@ -151,7 +150,6 @@ type Settings struct {
 	// GuestWidthOverride widens the guest framebuffer (experimental widescreen).
 	// Zero keeps the device-native width. Height stays native.
 	GuestWidthOverride   int                          `json:"guest_width_override,omitempty"`
-	KeyboardProfile      string                       `json:"keyboard_profile"`
 	KeyboardBindings     map[string]string            `json:"keyboard_bindings,omitempty"`
 	GamepadEnabled       bool                         `json:"gamepad_enabled"`
 	GamepadLayout        string                       `json:"gamepad_layout"`
@@ -285,7 +283,6 @@ func defaultSettings() Settings {
 		Volume:                100,
 		AudioLatencyMS:        60,
 		AudioSoften:           true,
-		KeyboardProfile:       "default",
 		GamepadEnabled:        true,
 		GamepadLayout:         "standard",
 		GamepadAnalog:         true,
@@ -374,11 +371,6 @@ func (s *Settings) normalize() {
 	if s.AudioLatencyMS < 20 || s.AudioLatencyMS > 250 {
 		s.AudioLatencyMS = 60
 	}
-	if s.KeyboardProfile != "default" &&
-		s.KeyboardProfile != "wasd" &&
-		s.KeyboardProfile != "custom" {
-		s.KeyboardProfile = "default"
-	}
 	if s.GamepadLayout != "standard" &&
 		s.GamepadLayout != "swapped" &&
 		s.GamepadLayout != "custom" {
@@ -451,7 +443,6 @@ func (profile *DisplayProfile) normalize() {
 
 func (s Settings) globalControllerProfile() ControllerProfile {
 	profile := ControllerProfile{
-		KeyboardProfile:  s.KeyboardProfile,
 		KeyboardBindings: cloneStringMap(s.KeyboardBindings),
 		GamepadEnabled:   s.GamepadEnabled,
 		GamepadLayout:    s.GamepadLayout,
@@ -465,7 +456,6 @@ func (s Settings) globalControllerProfile() ControllerProfile {
 
 func (s *Settings) setGlobalControllerProfile(profile ControllerProfile) {
 	profile.normalize()
-	s.KeyboardProfile = profile.KeyboardProfile
 	s.KeyboardBindings = cloneStringMap(profile.KeyboardBindings)
 	s.GamepadEnabled = profile.GamepadEnabled
 	s.GamepadLayout = profile.GamepadLayout
@@ -475,11 +465,6 @@ func (s *Settings) setGlobalControllerProfile(profile ControllerProfile) {
 }
 
 func (profile *ControllerProfile) normalize() {
-	if profile.KeyboardProfile != "default" &&
-		profile.KeyboardProfile != "wasd" &&
-		profile.KeyboardProfile != "custom" {
-		profile.KeyboardProfile = "default"
-	}
 	switch profile.GamepadLayout {
 	case "standard", "swapped", "custom":
 	default:

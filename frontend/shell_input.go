@@ -68,7 +68,7 @@ func (s *Shell) handleMappedInput() {
 			ebiten.IsKeyPressed(ebiten.KeyAltLeft) ||
 			ebiten.IsKeyPressed(ebiten.KeyAltRight)
 		if !modifierPressed {
-			for _, binding := range keyboardBindingsForProfile(profile) {
+			for _, binding := range keyboardInputBindingsForProfile(profile) {
 				if ebiten.IsKeyPressed(binding.Key) {
 					next[binding.Control] = true
 				}

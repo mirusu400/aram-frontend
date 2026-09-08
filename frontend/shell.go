@@ -136,6 +136,7 @@ type Shell struct {
 	bindingCapture            *bindingCapture
 	gamepadMappingsLoaded     bool
 	hapticActive              bool
+	hapticRemaining           time.Duration
 	touchControls             map[ebiten.TouchID]string
 	padTouchActive            bool
 	padTouchID                ebiten.TouchID
