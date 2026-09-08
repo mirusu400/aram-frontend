@@ -1,8 +1,10 @@
 package frontend
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -34,7 +36,12 @@ func (s *Shell) exportSaveData() {
 		if err == nil {
 			path, err = writeTextArtifact("save-backups", prefix, ".aramsave", data)
 		}
-		s.artifactResults <- artifactResult{kind: "Save backup", path: path, err: err}
+		s.artifactResults <- artifactResult{
+			kind:      "Save backup",
+			path:      path,
+			shareMIME: saveBackupMIMEType,
+			err:       err,
+		}
 	}()
 }
 
@@ -46,6 +53,14 @@ func (s *Shell) openSaveBackupFolder() {
 	if err == nil {
 		err = openArtifactFolder(path)
 	}
+	if errors.Is(err, ErrFolderBrowserUnavailable) {
+		// A handset has no file manager that reaches app-private storage, so
+		// revealing the folder is not merely unsupported - it would leave the
+		// backup permanently unreachable. Hand the newest backup to another
+		// app instead, which is the same job the folder does on desktop.
+		s.shareNewestSaveBackup(path)
+		return
+	}
 	if err != nil {
 		message := s.tr("Save backup folder: ") + err.Error()
 		s.appendLog(message)
@@ -55,6 +70,65 @@ func (s *Shell) openSaveBackupFolder() {
 	message := s.trf("Save backup folder opened: %s", path)
 	s.appendLog(message)
 	s.setStatus(message)
+}
+
+// shareNewestSaveBackup offers the most recent backup below directory to
+// another app. The newest one is the one a user who just pressed "Back Up
+// Save..." means; older ones stay reachable through the same command after a
+// new backup is made.
+func (s *Shell) shareNewestSaveBackup(directory string) {
+	path, err := newestSaveBackup(directory)
+	if err != nil {
+		message := s.tr("Save backup folder: ") + err.Error()
+		s.appendLog(message)
+		s.setStatus(message)
+		return
+	}
+	if path == "" {
+		s.setStatus(s.tr("Save backup: no backup has been made yet"))
+		return
+	}
+	name := filepath.Base(path)
+	if err := shareNativeFile(path, saveBackupMIMEType, name); err != nil {
+		message := s.tr("Save backup folder: ") + err.Error()
+		s.appendLog(message)
+		s.setStatus(message)
+		return
+	}
+	s.setStatus(s.trf("Sharing save backup: %s", name))
+}
+
+// newestSaveBackup returns the most recently written .aramsave file in
+// directory, or an empty path when the folder holds none.
+func newestSaveBackup(directory string) (string, error) {
+	entries, err := os.ReadDir(directory)
+	if err != nil {
+		return "", err
+	}
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.EqualFold(filepath.Ext(entry.Name()), ".aramsave") {
+			continue
+		}
+		names = append(names, entry.Name())
+	}
+	if len(names) == 0 {
+		return "", nil
+	}
+	// The names carry writeTextArtifact's sortable timestamp suffix, so the
+	// last name is the newest write without stat-ing every entry.
+	sort.Strings(names)
+	return filepath.Join(directory, names[len(names)-1]), nil
+}
+
+// ImportExternalSaveBackup is the native-host entry point after its document
+// picker hands over a save backup file. It mirrors OpenExternalDocument: the
+// host calls from its own thread, and the restore runs on the update loop.
+func (s *Shell) ImportExternalSaveBackup(path string) {
+	select {
+	case s.externalSaveBackups <- path:
+	default:
+	}
 }
 
 // importSaveData prompts for a save backup file and restores it into the loaded

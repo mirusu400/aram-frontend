@@ -678,6 +678,8 @@
   "Open Save Backup Folder": "Open Save Backup Folder",
   "Save backup folder: ": "Save backup folder: ",
   "Save backup folder opened: %s": "Save backup folder opened: %s",
+  "Sharing save backup: %s": "Sharing save backup: %s",
+  "Save backup: no backup has been made yet": "Save backup: no backup has been made yet",
   "ARAM stopped": "ARAM stopped",
   "The emulated machine faulted and the title stopped.\n\nReason: %s\n\nOpen the issue report form so this can be fixed? A redacted debug bundle (host file paths removed) is attached to a public GitHub issue.": "The emulated machine faulted and the title stopped.\n\nReason: %s\n\nOpen the issue report form so this can be fixed? A redacted debug bundle (host file paths removed) is attached to a public GitHub issue.",
   "Emulator fault: %s": "Emulator fault: %s"

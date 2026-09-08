@@ -12,6 +12,10 @@ func (s *Shell) consumeResults() {
 			s.openRequest(request)
 		case commandID := <-s.externalCommands:
 			s.dispatchCommand(commandID)
+		case path := <-s.externalSaveBackups:
+			s.dialogOpen = false
+			s.state = s.preDialogState
+			s.importSaveDataFromPath(path)
 		case <-s.externalSelectionCanceled:
 			s.dialogOpen = false
 			s.state = s.preDialogState
@@ -117,6 +121,7 @@ func (s *Shell) consumeResults() {
 				s.tr(settingValueLabel(result.kind)),
 				result.path,
 			))
+			s.offerArtifact(result)
 		case result := <-s.saveRestoreResults:
 			if result.err != nil {
 				s.setStatus(s.tr("Restore save: ") + result.err.Error())

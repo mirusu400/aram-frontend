@@ -2,6 +2,8 @@ package frontend
 
 import (
 	"encoding/json"
+	"errors"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -10,7 +12,30 @@ type artifactResult struct {
 	kind    string
 	path    string
 	warning string
-	err     error
+	// shareMIME, when set, asks the shell to offer the written file to another
+	// app on a host that can. An artifact below app-private storage is
+	// otherwise unreachable on a handset, which is where a save backup has to
+	// go to survive losing the app.
+	shareMIME string
+	err       error
+}
+
+// offerArtifact hands a freshly written artifact to another app when the host
+// supports it. A host that cannot share reports ErrShareUnavailable, which is
+// the ordinary desktop answer and not a failure worth a status of its own.
+func (s *Shell) offerArtifact(result artifactResult) {
+	if result.shareMIME == "" || result.path == "" {
+		return
+	}
+	name := filepath.Base(result.path)
+	err := shareNativeFile(result.path, result.shareMIME, name)
+	switch {
+	case err == nil:
+		s.setStatus(s.trf("Sharing save backup: %s", name))
+	case errors.Is(err, ErrShareUnavailable):
+	default:
+		s.setStatus(s.tr("Save backup folder: ") + err.Error())
+	}
 }
 
 type dropResult struct {

@@ -678,6 +678,8 @@
   "Open Save Backup Folder": "세이브 백업 폴더 열기",
   "Save backup folder: ": "세이브 백업 폴더: ",
   "Save backup folder opened: %s": "세이브 백업 폴더를 열었습니다: %s",
+  "Sharing save backup: %s": "세이브 백업을 내보내는 중: %s",
+  "Save backup: no backup has been made yet": "세이브 백업: 아직 백업한 파일이 없습니다",
   "ARAM stopped": "ARAM이 멈췄습니다",
   "The emulated machine faulted and the title stopped.\n\nReason: %s\n\nOpen the issue report form so this can be fixed? A redacted debug bundle (host file paths removed) is attached to a public GitHub issue.": "에뮬레이트된 기기에 오류가 발생하여 타이틀이 멈췄습니다.\n\n원인: %s\n\n문제를 고칠 수 있도록 문제 신고 양식을 여시겠습니까? 민감 정보를 지운 디버그 번들(호스트 파일 경로 제거됨)이 공개 GitHub 이슈에 첨부됩니다.",
   "Emulator fault: %s": "에뮬레이터 오류: %s"

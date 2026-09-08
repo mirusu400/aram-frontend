@@ -181,6 +181,7 @@ type Shell struct {
 	externalOpen              chan OpenRequest
 	externalCommands          chan string
 	externalSelectionCanceled chan struct{}
+	externalSaveBackups       chan string
 	dropResults               chan dropResult
 	artifactResults           chan artifactResult
 	saveRestoreResults        chan saveRestoreResult
@@ -259,6 +260,7 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		externalOpen:              make(chan OpenRequest, 2),
 		externalCommands:          make(chan string, 4),
 		externalSelectionCanceled: make(chan struct{}, 1),
+		externalSaveBackups:       make(chan string, 2),
 		dropResults:               make(chan dropResult, 2),
 		artifactResults:           make(chan artifactResult, 4),
 		saveRestoreResults:        make(chan saveRestoreResult, 2),
