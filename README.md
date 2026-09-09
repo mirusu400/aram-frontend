@@ -161,3 +161,10 @@ the same desktop archives to the release for the Stable channel.
 
 The native Android host project and release signing remain integration
 responsibilities rather than frontend-library concerns.
+
+## License
+
+Licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE.md).
+Noncommercial use (personal projects, research, education, hobby builds) is
+free. Commercial use, including shipping a product or service built on this
+code, requires a separate license from the copyright holder.
