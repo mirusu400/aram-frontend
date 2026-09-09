@@ -171,6 +171,9 @@ type Shell struct {
 	welcomeInstalling         bool
 	updater                   updateDownloader
 	issueRelay                issueRelayService
+	analytics                 analyticsService
+	analyticsSessionStartedAt time.Time
+	analyticsLastMilestone    FrontendState
 	updateProgress            map[updateComponent]updateProgress
 	pickerResults             chan pickerResult
 	backendResults            chan backendResult
@@ -223,6 +226,10 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		picker = NewPlatformPicker()
 	}
 	settings := loadSettings()
+	if settings.AnalyticsID == "" {
+		settings.AnalyticsID = newAnalyticsDistinctID()
+		_ = settings.save()
+	}
 	language := normalizeLanguage(settings.Language)
 	if localized, ok := picker.(languageAwarePicker); ok {
 		localized.SetLanguage(language)
@@ -250,6 +257,8 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		busyCommands:              make(map[BackendCommand]bool),
 		updater:                   newGitHubUpdater(),
 		issueRelay:                newIssueRelayClient(),
+		analytics:                 newAnalyticsService(settings.AnalyticsEnabled, settings.AnalyticsID),
+		analyticsSessionStartedAt: time.Now(),
 		updateProgress:            make(map[updateComponent]updateProgress),
 		pickerResults:             make(chan pickerResult, 2),
 		backendResults:            make(chan backendResult, 2),
@@ -326,6 +335,7 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		// populated by the time the user switches to it.
 		shell.rescanLibrary()
 	}
+	shell.analytics.CaptureAppStarted()
 	return shell
 }
 

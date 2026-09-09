@@ -30,6 +30,12 @@ func experimentSettingsRowModels(shell *Shell) []settingsRowModel {
 			action:      shell.toggleCPUProfile,
 		},
 		{
+			label:       "Usage analytics",
+			description: "Share anonymous usage data (platform, title-load milestones, session length) to help prioritize fixes. No title names, file paths, or personal data are collected.",
+			value:       onOff(shell.settings.AnalyticsEnabled),
+			action:      shell.toggleAnalyticsEnabled,
+		},
+		{
 			label:       "Widescreen",
 			description: "Widen the guest screen. A camera-scrolled title (some RPGs) shows more of the world; other titles leave margins or misplace fixed art. Tuned for 320-tall titles. Takes effect the next time a title is opened.",
 			dropdown: &settingsDropdownModel{

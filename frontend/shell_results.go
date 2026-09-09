@@ -69,6 +69,9 @@ func (s *Shell) consumeResults() {
 			)
 			if result.err != nil {
 				s.state = frontendStateForError(result.err)
+				if s.input != nil {
+					s.reportAnalyticsMilestone(s.state, s.input.SHA256, s.input.ProfileID)
+				}
 				s.problem = &FrontendProblem{
 					State:       s.state,
 					Input:       displayNameForInfo(s.input),
@@ -161,6 +164,7 @@ func (s *Shell) consumeBackendResult(result backendResult) {
 	}
 	if result.err != nil {
 		s.state = frontendStateForError(result.err)
+		s.reportAnalyticsMilestone(s.state, result.info.SHA256, result.info.ProfileID)
 		s.problem = &FrontendProblem{
 			State:       s.state,
 			Input:       displayName(result.request),
@@ -185,6 +189,7 @@ func (s *Shell) consumeBackendResult(result backendResult) {
 	if s.state == FrontendEmpty {
 		s.state = FrontendReady
 	}
+	s.reportAnalyticsMilestone(s.state, result.info.SHA256, result.info.ProfileID)
 	s.setStatus(s.trf(
 		"Loaded %s | %s | profile %s",
 		result.info.DisplayName,

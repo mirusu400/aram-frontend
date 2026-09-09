@@ -47,6 +47,7 @@ func RunWithOptions(
 	// their shells with NewShell directly and must never raise a real dialog.
 	shell.faultPrompter = platformReportPrompter
 	defer shell.closeAudio()
+	defer shell.reportAnalyticsSessionEnded()
 	return runGameWithCrashReporting(shell, func() error {
 		return ebiten.RunGame(shell)
 	})

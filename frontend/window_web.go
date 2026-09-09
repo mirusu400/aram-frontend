@@ -40,5 +40,6 @@ func Run(backend Backend, initialPath string) error {
 	setWebInputSink(shell.OpenExternalBytes)
 	takeInitialWebInput()
 	defer shell.closeAudio()
+	defer shell.reportAnalyticsSessionEnded()
 	return ebiten.RunGame(shell)
 }

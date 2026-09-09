@@ -21,6 +21,13 @@ var BuildTimestamp string
 // Stable/Nightly builds leave it empty and keep the in-app updater.
 var SelfUpdateDisabled string
 
+// AnalyticsAPIKey is PostHog's public project API key (EU Cloud), populated by
+// CI builds through -ldflags from the ARAM_POSTHOG_API_KEY secret. It is safe
+// to embed client-side - this is not the personal/admin secret key. A local
+// `go run`/`go build` with no -ldflags leaves it empty, which newAnalyticsService
+// treats the same as the user having opted out: no client is constructed.
+var AnalyticsAPIKey string
+
 // selfUpdateDisabled reports whether the self-update subsystem is switched off
 // for this build. Any value other than the empty string or an explicit
 // off/false/0/no disables it, so a bare "-X ...SelfUpdateDisabled=1" is enough.

@@ -248,6 +248,9 @@ func (s *Shell) syncBackendState() {
 	}
 	s.lastRunState = state
 	s.state = state
+	if s.input != nil {
+		s.reportAnalyticsMilestone(state, s.input.SHA256, s.input.ProfileID)
+	}
 }
 
 func (s *Shell) syncHostLifecycle() {
