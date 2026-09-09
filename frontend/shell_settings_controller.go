@@ -47,7 +47,9 @@ func (s *Shell) toggleTouchDpadCircular() {
 
 func (s *Shell) toggleVibration() {
 	s.settings.VibrationEnabled = !s.settings.VibrationEnabled
-	if !s.settings.VibrationEnabled {
+	if s.settings.VibrationEnabled {
+		s.previewHaptics()
+	} else {
 		s.stopHapticsIfActive()
 	}
 	s.saveControllerSettings(s.trf(

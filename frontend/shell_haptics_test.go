@@ -56,3 +56,19 @@ func TestStartsHapticPulse(t *testing.T) {
 		t.Fatal("a back-to-back request with a renewed duration was missed")
 	}
 }
+
+func TestHapticPreviewPulse(t *testing.T) {
+	magnitude, duration, ok := hapticPreviewPulse(true)
+	if !ok {
+		t.Fatal("switching vibration on must confirm with a pulse")
+	}
+	if magnitude <= 0 || magnitude > 1 {
+		t.Fatalf("preview magnitude %v out of 0..1", magnitude)
+	}
+	if duration <= 0 {
+		t.Fatalf("preview duration %v must be positive", duration)
+	}
+	if _, _, ok := hapticPreviewPulse(false); ok {
+		t.Fatal("switching vibration off must not buzz")
+	}
+}

@@ -11,6 +11,14 @@ import (
 // the motor alive between ticks without a visible gap.
 const gamepadRumbleHold = 100 * time.Millisecond
 
+// hapticPreview* describe the confirmation buzz played when vibration is
+// switched on in settings. It is short and mid-strength: long enough to feel on
+// a phone, weak enough not to read as a title's own rumble.
+const (
+	hapticPreviewDuration  = 120 * time.Millisecond
+	hapticPreviewMagnitude = 0.6
+)
+
 // updateHaptics polls the backend's vibration request once per tick and drives
 // the host rumble motors and phone vibrator. Gamepad rumble is state-based and
 // re-issued while active; the phone vibrator runs a whole pulse on its own, so
@@ -65,6 +73,38 @@ func (s *Shell) driveGamepadRumble(magnitude float64) {
 	if stopping {
 		duration = 0
 	}
+	vibrateGamepads(magnitude, duration)
+}
+
+// previewHaptics plays one confirmation pulse so switching vibration on proves
+// the motor works without waiting for a title to request one. It ignores the
+// guest request and the machine state; the settings toggle is the trigger.
+func (s *Shell) previewHaptics() {
+	magnitude, duration, ok := hapticPreviewPulse(s.settings.VibrationEnabled)
+	if !ok {
+		return
+	}
+	ebiten.Vibrate(&ebiten.VibrateOptions{
+		Duration:  duration,
+		Magnitude: magnitude,
+	})
+	if !s.controllerProfile().GamepadEnabled {
+		return
+	}
+	vibrateGamepads(magnitude, duration)
+}
+
+// hapticPreviewPulse reports the confirmation pulse for a toggle result. It is
+// pure so the "only when switched on" rule can be tested without motors.
+func hapticPreviewPulse(enabled bool) (float64, time.Duration, bool) {
+	if !enabled {
+		return 0, 0, false
+	}
+	return hapticPreviewMagnitude, hapticPreviewDuration, true
+}
+
+// vibrateGamepads sets both motors on every connected standard-layout pad.
+func vibrateGamepads(magnitude float64, duration time.Duration) {
 	for _, id := range ebiten.AppendGamepadIDs(nil) {
 		if !ebiten.IsStandardGamepadLayoutAvailable(id) {
 			continue
