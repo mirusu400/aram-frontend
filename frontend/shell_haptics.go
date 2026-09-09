@@ -17,7 +17,33 @@ const gamepadRumbleHold = 100 * time.Millisecond
 const (
 	hapticPreviewDuration  = 120 * time.Millisecond
 	hapticPreviewMagnitude = 0.6
+	buttonHapticDuration   = 18 * time.Millisecond
+	buttonHapticMagnitude  = 0.22
 )
+
+// buttonHaptic gives touch controls and successful UI button taps a small,
+// crisp confirmation. It is phone-only and follows the user's vibration
+// setting; gamepads are deliberately left to guest-requested rumble.
+func (s *Shell) buttonHaptic() {
+	magnitude, duration, ok := buttonHapticPulse(
+		platformUsesTouchLayout(),
+		s.settings.VibrationEnabled,
+	)
+	if !ok {
+		return
+	}
+	ebiten.Vibrate(&ebiten.VibrateOptions{
+		Duration:  duration,
+		Magnitude: magnitude,
+	})
+}
+
+func buttonHapticPulse(touchPlatform, enabled bool) (float64, time.Duration, bool) {
+	if !touchPlatform || !enabled {
+		return 0, 0, false
+	}
+	return buttonHapticMagnitude, buttonHapticDuration, true
+}
 
 // updateHaptics polls the backend's vibration request once per tick and drives
 // the host rumble motors and phone vibrator. Gamepad rumble is state-based and

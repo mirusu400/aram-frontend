@@ -36,7 +36,7 @@ func (u *shellUI) buildTopBar(shell *Shell) *widget.Container {
 				VerticalPosition:   widget.AnchorLayoutPositionStart,
 				StretchHorizontal:  true,
 			}),
-			widget.WidgetOpts.MinSize(0, menuBarHeight),
+			widget.WidgetOpts.MinSize(0, design.px(menuBarHeight)),
 		),
 	)
 
@@ -58,7 +58,7 @@ func (u *shellUI) buildTopBar(shell *Shell) *widget.Container {
 			shell.tr(menu.Label),
 			design.Components.MenuButton,
 			design.Type.Strong,
-			widths[index],
+			design.px(widths[index]),
 			design.Components.MenuButton.MinHeight,
 			widget.TextPositionCenter,
 			func() { u.toggleMenu(menuIndex) },
@@ -106,7 +106,7 @@ func (u *shellUI) buildTopBar(shell *Shell) *widget.Container {
 func (u *shellUI) buildUpdateBadge(shell *Shell) *widget.Button {
 	design := u.design
 	label := shell.tr("Update available")
-	width := len([]rune(label))*8 + 24
+	width := design.px(len([]rune(label))*8 + 24)
 
 	// The badge's tooltip text is refreshed in sync() with the found version,
 	// so hold on to its Text widget.
@@ -117,7 +117,7 @@ func (u *shellUI) buildUpdateBadge(shell *Shell) *widget.Button {
 	padding := style.Padding
 	badge := widget.NewButton(
 		widget.ButtonOpts.WidgetOpts(
-			widget.WidgetOpts.MinSize(width, menuRowHeight),
+			widget.WidgetOpts.MinSize(width, design.px(menuRowHeight)),
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
 				Position: widget.RowLayoutPositionCenter,
 			}),
@@ -128,6 +128,7 @@ func (u *shellUI) buildUpdateBadge(shell *Shell) *widget.Button {
 		widget.ButtonOpts.TextPosition(widget.TextPositionCenter, widget.TextPositionCenter),
 		widget.ButtonOpts.TextPadding(&padding),
 		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
+			shell.buttonHaptic()
 			shell.openUpdatesPanel()
 		}),
 	)
@@ -167,9 +168,9 @@ func (u *shellUI) buildApplicationToolbar(shell *Shell) *widget.Container {
 				HorizontalPosition: widget.AnchorLayoutPositionStart,
 				VerticalPosition:   widget.AnchorLayoutPositionStart,
 				StretchHorizontal:  true,
-				Padding:            &widget.Insets{Top: menuBarHeight},
+				Padding:            &widget.Insets{Top: design.px(menuBarHeight)},
 			}),
-			widget.WidgetOpts.MinSize(0, applicationToolbarHeight),
+			widget.WidgetOpts.MinSize(0, design.px(applicationToolbarHeight)),
 		),
 	)
 
@@ -201,7 +202,7 @@ func (u *shellUI) buildApplicationToolbar(shell *Shell) *widget.Container {
 			// button is opaque, so it carries a hover tooltip naming the
 			// action, and the text labels stay available through the menus.
 			iconOpts := []widget.WidgetOpt{widget.WidgetOpts.MinSize(
-				toolbarButtonWidth, toolbarButtonHeight)}
+				design.px(toolbarButtonWidth), design.px(toolbarButtonHeight))}
 			if tooltip != "" {
 				tip, _ := u.buildTextTooltip(tooltip)
 				iconOpts = append(iconOpts, widget.WidgetOpts.ToolTip(tip))
@@ -211,6 +212,7 @@ func (u *shellUI) buildApplicationToolbar(shell *Shell) *widget.Container {
 				widget.ButtonOpts.Image(design.Components.SubtleButton.Image),
 				widget.ButtonOpts.Graphic(graphic),
 				widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
+					shell.buttonHaptic()
 					shell.dispatchCommand(commandID)
 				}),
 			)
@@ -223,13 +225,13 @@ func (u *shellUI) buildApplicationToolbar(shell *Shell) *widget.Container {
 			// it lowers that style's own floor rather than letting the floor
 			// push the bar past the height the workspace lays out against.
 			style := design.Components.SubtleButton
-			style.MinHeight = toolbarButtonHeight
+			style.MinHeight = design.px(toolbarButtonHeight)
 			button = design.button(
 				label,
 				style,
 				design.Type.Strong,
-				width,
-				toolbarButtonHeight,
+				design.px(width),
+				design.px(toolbarButtonHeight),
 				widget.TextPositionCenter,
 				func() { shell.dispatchCommand(commandID) },
 			)
@@ -245,7 +247,7 @@ func (u *shellUI) buildApplicationToolbar(shell *Shell) *widget.Container {
 				widget.WidgetOpts.LayoutData(widget.RowLayoutData{
 					Position: widget.RowLayoutPositionCenter,
 				}),
-				widget.WidgetOpts.MinSize(1, toolbarButtonHeight-8),
+				widget.WidgetOpts.MinSize(design.px(1), design.px(toolbarButtonHeight-8)),
 			),
 		))
 	}
@@ -288,7 +290,7 @@ func (u *shellUI) buildStatusBar() *widget.Container {
 				VerticalPosition:   widget.AnchorLayoutPositionEnd,
 				StretchHorizontal:  true,
 			}),
-			widget.WidgetOpts.MinSize(0, statusBarHeight),
+			widget.WidgetOpts.MinSize(0, design.px(statusBarHeight)),
 		),
 	)
 	u.statusText = design.text(
@@ -403,12 +405,13 @@ func (u *shellUI) openMenu(index int) {
 		// an anchored dropdown that can run past a phone screen. Commands
 		// flow into extra columns when one column would not fit the height.
 		viewWidth, viewHeight := u.owner.viewportSize()
-		layout := touchMenuLayoutFor(
+		layout := touchMenuLayoutForScale(
 			viewWidth,
 			viewHeight,
 			itemHeight,
 			design.Space.L,
 			len(commands),
+			design.Scale,
 		)
 		location = layout.window
 		contents = widget.NewContainer(
@@ -444,15 +447,15 @@ func (u *shellUI) openMenu(index int) {
 			)),
 		)
 		for _, command := range commands {
-			contents.AddChild(newCommandButton(command, dropdownWidth-design.Space.L))
+			contents.AddChild(newCommandButton(command, design.px(dropdownWidth)-design.Space.L))
 		}
 		startX := menuUIStartX(u.owner.menus, index, design)
 		height := design.Space.L + len(commands)*itemHeight
 		location = image.Rect(
 			startX,
-			menuBarHeight+design.Space.XS,
-			startX+dropdownWidth,
-			menuBarHeight+design.Space.XS+height,
+			design.px(menuBarHeight)+design.Space.XS,
+			startX+design.px(dropdownWidth),
+			design.px(menuBarHeight)+design.Space.XS+height,
 		)
 	}
 
@@ -516,7 +519,7 @@ func menuUIStartX(menus []Menu, index int, design *ARAMDesignSystem) int {
 	x := design.Space.L
 	widths := menuWidths(menus)
 	for current := 0; current < index; current++ {
-		x += widths[current] + design.Space.XS
+		x += design.px(widths[current]) + design.Space.XS
 	}
 	return x
 }
@@ -533,24 +536,31 @@ type touchMenuLayout struct {
 func touchMenuLayoutFor(
 	viewWidth, viewHeight, itemHeight, framePadding, count int,
 ) touchMenuLayout {
+	return touchMenuLayoutForScale(viewWidth, viewHeight, itemHeight, framePadding, count, 1)
+}
+
+func touchMenuLayoutForScale(
+	viewWidth, viewHeight, itemHeight, framePadding, count int,
+	scale float64,
+) touchMenuLayout {
 	if viewWidth <= 0 || viewHeight <= 0 {
-		viewWidth, viewHeight = logicalWidth, logicalHeight
+		viewWidth, viewHeight = scaledScreenSize(logicalWidth, logicalHeight, scale)
 	}
 	count = max(1, count)
 	itemHeight = max(1, itemHeight)
-	const margin = 18
-	const minColumnWidth = 160
-	available := max(itemHeight, viewHeight-menuBarHeight-statusBarHeight-margin*2)
+	margin := scaledPixels(18, scale)
+	minColumnWidth := scaledPixels(160, scale)
+	available := max(itemHeight, viewHeight-scaledPixels(menuBarHeight+statusBarHeight, scale)-margin*2)
 	maxRows := max(1, (available-framePadding)/itemHeight)
 	columns := (count + maxRows - 1) / maxRows
 	maxColumns := max(1, (viewWidth-margin*2)/minColumnWidth)
 	columns = max(1, min(columns, maxColumns))
 	perColumn := (count + columns - 1) / columns
-	columnWidth := min(dropdownWidth, (viewWidth-margin*2)/columns)
+	columnWidth := min(scaledPixels(dropdownWidth, scale), (viewWidth-margin*2)/columns)
 	width := columnWidth * columns
 	height := min(available, framePadding+perColumn*itemHeight)
 	x := max(0, (viewWidth-width)/2)
-	y := menuBarHeight + margin + max(0, (available-height)/2)
+	y := scaledPixels(menuBarHeight, scale) + margin + max(0, (available-height)/2)
 	return touchMenuLayout{
 		columns:     columns,
 		perColumn:   perColumn,

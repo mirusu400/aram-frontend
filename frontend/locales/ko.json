@@ -436,7 +436,7 @@
   "Buffer health": "버퍼 상태",
   "Current host fill and cumulative underrun / overrun events.": "현재 호스트 버퍼 채움과 누적 언더런 / 오버런 이벤트.",
   "Vibration": "진동",
-  "Rumble a connected gamepad and vibrate the phone when a title requests it.": "타이틀이 요청하면 연결된 게임패드를 진동시키고 휴대폰을 울립니다.",
+  "Give button taps subtle feedback, and rumble when a title requests it.": "버튼을 탭할 때 약하게 진동하고, 타이틀이 요청한 진동도 전달합니다.",
   "Input %s: %s": "%s 입력: %s",
   "Input: %s": "입력: %s",
   "Inspecting %s...": "%s 검사 중...",

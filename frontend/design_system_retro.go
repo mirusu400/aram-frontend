@@ -16,8 +16,8 @@ func applyRetroSkin(ds *ARAMDesignSystem, family string) {
 	theme := retroThemeID(family, ds.Mode)
 	ds.Family = family
 	ds.Palette = retroPalette(theme, ds.Palette)
-	ds.Components = retroComponents(theme, family, ds.Palette)
-	ds.Type = retroTypography()
+	ds.Components = retroComponentsAtScale(theme, family, ds.Palette, ds.Scale)
+	ds.Type = retroTypographyAtScale(ds.Scale)
 	ds.Theme = &widget.Theme{
 		DefaultFace:      ds.Type.Body,
 		DefaultTextColor: ds.Palette.Text,
@@ -26,7 +26,7 @@ func applyRetroSkin(ds *ARAMDesignSystem, family string) {
 		TextTheme: &widget.TextParams{
 			Face:    ds.Type.Body,
 			Color:   ds.Palette.Text,
-			Padding: retroTextPadding(),
+			Padding: retroTextPaddingAtScale(ds.Scale),
 		},
 	}
 }
@@ -47,30 +47,36 @@ func (d *ARAMDesignSystem) retroIcon(name string) *widget.GraphicImage {
 	if !ok {
 		return nil
 	}
-	return retroIconGraphic(theme, name)
+	return retroIconGraphicAtScale(theme, name, d.Scale)
 }
 
 // retroComponents maps the pack's slice vocabulary (panel, titlebar, selection,
 // …) onto the component roles the shell consumes. The checkbox stays
 // vector-drawn from the retro palette because the pack ships no checkbox tile.
 func retroComponents(theme, family string, palette ARAMPalette) ARAMComponents {
+	return retroComponentsAtScale(theme, family, palette, 1)
+}
+
+func retroComponentsAtScale(theme, family string, palette ARAMPalette, scale float64) ARAMComponents {
+	px := func(value int) int { return scaledPixels(value, scale) }
+	ns := func(name string) *euiimage.NineSlice { return retroNineSliceAtScale(theme, name, scale) }
 	transparent := euiimage.NewNineSliceColor(color.NRGBA{})
-	button := retroButtonImage(theme, "button")
-	hover := retroNineSlice(theme, "button_hover")
-	selection := retroNineSlice(theme, "selection")
-	panel := retroNineSlice(theme, "panel")
-	sunken := retroNineSlice(theme, "panel_sunken")
-	statusBar := retroNineSlice(theme, "statusbar")
-	progressTrack := retroNineSlice(theme, "progress_track")
+	button := retroButtonImageAtScale(theme, "button", scale)
+	hover := ns("button_hover")
+	selection := ns("selection")
+	panel := ns("panel")
+	sunken := ns("panel_sunken")
+	statusBar := ns("statusbar")
+	progressTrack := ns("progress_track")
 	// Primary actions wear the soft-key face (확인/취소 in the era's shells);
 	// the pack ships it with idle and pressed states only.
-	softKeyPressed := retroNineSlice(theme, "softkey_pressed")
+	softKeyPressed := ns("softkey_pressed")
 	softKey := &widget.ButtonImage{
-		Idle:         retroNineSlice(theme, "softkey_idle"),
-		Hover:        retroNineSlice(theme, "softkey_idle"),
+		Idle:         ns("softkey_idle"),
+		Hover:        ns("softkey_idle"),
 		Pressed:      softKeyPressed,
 		PressedHover: softKeyPressed,
-		Disabled:     retroNineSlice(theme, "button_disabled"),
+		Disabled:     ns("button_disabled"),
 	}
 
 	return ARAMComponents{
@@ -79,17 +85,17 @@ func retroComponents(theme, family string, palette ARAMPalette) ARAMComponents {
 		StatusBar:     statusBar,
 		Surface:       panel,
 		SurfaceRaised: panel,
-		DialogTitle:   retroNineSlice(theme, "titlebar"),
+		DialogTitle:   ns("titlebar"),
 		DialogBody:    panel,
 		NavRail:       sunken,
 		Dropdown:      panel,
 		Badge:         selection,
 		Divider:       euiimage.NewNineSliceColor(palette.Border),
 		ControlGroup:  sunken,
-		LCDBezel:      retroNineSlice(theme, "lcd_bezel"),
+		LCDBezel:      ns("lcd_bezel"),
 		Scrim:         euiimage.NewNineSliceColor(palette.Overlay),
 		Scroll: &widget.ScrollContainerImage{
-			Idle: retroNineSlice(theme, "scroll_track"),
+			Idle: ns("scroll_track"),
 			Mask: euiimage.NewNineSliceColor(color.White),
 		},
 		SliderTrack: &widget.SliderTrackImage{
@@ -98,35 +104,35 @@ func retroComponents(theme, family string, palette ARAMPalette) ARAMComponents {
 			Disabled: progressTrack,
 		},
 		SliderHandle: button,
-		Checkbox:     checkboxImages(palette),
+		Checkbox:     scaledCheckboxImages(palette, scale),
 		MenuButton: ARAMButtonStyle{
 			// Hover already draws the era-defining accent gradient bar.
 			Image: buttonImages(transparent, selection, selection, selection, transparent),
 			Text: buttonTextColors(
 				palette.Text, palette.OnAccent, palette.OnAccent, palette.TextDisabled),
-			Padding:   widget.Insets{Left: 8, Right: 8},
-			MinHeight: menuRowHeight,
+			Padding:   widget.Insets{Left: px(8), Right: px(8)},
+			MinHeight: px(menuRowHeight),
 		},
 		CommandButton: ARAMButtonStyle{
 			Image: button,
 			Text: buttonTextColors(
 				palette.Text, palette.Text, palette.Text, palette.TextDisabled),
-			Padding:   widget.Insets{Left: 12, Right: 12},
-			MinHeight: 34,
+			Padding:   widget.Insets{Left: px(12), Right: px(12)},
+			MinHeight: px(34),
 		},
 		SubtleButton: ARAMButtonStyle{
 			Image: buttonImages(transparent, hover, selection, selection, transparent),
 			Text: buttonTextColors(
 				palette.TextMuted, palette.Text, palette.OnAccent, palette.TextDisabled),
-			Padding:   widget.Insets{Left: 8, Right: 8},
-			MinHeight: 30,
+			Padding:   widget.Insets{Left: px(8), Right: px(8)},
+			MinHeight: px(30),
 		},
 		PrimaryButton: ARAMButtonStyle{
 			Image: softKey,
 			Text: buttonTextColors(
 				palette.OnWarm, palette.OnWarm, palette.OnWarm, palette.TextDisabled),
-			Padding:   widget.Insets{Left: 18, Right: 18},
-			MinHeight: 36,
+			Padding:   widget.Insets{Left: px(18), Right: px(18)},
+			MinHeight: px(36),
 		},
 		TouchButton: ARAMButtonStyle{
 			// A held key lights up with the accent fill, like the pressed
@@ -135,11 +141,11 @@ func retroComponents(theme, family string, palette ARAMPalette) ARAMComponents {
 			// they take the doubled slice, which keeps the gloss band and the
 			// drop shadow at a thickness the eye still reads as a moulded key.
 			Image: &widget.ButtonImage{
-				Idle:         retroScaledNineSlice(theme, "button_idle", retroKeyScale),
-				Hover:        retroScaledNineSlice(theme, "button_hover", retroKeyScale),
-				Pressed:      retroScaledNineSlice(theme, "button_primary_pressed", retroKeyScale),
-				PressedHover: retroScaledNineSlice(theme, "button_primary_pressed", retroKeyScale),
-				Disabled:     retroScaledNineSlice(theme, "button_disabled", retroKeyScale),
+				Idle:         retroScaledNineSlice(theme, "button_idle", retroKeyScale*retroRasterScale(scale)),
+				Hover:        retroScaledNineSlice(theme, "button_hover", retroKeyScale*retroRasterScale(scale)),
+				Pressed:      retroScaledNineSlice(theme, "button_primary_pressed", retroKeyScale*retroRasterScale(scale)),
+				PressedHover: retroScaledNineSlice(theme, "button_primary_pressed", retroKeyScale*retroRasterScale(scale)),
+				Disabled:     retroScaledNineSlice(theme, "button_disabled", retroKeyScale*retroRasterScale(scale)),
 			},
 			// Full ink, not the muted role: a key legend is the label the
 			// player reads mid-game, and the pack's own keypad sheet draws it
@@ -149,8 +155,8 @@ func retroComponents(theme, family string, palette ARAMPalette) ARAMComponents {
 			Text: buttonTextColors(
 				palette.Text, palette.Text,
 				retroKeyPressedInk(family, palette), palette.TextDisabled),
-			Padding:   widget.Insets{Left: 10, Right: 10},
-			MinHeight: 44,
+			Padding:   widget.Insets{Left: px(10), Right: px(10)},
+			MinHeight: px(44),
 		},
 	}
 }
@@ -227,5 +233,5 @@ func (d *ARAMDesignSystem) retroIndicatorIcon(
 	if !ok {
 		return nil
 	}
-	return retroTintedIcon(theme, name, tint)
+	return retroTintedIconAtScale(theme, name, tint, d.Scale)
 }

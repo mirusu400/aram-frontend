@@ -75,6 +75,37 @@ func TestCircularPadCoversTheCross(t *testing.T) {
 	}
 }
 
+func TestCircularPadIsOneMovableLayoutSlot(t *testing.T) {
+	const width, height = 1000, 1200
+	options := defaultTouchLayoutOptions()
+	options.Circular = true
+	options.Placements = map[string]TouchPlacement{
+		circularTouchPadID: {X: 0.72, Y: 0.68},
+	}
+
+	buttons := touchControlButtonsWithOptions(width, height, options)
+	padCount := 0
+	for _, button := range buttons {
+		if isCircularPadSlotID(button.ID) {
+			t.Errorf("cross slot %q remained while circular mode is on", button.ID)
+		}
+		if button.ID != circularTouchPadID {
+			continue
+		}
+		padCount++
+		center := button.Bounds.Min.Add(button.Bounds.Size().Div(2))
+		if center.X != 720 || center.Y != 816 {
+			t.Errorf("custom pad center = %v; want (720,816)", center)
+		}
+	}
+	if padCount != 1 {
+		t.Fatalf("circular layout has %d pad slots; want 1", padCount)
+	}
+	if !isTouchButtonID(circularTouchPadID) {
+		t.Fatal("circular pad placement must survive settings normalization")
+	}
+}
+
 // A center tap - a press that never leaves the deadzone - confirms with OK; a
 // drag that moved the knob just stops with nothing pressed.
 func TestCircularPadReleaseTapArmsOK(t *testing.T) {

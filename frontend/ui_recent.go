@@ -52,7 +52,7 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 	// centeredWindowRect call below), not the full app viewport. Budget each
 	// entry label to the list cell width, minus room for the icon tile, so
 	// the widest row can never overflow its cell.
-	windowWidth := min(recentWindowWidth, u.viewportWidth-2*centeredWindowMargin)
+	windowWidth := min(recentWindowWidth, u.outsideWidth-2*centeredWindowMargin)
 	labelWidth := max(28, min(90, (windowWidth-174)/7))
 	detailWidth := max(28, min(104, (windowWidth-96)/7))
 
@@ -76,7 +76,7 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 			design.Type.Caption,
 			design.Palette.TextMuted,
 		),
-		widget.TextOpts.MaxWidth(float64(max(240, u.viewportWidth-96))),
+		widget.TextOpts.MaxWidth(float64(max(design.px(240), u.viewportWidth-design.px(96)))),
 		widget.TextOpts.WidgetOpts(
 			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 				HorizontalPosition: widget.AnchorLayoutPositionStart,
@@ -85,10 +85,10 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 				Padding: &widget.Insets{
 					Left:   design.Space.XL,
 					Right:  design.Space.XL,
-					Bottom: 62,
+					Bottom: design.px(62),
 				},
 			}),
-			widget.WidgetOpts.MinSize(0, 92),
+			widget.WidgetOpts.MinSize(0, design.px(92)),
 		),
 	)
 	contents.AddChild(pathText)
@@ -110,7 +110,7 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 		shell.tr("Open"),
 		design.Components.PrimaryButton,
 		design.Type.Strong,
-		96,
+		design.px(96),
 		design.Components.PrimaryButton.MinHeight,
 		widget.TextPositionCenter,
 		func() {
@@ -134,7 +134,7 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 		shell.tr("Cancel"),
 		design.Components.SubtleButton,
 		design.Type.Strong,
-		96,
+		design.px(96),
 		design.Components.SubtleButton.MinHeight,
 		widget.TextPositionCenter,
 		func() {
@@ -146,7 +146,7 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 		HorizontalPosition: widget.AnchorLayoutPositionEnd,
 		VerticalPosition:   widget.AnchorLayoutPositionEnd,
 		Padding: &widget.Insets{
-			Right:  design.Space.L + 104,
+			Right:  design.Space.L + design.px(104),
 			Bottom: design.Space.M,
 		},
 	}
@@ -203,7 +203,7 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 		row := widget.NewButton(
 			widget.ButtonOpts.WidgetOpts(
 				widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
-				widget.WidgetOpts.MinSize(0, 40),
+				widget.WidgetOpts.MinSize(0, design.px(40)),
 			),
 			widget.ButtonOpts.Image(image),
 			widget.ButtonOpts.TextAndImage(
@@ -215,11 +215,12 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 			widget.ButtonOpts.TextPosition(widget.TextPositionStart, widget.TextPositionCenter),
 			widget.ButtonOpts.TextPadding(&widget.Insets{
 				Left:   design.Space.S,
-				Top:    8,
+				Top:    design.px(8),
 				Right:  design.Space.S,
-				Bottom: 8,
+				Bottom: design.px(8),
 			}),
 			widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
+				shell.buttonHaptic()
 				selectRow(entry.Path)
 			}),
 		)
@@ -241,9 +242,9 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 				StretchVertical:    true,
 				Padding: &widget.Insets{
 					Left:   design.Space.XL,
-					Top:    48,
+					Top:    design.px(48),
 					Right:  design.Space.XL,
-					Bottom: 172,
+					Bottom: design.px(172),
 				},
 			}),
 			widget.WidgetOpts.ScrolledHandler(func(args *widget.WidgetScrolledEventArgs) {
@@ -270,14 +271,15 @@ func (u *shellUI) syncRecentPanel(shell *Shell) {
 	))
 	recentWindow = widget.NewWindow(
 		widget.WindowOpts.Contents(contents),
-		widget.WindowOpts.TitleBar(titleBar, 42),
+		widget.WindowOpts.TitleBar(titleBar, design.px(42)),
 		widget.WindowOpts.Modal(),
 		widget.WindowOpts.Draggable(),
-		widget.WindowOpts.Location(centeredWindowRect(
+		widget.WindowOpts.Location(centeredWindowRectAtScale(
 			u.viewportWidth,
 			u.viewportHeight,
-			recentWindowWidth,
-			580,
+			design.px(recentWindowWidth),
+			design.px(580),
+			design.Scale,
 		)),
 	)
 	u.panelWindow = recentWindow
@@ -309,7 +311,7 @@ func recentPanelSignature(shell *Shell, viewportWidth, viewportHeight int, entri
 func recentRowIconImage(shell *Shell, design *ARAMDesignSystem, path, name string) *ebiten.Image {
 	shell.requestHomeIcon(path)
 	if icon := shell.homeIcon(path); icon != nil {
-		return scaleIconToTile(icon)
+		return scaleIconToTileAtScale(icon, design.Scale)
 	}
 	return homeIconPlaceholder(design, path, name)
 }

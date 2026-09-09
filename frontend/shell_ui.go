@@ -39,6 +39,8 @@ type shellUI struct {
 	scrim                *widget.Container
 	viewportWidth        int
 	viewportHeight       int
+	outsideWidth         int
+	outsideHeight        int
 	compact              bool
 	settingsScroll       *widget.ScrollContainer
 	settingsSliders      []settingsSliderBinding
@@ -46,7 +48,11 @@ type shellUI struct {
 	settingsOffsets      map[string]float64
 	settingsTouchID      ebiten.TouchID
 	settingsTouchActive  bool
+	settingsTouchDragged bool
+	settingsTouchStartX  int
+	settingsTouchStartY  int
 	settingsTouchLastY   int
+	touchCursor          *touchCursorUpdater
 	recentScroll         *widget.ScrollContainer
 	recentRowPaths       []string
 	recentSelectedPath   string
@@ -65,7 +71,23 @@ type shellUI struct {
 	welcomeLaterButton   *widget.Button
 }
 
+func (u *shellUI) logicalViewportSize() (int, int) {
+	scale := 1.0
+	if u.design != nil {
+		scale = normalizedRenderScale(u.design.Scale)
+	}
+	width, height := u.outsideWidth, u.outsideHeight
+	if width <= 0 || scaledPixels(width, scale) != u.viewportWidth {
+		width = max(1, int(float64(u.viewportWidth)/scale+0.5))
+	}
+	if height <= 0 || scaledPixels(height, scale) != u.viewportHeight {
+		height = max(1, int(float64(u.viewportHeight)/scale+0.5))
+	}
+	return width, height
+}
+
 func newShellUI(shell *Shell, design *ARAMDesignSystem) *shellUI {
+	design.buttonHaptic = shell.buttonHaptic
 	view := &shellUI{
 		owner:           shell,
 		design:          design,
@@ -76,6 +98,7 @@ func newShellUI(shell *Shell, design *ARAMDesignSystem) *shellUI {
 		bindingDevice:   bindingDeviceKeyboard,
 		settingsOffsets: make(map[string]float64),
 	}
+	view.touchCursor = installTouchCursorUpdater()
 
 	root := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewAnchorLayout()))
 	topBar := view.buildTopBar(shell)
@@ -112,16 +135,20 @@ func newShellUI(shell *Shell, design *ARAMDesignSystem) *shellUI {
 
 func (u *shellUI) sync(shell *Shell) {
 	width, height := shell.viewportSize()
-	if width != u.viewportWidth || height != u.viewportHeight {
+	outsideWidth, outsideHeight := shell.outsideSize()
+	if width != u.viewportWidth || height != u.viewportHeight ||
+		outsideWidth != u.outsideWidth || outsideHeight != u.outsideHeight {
 		u.viewportWidth = width
 		u.viewportHeight = height
-		u.compact = width < 820 || height < 620
+		u.outsideWidth = outsideWidth
+		u.outsideHeight = outsideHeight
+		u.compact = outsideWidth < 820 || outsideHeight < 620
 		u.panelSignature = ""
 		u.closeMenu()
 	}
-	u.toolbarTitle.GetWidget().SetVisibility(visibility(width >= 760))
+	u.toolbarTitle.GetWidget().SetVisibility(visibility(outsideWidth >= 760))
 	if u.buildStampText != nil {
-		u.buildStampText.GetWidget().SetVisibility(visibility(width >= 700))
+		u.buildStampText.GetWidget().SetVisibility(visibility(outsideWidth >= 700))
 	}
 	if u.updateBadge != nil {
 		u.updateBadge.GetWidget().SetVisibility(visibility(shell.updateNoticeReady))
@@ -129,20 +156,20 @@ func (u *shellUI) sync(shell *Shell) {
 			u.updateBadgeTip.Label = shell.updateNoticeTooltip()
 		}
 	}
-	u.statusMeta.GetWidget().SetVisibility(visibility(width >= 700))
-	u.syncStatusIndicators(shell, width)
+	u.statusMeta.GetWidget().SetVisibility(visibility(outsideWidth >= 700))
+	u.syncStatusIndicators(shell, outsideWidth)
 	for id, button := range u.toolbarButtons {
 		visible := true
-		if width < 620 && (id == "emu.stop" || id == "emu.reset" ||
+		if outsideWidth < 620 && (id == "emu.stop" || id == "emu.reset" ||
 			id == "view.keypad" || id == "view.layout" || id == "view.aspect") {
 			visible = false
 		}
-		if width < 480 && id == "emu.pause" {
+		if outsideWidth < 480 && id == "emu.pause" {
 			visible = false
 		}
 		button.GetWidget().SetVisibility(visibility(visible))
 	}
-	statusLimit := max(24, min(92, (width-32)/7))
+	statusLimit := max(24, min(92, (outsideWidth-32)/7))
 	u.setStatusLabel(u.statusText, shorten(shell.status, statusLimit))
 	// Show the achieved speed (e.g. "1x (98%)") rather than only the requested
 	// setting, so a title running below handset speed is visible in the
@@ -204,7 +231,6 @@ func (u *shellUI) sync(shell *Shell) {
 	}
 	u.syncHomeSurface(shell)
 	u.syncPanel(shell)
-	u.updateSettingsTouchScroll(shell)
 }
 
 func (u *shellUI) syncPanel(shell *Shell) {
@@ -230,8 +256,8 @@ func (u *shellUI) syncPanel(shell *Shell) {
 		u.syncInteractiveToolPanel(shell)
 		return
 	}
-	wrapWidth := max(28, min(78, (u.viewportWidth-72)/7))
-	lineLimit := max(8, min(29, (u.viewportHeight-150)/16))
+	wrapWidth := max(28, min(78, (u.outsideWidth-72)/7))
+	lineLimit := max(8, min(29, (u.outsideHeight-150)/16))
 	lines := wrapPanelLines(shell.trLines(shell.panelLines()), wrapWidth, lineLimit)
 	signature := fmt.Sprintf(
 		"%dx%d\x00%s\x00%s\x00%s",
@@ -255,7 +281,7 @@ func (u *shellUI) syncPanel(shell *Shell) {
 	)
 	body := widget.NewText(
 		widget.TextOpts.Text(strings.Join(lines, "\n"), design.Type.Body, design.Palette.TextMuted),
-		widget.TextOpts.MaxWidth(680),
+		widget.TextOpts.MaxWidth(float64(design.px(680))),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionStart,
@@ -263,7 +289,7 @@ func (u *shellUI) syncPanel(shell *Shell) {
 				Left:   design.Space.XL,
 				Top:    design.Space.XL,
 				Right:  design.Space.XL,
-				Bottom: 72,
+				Bottom: design.px(72),
 			},
 		})),
 	)
@@ -290,7 +316,7 @@ func (u *shellUI) syncPanel(shell *Shell) {
 		shell.tr("Close"),
 		design.Components.PrimaryButton,
 		design.Type.Strong,
-		96,
+		design.px(96),
 		design.Components.PrimaryButton.MinHeight,
 		widget.TextPositionCenter,
 		func() {
@@ -329,13 +355,14 @@ func (u *shellUI) syncPanel(shell *Shell) {
 	))
 	panelWindow = widget.NewWindow(
 		widget.WindowOpts.Contents(contents),
-		widget.WindowOpts.TitleBar(titleBar, 46),
+		widget.WindowOpts.TitleBar(titleBar, design.px(46)),
 		widget.WindowOpts.Modal(),
-		widget.WindowOpts.Location(centeredWindowRect(
+		widget.WindowOpts.Location(centeredWindowRectAtScale(
 			u.viewportWidth,
 			u.viewportHeight,
-			740,
-			580,
+			design.px(740),
+			design.px(580),
+			design.Scale,
 		)),
 	)
 	u.panelWindow = panelWindow

@@ -63,6 +63,13 @@ keys included, is a placement slot: `Touch button layout` drags them into
 custom positions stored normalized in `touch_layout`, so a saved arrangement
 survives rotation and resizes.
 
+The Android/iOS render target is HiDPI-aware. Their native view dimensions
+arrive from Ebitengine in DIP, while `Monitor().DeviceScaleFactor()` identifies
+the backing-surface density. The frontend retains the DIP size for responsive
+decisions and returns the density-scaled pixel size from `Layout`; all shared UI
+metrics and touch bounds are scaled to that same coordinate space. This avoids
+upscaling a low-resolution text atlas on high-density phone displays.
+
 `Touch controls overlay` defaults on and lets the guest keep the full display
 area while the touch deck is painted above it. Turning the option off restores
 the docked layout that reserves space below the guest. This presentation choice

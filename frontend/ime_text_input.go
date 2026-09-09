@@ -113,7 +113,7 @@ func (t *imeTextInput) SetLocation(rect image.Rectangle) {
 }
 
 func (t *imeTextInput) PreferredSize() (int, int) {
-	width, height := 50, t.lineHeight+t.design.Space.S*2
+	width, height := t.design.px(50), t.lineHeight+t.design.Space.S*2
 	if height < t.widget.MinHeight {
 		height = t.widget.MinHeight
 	}
@@ -374,8 +374,10 @@ func (t *imeTextInput) notifyChanged() {
 func (t *imeTextInput) caretBounds() image.Rectangle {
 	x := t.widget.Rect.Min.X + t.padding.Left + t.scrollOffset + t.caretOffset
 	y := t.textTop()
-	return image.Rect(x, y, x+1, y+t.lineHeight)
+	return image.Rect(x, y, x+t.caretWidth(), y+t.lineHeight)
 }
+
+func (t *imeTextInput) caretWidth() int { return t.design.px(imeCaretWidth) }
 
 func (t *imeTextInput) textTop() int {
 	return t.widget.Rect.Min.Y + (t.widget.Rect.Dy()-t.lineHeight)/2
@@ -462,9 +464,9 @@ func (t *imeTextInput) renderContent(screen *ebiten.Image) {
 		vector.DrawFilledRect(
 			clip,
 			float32(left+from),
-			float32(top+t.lineHeight-1),
+			float32(top+t.lineHeight-t.design.px(1)),
 			float32(to-from),
-			1,
+			float32(t.design.px(1)),
 			palette.Accent,
 			false,
 		)
@@ -480,7 +482,7 @@ func (t *imeTextInput) renderContent(screen *ebiten.Image) {
 			clip,
 			float32(left+caretOffset),
 			float32(top),
-			imeCaretWidth,
+			float32(t.caretWidth()),
 			float32(t.lineHeight),
 			caretColor,
 			false,
@@ -492,8 +494,8 @@ func (t *imeTextInput) updateScroll(caretOffset int, visibleWidth int) {
 	if visibleWidth <= 0 {
 		return
 	}
-	if caretOffset+t.scrollOffset+imeCaretWidth > visibleWidth {
-		t.scrollOffset = visibleWidth - caretOffset - imeCaretWidth
+	if caretOffset+t.scrollOffset+t.caretWidth() > visibleWidth {
+		t.scrollOffset = visibleWidth - caretOffset - t.caretWidth()
 	}
 	if caretOffset+t.scrollOffset < 0 {
 		t.scrollOffset = -caretOffset

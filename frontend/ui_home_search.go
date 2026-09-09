@@ -37,15 +37,15 @@ func (u *shellUI) ensureHomeChrome(shell *Shell) {
 	u.homeSearchInput = newIMETextInput(design, imeTextInputConfig{
 		Placeholder: shell.tr("Search titles"),
 		Text:        shell.homeFilterQuery,
-		MinHeight:   homeSearchFieldHeight,
+		MinHeight:   design.px(homeSearchFieldHeight),
 		LayoutData: widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionStart,
 			StretchHorizontal:  true,
 			Padding: &widget.Insets{
-				Left:  22,
-				Right: 22 + homeSearchFieldHeight + design.Space.XS,
-				Top:   6,
+				Left:  design.px(22),
+				Right: design.px(22+homeSearchFieldHeight) + design.Space.XS,
+				Top:   design.px(6),
 			},
 		},
 		Changed: func(value string) {
@@ -58,15 +58,15 @@ func (u *shellUI) ensureHomeChrome(shell *Shell) {
 		"×",
 		design.Components.SubtleButton,
 		design.Type.Strong,
-		homeSearchFieldHeight,
-		homeSearchFieldHeight,
+		design.px(homeSearchFieldHeight),
+		design.px(homeSearchFieldHeight),
 		widget.TextPositionCenter,
 		func() { u.clearHomeSearch(shell) },
 	)
 	clearButton.GetWidget().LayoutData = widget.AnchorLayoutData{
 		HorizontalPosition: widget.AnchorLayoutPositionEnd,
 		VerticalPosition:   widget.AnchorLayoutPositionStart,
-		Padding:            &widget.Insets{Right: 22, Top: 6},
+		Padding:            &widget.Insets{Right: design.px(22), Top: design.px(6)},
 	}
 	u.homeContainer.AddChild(clearButton)
 
@@ -77,7 +77,7 @@ func (u *shellUI) ensureHomeChrome(shell *Shell) {
 			VerticalPosition:   widget.AnchorLayoutPositionStart,
 			StretchHorizontal:  true,
 			StretchVertical:    true,
-			Padding:            &widget.Insets{Top: homeSearchBarHeight},
+			Padding:            &widget.Insets{Top: design.px(homeSearchBarHeight)},
 		})),
 	)
 	u.homeContainer.AddChild(u.homeBody)

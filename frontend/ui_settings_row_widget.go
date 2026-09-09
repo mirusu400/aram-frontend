@@ -20,10 +20,11 @@ func (u *shellUI) buildSettingsRow(
 	// side — a phone leaves the copy barely any width once the nav rail and
 	// the control have taken theirs — so the row stacks instead, which is
 	// also what a handset settings list looks like.
-	sliderValueWidth := 56
-	sliderWidth := 150
-	if u.viewportWidth < 600 {
-		sliderWidth = 110
+	sliderValueWidth := design.px(56)
+	sliderWidth := design.px(150)
+	logicalWidth, _ := u.logicalViewportSize()
+	if logicalWidth < 600 {
+		sliderWidth = design.px(110)
 	}
 	if model.slider != nil {
 		actionWidth = sliderWidth + design.Space.S + sliderValueWidth
@@ -31,14 +32,14 @@ func (u *shellUI) buildSettingsRow(
 	stacked := u.settingsRowStacks(design, actionWidth)
 	if stacked {
 		actionWidth = u.settingsCopyWidth(design, actionWidth)
-		sliderWidth = max(64, actionWidth-sliderValueWidth-design.Space.S)
+		sliderWidth = max(design.px(64), actionWidth-sliderValueWidth-design.Space.S)
 	}
 	copyWidth := u.settingsCopyWidth(design, actionWidth)
 	actionLabelWidth := actionWidth - 2*design.Space.S
 	var rowLayout widget.Layouter = widget.NewAnchorLayout()
-	minHeight := 58
+	minHeight := design.px(58)
 	if stacked {
-		minHeight = 50
+		minHeight = design.px(50)
 		rowLayout = widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
 			widget.RowLayoutOpts.Padding(&widget.Insets{
@@ -123,9 +124,9 @@ func (u *shellUI) buildSettingsRow(
 		dropdown := widget.NewListComboButton(
 			widget.ListComboButtonOpts.Entries(entries),
 			widget.ListComboButtonOpts.InitialEntry(initial),
-			widget.ListComboButtonOpts.MaxContentHeight(148),
+			widget.ListComboButtonOpts.MaxContentHeight(design.px(148)),
 			widget.ListComboButtonOpts.WidgetOpts(
-				widget.WidgetOpts.MinSize(actionWidth, 32),
+				widget.WidgetOpts.MinSize(actionWidth, design.px(32)),
 				widget.WidgetOpts.LayoutData(actionLayout),
 			),
 			widget.ListComboButtonOpts.ButtonParams(&widget.ButtonParams{
@@ -145,7 +146,7 @@ func (u *shellUI) buildSettingsRow(
 					HTextPosition: widget.TextPositionEnd,
 					VTextPosition: widget.TextPositionCenter,
 				},
-				MinSize: &image.Point{Y: 32},
+				MinSize: &image.Point{Y: design.px(32)},
 			}),
 			widget.ListComboButtonOpts.ListParams(&widget.ListParams{
 				ScrollContainerImage: &widget.ScrollContainerImage{
@@ -160,8 +161,8 @@ func (u *shellUI) buildSettingsRow(
 						Disabled: trackIdle,
 					},
 					HandleImage:   design.Components.SliderHandle,
-					MinHandleSize: intPointer(24),
-					TrackPadding:  &widget.Insets{Left: 3, Right: 3},
+					MinHandleSize: intPointer(design.px(24)),
+					TrackPadding:  &widget.Insets{Left: design.px(3), Right: design.px(3)},
 				},
 				EntryFace: design.Type.Body,
 				EntryColor: &widget.ListEntryColor{
@@ -191,6 +192,7 @@ func (u *shellUI) buildSettingsRow(
 					if !ok {
 						return
 					}
+					u.owner.buttonHaptic()
 					dropdownModel.apply(index)
 				},
 			),
@@ -220,7 +222,7 @@ func (u *shellUI) buildSettingsRow(
 			widget.SliderOpts.MinMax(sliderModel.min, sliderModel.max),
 			widget.SliderOpts.InitialCurrent(current),
 			widget.SliderOpts.Images(design.Components.SliderTrack, design.Components.SliderHandle),
-			widget.SliderOpts.FixedHandleSize(14),
+			widget.SliderOpts.FixedHandleSize(design.px(14)),
 			widget.SliderOpts.PageSizeFunc(func() int { return 1 }),
 			widget.SliderOpts.ChangedHandler(func(args *widget.SliderChangedEventArgs) {
 				sliderModel.apply(args.Current)
@@ -231,7 +233,7 @@ func (u *shellUI) buildSettingsRow(
 				valueLabel.Label = sliderModel.format(applied)
 			}),
 			widget.SliderOpts.WidgetOpts(
-				widget.WidgetOpts.MinSize(sliderWidth, 22),
+				widget.WidgetOpts.MinSize(sliderWidth, design.px(22)),
 				widget.WidgetOpts.LayoutData(widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}),
 			),
 		)
@@ -274,7 +276,7 @@ func (u *shellUI) buildSettingsRow(
 		design.Components.SubtleButton,
 		design.Type.Strong,
 		actionWidth,
-		32,
+		design.px(32),
 		widget.TextPositionEnd,
 		func() {
 			action()

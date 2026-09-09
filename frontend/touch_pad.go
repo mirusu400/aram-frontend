@@ -10,6 +10,8 @@ import (
 )
 
 const (
+	circularTouchPadID = "circular-pad"
+
 	// circularPadDeadzoneRatio is the share of the pad radius a thumb has to
 	// travel from center before any direction fires. Inside it the pad is at
 	// rest, which is also what lets a still tap read as OK rather than a nudge.
@@ -67,11 +69,34 @@ func (s *Shell) drawCircularPad(
 	width, height int,
 	options touchLayoutOptions,
 ) {
-	metrics := touchDeckMetricsFor(width, height, options)
-	center, radius := circularPadCircle(metrics)
+	button, ok := circularPadButton(width, height, options, s.renderScale)
+	if !ok {
+		return
+	}
+	s.drawCircularPadBounds(screen, button.Bounds)
+}
+
+// circularPadButton finds the round-pad slot after its default geometry,
+// custom placement, and visibility have all been applied.
+func circularPadButton(
+	width, height int,
+	options touchLayoutOptions,
+	renderScale float64,
+) (touchButton, bool) {
+	for _, button := range touchControlButtonsWithRenderScale(width, height, options, renderScale) {
+		if button.ID == circularTouchPadID {
+			return button, true
+		}
+	}
+	return touchButton{}, false
+}
+
+func (s *Shell) drawCircularPadBounds(screen *ebiten.Image, bounds image.Rectangle) {
+	radius := min(bounds.Dx(), bounds.Dy()) / 2
 	if radius <= 0 {
 		return
 	}
+	center := bounds.Min.Add(bounds.Size().Div(2))
 	palette := defaultARAMPalette()
 	if s.design != nil {
 		palette = s.design.Palette
@@ -79,8 +104,8 @@ func (s *Shell) drawCircularPad(
 	cx, cy, r := float32(center.X), float32(center.Y), float32(radius)
 	// An outer ring under an inset face reads as a dish without a stroke.
 	vector.DrawFilledCircle(screen, cx, cy, r, palette.BorderStrong, true)
-	vector.DrawFilledCircle(screen, cx, cy, r-2, palette.SurfaceRaised, true)
-	glyph := max(touchControlMinSize/2, metrics.buttonSize/2)
+	vector.DrawFilledCircle(screen, cx, cy, r-float32(s.px(2)), palette.SurfaceRaised, true)
+	glyph := max(s.px(touchControlMinSize)/2, radius/3)
 	off := int(float64(radius) * 0.6)
 	for _, hint := range []struct {
 		name   string
@@ -108,7 +133,7 @@ func (s *Shell) drawCircularPad(
 		ring, fill = palette.Accent, palette.Accent
 	}
 	vector.DrawFilledCircle(screen, knobX, knobY, knobR, ring, true)
-	vector.DrawFilledCircle(screen, knobX, knobY, knobR-2, fill, true)
+	vector.DrawFilledCircle(screen, knobX, knobY, knobR-float32(s.px(2)), fill, true)
 	// OK on the knob makes tap-to-confirm discoverable.
 	if s.design != nil {
 		ink := color.Color(palette.TextMuted)

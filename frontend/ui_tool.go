@@ -83,7 +83,7 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 				Left:   design.Space.XL,
 				Top:    design.Space.XL,
 				Right:  design.Space.XL,
-				Bottom: 82,
+				Bottom: design.px(82),
 			},
 		})),
 	)
@@ -94,7 +94,7 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 				design.Type.Body,
 				design.Palette.TextMuted,
 			),
-			widget.TextOpts.MaxWidth(float64(max(280, u.viewportWidth-120))),
+			widget.TextOpts.MaxWidth(float64(max(design.px(280), u.viewportWidth-design.px(120)))),
 			widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
 				Stretch: true,
 			})),
@@ -140,7 +140,7 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 			widget.RowLayoutData{Stretch: true},
 		))
 		if len(field.Options) > 0 {
-			dropdown := newToolFieldDropdown(design, panel, field, shell.tr)
+			dropdown := newToolFieldDropdown(design, shell, panel, field, shell.tr)
 			dropdown.GetWidget().Disabled = panel.Busy
 			u.panelDropdowns[field.ID] = dropdown
 			fieldBlock.AddChild(dropdown)
@@ -152,7 +152,7 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 			Placeholder: shell.tr(field.Placeholder),
 			Text:        panel.FieldValues[field.ID],
 			Disabled:    panel.Busy,
-			MinHeight:   34,
+			MinHeight:   design.px(34),
 			LayoutData:  widget.RowLayoutData{Stretch: true},
 			Changed: func(value string) {
 				if panel.FieldValues == nil {
@@ -188,7 +188,7 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 			shell.tr(action.Label),
 			design.Components.SubtleButton,
 			design.Type.Strong,
-			112,
+			design.px(112),
 			design.Components.SubtleButton.MinHeight,
 			widget.TextPositionCenter,
 			func() {
@@ -210,7 +210,7 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 		shell.tr("Close"),
 		design.Components.PrimaryButton,
 		design.Type.Strong,
-		96,
+		design.px(96),
 		design.Components.PrimaryButton.MinHeight,
 		widget.TextPositionCenter,
 		func() {
@@ -249,14 +249,15 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 	))
 	toolWindow = widget.NewWindow(
 		widget.WindowOpts.Contents(contents),
-		widget.WindowOpts.TitleBar(titleBar, 46),
+		widget.WindowOpts.TitleBar(titleBar, design.px(46)),
 		widget.WindowOpts.Modal(),
 		widget.WindowOpts.Draggable(),
-		widget.WindowOpts.Location(centeredWindowRect(
+		widget.WindowOpts.Location(centeredWindowRectAtScale(
 			u.viewportWidth,
 			u.viewportHeight,
-			740,
-			580,
+			design.px(740),
+			design.px(580),
+			design.Scale,
 		)),
 	)
 	u.panelWindow = toolWindow

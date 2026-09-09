@@ -330,12 +330,14 @@ func (s *Shell) handleTouch() {
 		x, y := ebiten.TouchPosition(id)
 		if s.focusMode {
 			width, height := s.viewportSize()
-			if pointInRect(x, y, focusExitBoundsFor(width, height)) {
+			if pointInRect(x, y, focusExitBoundsForScale(width, height, s.renderScale)) {
+				s.buttonHaptic()
 				s.toggleFocusMode()
 				continue
 			}
 			if s.guestInputAllowed() {
-				if control, ok := focusControlAtScaled(x, y, width, height, s.touchScale()); ok {
+				if control, ok := focusControlAtRenderScale(x, y, width, height, s.touchScale(), s.renderScale); ok {
+					s.buttonHaptic()
 					s.touchControls[id] = control
 				}
 			}
@@ -343,8 +345,9 @@ func (s *Shell) handleTouch() {
 		}
 		if s.touchChromeToggleAvailable() {
 			width, _ := s.viewportSize()
-			bounds := touchChromeToggleBounds(width, s.touchChromeHiddenActive())
+			bounds := touchChromeToggleBoundsAtScale(width, s.touchChromeHiddenActive(), s.renderScale)
 			if pointInRect(x, y, bounds) {
+				s.buttonHaptic()
 				s.toggleTouchChrome()
 				continue
 			}
@@ -353,6 +356,7 @@ func (s *Shell) handleTouch() {
 			!s.onScreenControlsHidden() {
 			if s.touchDpadCircular() && !s.padTouchActive &&
 				s.circularPadContains(x, y) {
+				s.buttonHaptic()
 				s.padTouchActive = true
 				s.padTouchID = id
 				s.padTouchMoved = false
@@ -361,6 +365,7 @@ func (s *Shell) handleTouch() {
 				continue
 			}
 			if control, ok := s.touchControlAt(x, y); ok {
+				s.buttonHaptic()
 				s.touchControls[id] = control
 				continue
 			}
@@ -382,11 +387,8 @@ func (s *Shell) handleTouch() {
 // to whatever sat under the cross.
 func (s *Shell) circularPadContains(x, y int) bool {
 	width, height := s.viewportSize()
-	metrics := touchDeckMetricsFor(width, height, s.touchLayoutOptions())
-	center, radius := circularPadCircle(metrics)
-	return pointInRect(x, y, rectAt(
-		center.X-radius, center.Y-radius, radius*2, radius*2,
-	))
+	button, ok := circularPadButton(width, height, s.touchLayoutOptions(), s.renderScale)
+	return ok && pointInRect(x, y, button.Bounds)
 }
 
 // sampleCircularPad reads the live position of the pad's touch each tick and
@@ -403,8 +405,13 @@ func (s *Shell) sampleCircularPad() {
 	}
 	x, y := ebiten.TouchPosition(s.padTouchID)
 	width, height := s.viewportSize()
-	metrics := touchDeckMetricsFor(width, height, s.touchLayoutOptions())
-	center, radius := circularPadCircle(metrics)
+	button, ok := circularPadButton(width, height, s.touchLayoutOptions(), s.renderScale)
+	if !ok {
+		s.releaseCircularPad()
+		return
+	}
+	center := button.Bounds.Min.Add(button.Bounds.Size().Div(2))
+	radius := min(button.Bounds.Dx(), button.Bounds.Dy()) / 2
 	dx := float64(x - center.X)
 	dy := float64(y - center.Y)
 	dist := math.Hypot(dx, dy)
@@ -449,7 +456,7 @@ func touchIDActive(id ebiten.TouchID) bool {
 
 func (s *Shell) touchControlAt(x, y int) (string, bool) {
 	width, height := s.viewportSize()
-	button, ok := touchButtonAtWithOptions(x, y, width, height, s.touchLayoutOptions())
+	button, ok := touchButtonAtWithRenderScale(x, y, width, height, s.touchLayoutOptions(), s.renderScale)
 	if !ok {
 		return "", false
 	}

@@ -72,3 +72,23 @@ func TestHapticPreviewPulse(t *testing.T) {
 		t.Fatal("switching vibration off must not buzz")
 	}
 }
+
+func TestButtonHapticPulseIsShortAndTouchOnly(t *testing.T) {
+	magnitude, duration, ok := buttonHapticPulse(true, true)
+	if !ok || magnitude != buttonHapticMagnitude || duration != buttonHapticDuration {
+		t.Fatalf("button pulse = (%v, %v, %v)", magnitude, duration, ok)
+	}
+	if duration >= hapticPreviewDuration {
+		t.Fatal("button feedback should be subtler than the settings preview")
+	}
+	for _, test := range []struct {
+		touch, enabled bool
+	}{
+		{touch: false, enabled: true},
+		{touch: true, enabled: false},
+	} {
+		if _, _, ok := buttonHapticPulse(test.touch, test.enabled); ok {
+			t.Fatalf("button pulse unexpectedly enabled for %+v", test)
+		}
+	}
+}

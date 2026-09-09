@@ -32,27 +32,32 @@ func (d *ARAMDesignSystem) modernToolbarIcon(name string) *widget.GraphicImage {
 	if isRetroFamily(d.Family) {
 		return nil
 	}
-	idle := drawModernIcon(name, d.Palette.Text)
+	idle := drawModernIconAtScale(name, d.Palette.Text, d.Scale)
 	if idle == nil {
 		return nil
 	}
 	return &widget.GraphicImage{
 		Idle:     idle,
 		Pressed:  idle,
-		Disabled: drawModernIcon(name, d.Palette.TextDisabled),
+		Disabled: drawModernIconAtScale(name, d.Palette.TextDisabled, d.Scale),
 	}
 }
 
 // drawModernIcon rasterises one glyph in a single ink colour. An unknown name
 // returns nil so the toolbar keeps its text label for it.
 func drawModernIcon(name string, ink color.Color) *ebiten.Image {
-	const s = modernIconSize
-	const w float32 = 2.1
+	return drawModernIconAtScale(name, ink, 1)
+}
+
+func drawModernIconAtScale(name string, ink color.Color, scale float64) *ebiten.Image {
+	scale = normalizedRenderScale(scale)
+	s := scaledPixels(modernIconSize, scale)
+	f := float32(scale)
 	img := ebiten.NewImage(s, s)
 	switch name {
 	case "open":
 		// A folder with a raised tab.
-		fillIconPath(img, ink, func(p *vector.Path) {
+		fillIconPathScaled(img, ink, scale, func(p *vector.Path) {
 			p.MoveTo(3, 7)
 			p.LineTo(9, 7)
 			p.LineTo(11, 9)
@@ -61,59 +66,79 @@ func drawModernIcon(name string, ink color.Color) *ebiten.Image {
 			p.LineTo(3, 19)
 		})
 	case "play":
-		fillIconPath(img, ink, func(p *vector.Path) {
+		fillIconPathScaled(img, ink, scale, func(p *vector.Path) {
 			p.MoveTo(8, 6)
 			p.LineTo(8, 18)
 			p.LineTo(18, 12)
 		})
 	case "pause":
-		vector.DrawFilledRect(img, 8, 6, 3, 12, ink, true)
-		vector.DrawFilledRect(img, 13, 6, 3, 12, ink, true)
+		vector.DrawFilledRect(img, 8*f, 6*f, 3*f, 12*f, ink, true)
+		vector.DrawFilledRect(img, 13*f, 6*f, 3*f, 12*f, ink, true)
 	case "stop":
-		vector.DrawFilledRect(img, 7, 7, 10, 10, ink, true)
+		vector.DrawFilledRect(img, 7*f, 7*f, 10*f, 10*f, ink, true)
 	case "reset":
 		// A most-of-the-way-round reload arrow: a ring open at the upper right
 		// with a solid arrowhead closing the clockwise sweep.
-		strokeIconPath(img, ink, w, func(p *vector.Path) {
+		strokeIconPathScaled(img, ink, 2.1, scale, func(p *vector.Path) {
 			p.Arc(12, 12, 6.2, rad(-70), rad(200), vector.Clockwise)
 		})
-		fillIconPath(img, ink, func(p *vector.Path) {
+		fillIconPathScaled(img, ink, scale, func(p *vector.Path) {
 			p.MoveTo(13.2, 3.4)
 			p.LineTo(18.9, 5.9)
 			p.LineTo(13.0, 8.4)
 		})
 	case "settings":
 		// A three-track tune glyph: a line per row with a filled handle.
-		vector.StrokeLine(img, 4, 8, 20, 8, w, ink, true)
-		vector.DrawFilledCircle(img, 9, 8, 2.6, ink, true)
-		vector.StrokeLine(img, 4, 13, 20, 13, w, ink, true)
-		vector.DrawFilledCircle(img, 15, 13, 2.6, ink, true)
-		vector.StrokeLine(img, 4, 18, 20, 18, w, ink, true)
-		vector.DrawFilledCircle(img, 11, 18, 2.6, ink, true)
+		vector.StrokeLine(img, 4*f, 8*f, 20*f, 8*f, 2.1*f, ink, true)
+		vector.DrawFilledCircle(img, 9*f, 8*f, 2.6*f, ink, true)
+		vector.StrokeLine(img, 4*f, 13*f, 20*f, 13*f, 2.1*f, ink, true)
+		vector.DrawFilledCircle(img, 15*f, 13*f, 2.6*f, ink, true)
+		vector.StrokeLine(img, 4*f, 18*f, 20*f, 18*f, 2.1*f, ink, true)
+		vector.DrawFilledCircle(img, 11*f, 18*f, 2.6*f, ink, true)
 	case "keypad":
 		for _, y := range []float32{7, 12, 17} {
 			for _, x := range []float32{7, 12, 17} {
-				vector.DrawFilledCircle(img, x, y, 1.7, ink, true)
+				vector.DrawFilledCircle(img, x*f, y*f, 1.7*f, ink, true)
 			}
 		}
 	case "aspect":
 		// A closed screen frame: keep the display's proportions. Distinct from
 		// the fullscreen mark's four detached corners.
-		vector.StrokeRect(img, 3.5, 6.5, 17, 11, w, ink, true)
+		vector.StrokeRect(img, 3.5*f, 6.5*f, 17*f, 11*f, 2.1*f, ink, true)
 	case "fullscreen":
 		// Four outward corner brackets: the expand-to-fill mark.
-		vector.StrokeLine(img, 4, 10, 4, 4, w, ink, true)
-		vector.StrokeLine(img, 4, 4, 10, 4, w, ink, true)
-		vector.StrokeLine(img, 20, 10, 20, 4, w, ink, true)
-		vector.StrokeLine(img, 20, 4, 14, 4, w, ink, true)
-		vector.StrokeLine(img, 4, 14, 4, 20, w, ink, true)
-		vector.StrokeLine(img, 4, 20, 10, 20, w, ink, true)
-		vector.StrokeLine(img, 20, 14, 20, 20, w, ink, true)
-		vector.StrokeLine(img, 20, 20, 14, 20, w, ink, true)
+		vector.StrokeLine(img, 4*f, 10*f, 4*f, 4*f, 2.1*f, ink, true)
+		vector.StrokeLine(img, 4*f, 4*f, 10*f, 4*f, 2.1*f, ink, true)
+		vector.StrokeLine(img, 20*f, 10*f, 20*f, 4*f, 2.1*f, ink, true)
+		vector.StrokeLine(img, 20*f, 4*f, 14*f, 4*f, 2.1*f, ink, true)
+		vector.StrokeLine(img, 4*f, 14*f, 4*f, 20*f, 2.1*f, ink, true)
+		vector.StrokeLine(img, 4*f, 20*f, 10*f, 20*f, 2.1*f, ink, true)
+		vector.StrokeLine(img, 20*f, 14*f, 20*f, 20*f, 2.1*f, ink, true)
+		vector.StrokeLine(img, 20*f, 20*f, 14*f, 20*f, 2.1*f, ink, true)
 	default:
 		return nil
 	}
 	return img
+}
+
+func fillIconPathScaled(dst *ebiten.Image, ink color.Color, scale float64, build func(*vector.Path)) {
+	var source vector.Path
+	build(&source)
+	var scaled vector.Path
+	op := &vector.AddPathOptions{}
+	op.GeoM.Scale(scale, scale)
+	scaled.AddPath(&source, op)
+	fillIconPath(dst, ink, func(target *vector.Path) { target.AddPath(&scaled, &vector.AddPathOptions{}) })
+}
+
+func strokeIconPathScaled(dst *ebiten.Image, ink color.Color, width float32, scale float64, build func(*vector.Path)) {
+	var source vector.Path
+	build(&source)
+	var scaled vector.Path
+	op := &vector.AddPathOptions{}
+	op.GeoM.Scale(scale, scale)
+	scaled.AddPath(&source, op)
+	strokeIconPath(dst, ink, width*float32(scale), func(target *vector.Path) { target.AddPath(&scaled, &vector.AddPathOptions{}) })
 }
 
 func fillIconPath(dst *ebiten.Image, ink color.Color, build func(*vector.Path)) {

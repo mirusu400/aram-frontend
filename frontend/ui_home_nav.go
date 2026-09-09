@@ -104,8 +104,12 @@ func (u *shellUI) scrollHomeToIndex(index int) {
 		return
 	}
 	viewHeight := float64(u.homeScroll.ViewRect().Dy())
-	rowTop := float64(index * homeRowHeight)
-	rowBottom := rowTop + float64(homeRowHeight)
+	rowHeight := homeRowHeight
+	if u.design != nil {
+		rowHeight = u.design.px(homeRowHeight)
+	}
+	rowTop := float64(index * rowHeight)
+	rowBottom := rowTop + float64(rowHeight)
 	top := u.homeScroll.ScrollTop * overflow
 	if rowTop < top {
 		top = rowTop

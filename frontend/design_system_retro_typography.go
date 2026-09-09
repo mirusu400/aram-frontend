@@ -38,7 +38,12 @@ const retroCenterNudge = 1
 // top is paired with an equal bottom so the widget's preferred size, which
 // sums both, is unchanged.
 func retroTextPadding() *widget.Insets {
-	return &widget.Insets{Top: -retroCenterNudge, Bottom: retroCenterNudge}
+	return retroTextPaddingAtScale(1)
+}
+
+func retroTextPaddingAtScale(scale float64) *widget.Insets {
+	nudge := scaledPixels(retroCenterNudge, scale)
+	return &widget.Insets{Top: -nudge, Bottom: nudge}
 }
 
 var (
@@ -68,6 +73,29 @@ func retroTypography() ARAMTypography {
 		}
 	})
 	return retroType
+}
+
+func retroTypographyAtScale(scale float64) ARAMTypography {
+	scale = normalizedRenderScale(scale)
+	if scale == 1 {
+		return retroTypography()
+	}
+	pixel, err := text.NewGoTextFaceSource(bytes.NewReader(terrarumSansOTF))
+	if err != nil {
+		panic("load embedded Terrarum Sans font: " + err.Error())
+	}
+	fallback, err := text.NewGoTextFaceSource(bytes.NewReader(notoSansKR))
+	if err != nil {
+		panic("load embedded ARAM Korean font: " + err.Error())
+	}
+	return ARAMTypography{
+		Caption:     pixelTextFace(pixel, fallback, 20*scale),
+		Body:        pixelTextFace(pixel, fallback, 20*scale),
+		Strong:      pixelTextFace(pixel, fallback, 20*scale),
+		Heading:     pixelTextFace(pixel, fallback, 40*scale),
+		Display:     pixelTextFace(pixel, fallback, 40*scale),
+		CenterNudge: scaledPixels(retroCenterNudge, scale),
+	}
 }
 
 // pixelTextFace pairs the pixel font with a metric-safe fallback so the

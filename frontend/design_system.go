@@ -118,21 +118,34 @@ type ARAMComponents struct {
 // The tokens are intentionally public so platform-specific frontend code can
 // reuse the same language without importing widget construction details.
 type ARAMDesignSystem struct {
-	Mode       string
-	Family     string
+	Mode   string
+	Family string
+	// Scale converts density-independent UI units into render pixels. It is
+	// one on the current desktop path and follows the display density on
+	// Android/iOS, where Ebitengine's final surface is larger than Layout's
+	// outside size.
+	Scale      float64
 	Palette    ARAMPalette
 	Space      ARAMSpacing
 	Radius     ARAMRadius
 	Type       ARAMTypography
 	Components ARAMComponents
 	Theme      *widget.Theme
+	// buttonHaptic is installed by the owning shell. Keeping it here lets all
+	// design-system buttons share one valid-click feedback path.
+	buttonHaptic func()
 }
 
 // newARAMDesignSystem builds the style entry point for a light/dark mode and a
 // skin family. The modern family draws its chrome from the palette; the retro
 // families swap the palette and component images for the embedded sprite pack.
 func newARAMDesignSystem(mode, family string) *ARAMDesignSystem {
-	ds := newModernARAMDesignSystem(mode)
+	return newScaledARAMDesignSystem(mode, family, 1)
+}
+
+func newScaledARAMDesignSystem(mode, family string, scale float64) *ARAMDesignSystem {
+	scale = normalizedRenderScale(scale)
+	ds := newScaledModernARAMDesignSystem(mode, scale)
 	if isRetroFamily(family) {
 		applyRetroSkin(ds, family)
 	}
@@ -140,9 +153,15 @@ func newARAMDesignSystem(mode, family string) *ARAMDesignSystem {
 }
 
 func newModernARAMDesignSystem(mode string) *ARAMDesignSystem {
+	return newScaledModernARAMDesignSystem(mode, 1)
+}
+
+func newScaledModernARAMDesignSystem(mode string, scale float64) *ARAMDesignSystem {
+	scale = normalizedRenderScale(scale)
 	palette := aramPalette(mode)
-	spacing := ARAMSpacing{XXS: 2, XS: 4, S: 8, M: 12, L: 16, XL: 24, XXL: 32}
-	radius := ARAMRadius{Small: 6, Medium: 10, Large: 14, Pill: 8}
+	px := func(value int) int { return scaledPixels(value, scale) }
+	spacing := ARAMSpacing{XXS: px(2), XS: px(4), S: px(8), M: px(12), L: px(16), XL: px(24), XXL: px(32)}
+	radius := ARAMRadius{Small: px(6), Medium: px(10), Large: px(14), Pill: px(8)}
 
 	regularSource, err := text.NewGoTextFaceSource(bytes.NewReader(goregular.TTF))
 	if err != nil {
@@ -157,102 +176,103 @@ func newModernARAMDesignSystem(mode string) *ARAMDesignSystem {
 		panic("load embedded ARAM Korean font: " + err.Error())
 	}
 	typography := ARAMTypography{
-		Caption: goTextFace(regularSource, koreanSource, 11, 400),
-		Body:    goTextFace(regularSource, koreanSource, 13, 400),
-		Strong:  goTextFace(boldSource, koreanSource, 13, 700),
-		Heading: goTextFace(boldSource, koreanSource, 17, 700),
-		Display: goTextFace(boldSource, koreanSource, 24, 700),
+		Caption: goTextFace(regularSource, koreanSource, 11*scale, 400),
+		Body:    goTextFace(regularSource, koreanSource, 13*scale, 400),
+		Strong:  goTextFace(boldSource, koreanSource, 13*scale, 700),
+		Heading: goTextFace(boldSource, koreanSource, 17*scale, 700),
+		Display: goTextFace(boldSource, koreanSource, 24*scale, 700),
 	}
 
 	transparent := euiimage.NewNineSliceColor(color.NRGBA{})
 	menuIdle := transparent
 	menuHover := roundedNineSlice(palette.SurfaceHover, color.NRGBA{}, radius.Small, 0)
-	menuPressed := roundedNineSlice(palette.AccentSoft, palette.Accent, radius.Small, 1)
+	menuPressed := roundedNineSlice(palette.AccentSoft, palette.Accent, radius.Small, px(1))
 	commandIdle := transparent
 	commandHover := roundedNineSlice(palette.SurfaceHover, color.NRGBA{}, radius.Small, 0)
-	commandPressed := roundedNineSlice(palette.AccentSoft, palette.Accent, radius.Small, 1)
+	commandPressed := roundedNineSlice(palette.AccentSoft, palette.Accent, radius.Small, px(1))
 	commandDisabled := euiimage.NewNineSliceColor(color.NRGBA{})
 	subtleIdle := transparent
 	subtleHover := roundedNineSlice(palette.SurfaceHover, color.NRGBA{}, radius.Small, 0)
 	subtlePressed := roundedNineSlice(palette.AccentSoft, color.NRGBA{}, radius.Small, 0)
-	primaryIdle := roundedNineSlice(palette.Accent, palette.Accent, radius.Small, 1)
-	primaryHover := roundedNineSlice(palette.AccentHover, palette.AccentHover, radius.Small, 1)
-	primaryPressed := roundedNineSlice(palette.AccentPressed, palette.AccentPressed, radius.Small, 1)
-	touchIdle := roundedNineSlice(palette.SurfaceRaised, palette.Border, radius.Medium, 1)
-	touchHover := roundedNineSlice(palette.SurfaceHover, palette.BorderStrong, radius.Medium, 1)
-	touchPressed := roundedNineSlice(palette.Accent, palette.Accent, radius.Medium, 1)
+	primaryIdle := roundedNineSlice(palette.Accent, palette.Accent, radius.Small, px(1))
+	primaryHover := roundedNineSlice(palette.AccentHover, palette.AccentHover, radius.Small, px(1))
+	primaryPressed := roundedNineSlice(palette.AccentPressed, palette.AccentPressed, radius.Small, px(1))
+	touchIdle := roundedNineSlice(palette.SurfaceRaised, palette.Border, radius.Medium, px(1))
+	touchHover := roundedNineSlice(palette.SurfaceHover, palette.BorderStrong, radius.Medium, px(1))
+	touchPressed := roundedNineSlice(palette.Accent, palette.Accent, radius.Medium, px(1))
 
 	components := ARAMComponents{
 		MenuBar:       euiimage.NewNineSliceColor(palette.CanvasRaised),
 		Toolbar:       euiimage.NewNineSliceColor(palette.Surface),
 		StatusBar:     euiimage.NewNineSliceColor(palette.CanvasRaised),
-		Surface:       roundedNineSlice(palette.Surface, palette.Border, radius.Large, 1),
-		SurfaceRaised: roundedNineSlice(palette.SurfaceRaised, palette.BorderStrong, radius.Large, 1),
+		Surface:       roundedNineSlice(palette.Surface, palette.Border, radius.Large, px(1)),
+		SurfaceRaised: roundedNineSlice(palette.SurfaceRaised, palette.BorderStrong, radius.Large, px(1)),
 		DialogTitle: cornerNineSlice(palette.SurfaceRaised, palette.BorderStrong,
-			cornerRadii{TopLeft: radius.Large, TopRight: radius.Large}, 1),
+			cornerRadii{TopLeft: radius.Large, TopRight: radius.Large}, px(1)),
 		DialogBody: cornerNineSlice(palette.SurfaceRaised, palette.BorderStrong,
-			cornerRadii{BottomLeft: radius.Large, BottomRight: radius.Large}, 1),
+			cornerRadii{BottomLeft: radius.Large, BottomRight: radius.Large}, px(1)),
 		NavRail: cornerNineSlice(palette.CanvasRaised, color.NRGBA{},
 			cornerRadii{BottomLeft: radius.Large}, 0),
-		Dropdown:     roundedNineSlice(palette.SurfaceRaised, palette.BorderStrong, radius.Medium, 1),
-		Badge:        roundedNineSlice(palette.AccentSoft, palette.Accent, radius.Pill, 1),
+		Dropdown:     roundedNineSlice(palette.SurfaceRaised, palette.BorderStrong, radius.Medium, px(1)),
+		Badge:        roundedNineSlice(palette.AccentSoft, palette.Accent, radius.Pill, px(1)),
 		Divider:      euiimage.NewNineSliceColor(palette.Border),
-		ControlGroup: roundedNineSlice(palette.CanvasRaised, palette.Border, radius.Medium, 1),
+		ControlGroup: roundedNineSlice(palette.CanvasRaised, palette.Border, radius.Medium, px(1)),
 		Scrim:        euiimage.NewNineSliceColor(palette.Overlay),
 		Scroll: &widget.ScrollContainerImage{
 			Idle: euiimage.NewNineSliceColor(color.NRGBA{}),
 			Mask: euiimage.NewNineSliceColor(color.White),
 		},
 		SliderTrack: &widget.SliderTrackImage{
-			Idle:     roundedNineSlice(palette.CanvasRaised, palette.Border, radius.Pill, 1),
-			Hover:    roundedNineSlice(palette.CanvasRaised, palette.BorderStrong, radius.Pill, 1),
-			Disabled: roundedNineSlice(palette.CanvasRaised, palette.Border, radius.Pill, 1),
+			Idle:     roundedNineSlice(palette.CanvasRaised, palette.Border, radius.Pill, px(1)),
+			Hover:    roundedNineSlice(palette.CanvasRaised, palette.BorderStrong, radius.Pill, px(1)),
+			Disabled: roundedNineSlice(palette.CanvasRaised, palette.Border, radius.Pill, px(1)),
 		},
 		SliderHandle: buttonImages(
-			roundedNineSlice(palette.SurfaceRaised, palette.BorderStrong, radius.Small, 1),
-			roundedNineSlice(palette.SurfaceHover, palette.Accent, radius.Small, 1),
-			roundedNineSlice(palette.AccentSoft, palette.Accent, radius.Small, 1),
-			roundedNineSlice(palette.AccentSoft, palette.Accent, radius.Small, 1),
-			roundedNineSlice(palette.SurfaceRaised, palette.Border, radius.Small, 1),
+			roundedNineSlice(palette.SurfaceRaised, palette.BorderStrong, radius.Small, px(1)),
+			roundedNineSlice(palette.SurfaceHover, palette.Accent, radius.Small, px(1)),
+			roundedNineSlice(palette.AccentSoft, palette.Accent, radius.Small, px(1)),
+			roundedNineSlice(palette.AccentSoft, palette.Accent, radius.Small, px(1)),
+			roundedNineSlice(palette.SurfaceRaised, palette.Border, radius.Small, px(1)),
 		),
-		Checkbox: checkboxImages(palette),
+		Checkbox: scaledCheckboxImages(palette, scale),
 		MenuButton: ARAMButtonStyle{
 			Image:     buttonImages(menuIdle, menuHover, menuPressed, menuPressed, commandDisabled),
 			Text:      buttonTextColors(palette.TextMuted, palette.Text, palette.Text, palette.TextDisabled),
-			Padding:   widget.Insets{Left: 8, Right: 8},
-			MinHeight: menuRowHeight,
+			Padding:   widget.Insets{Left: px(8), Right: px(8)},
+			MinHeight: px(menuRowHeight),
 		},
 		CommandButton: ARAMButtonStyle{
 			Image:     buttonImages(commandIdle, commandHover, commandPressed, commandPressed, commandDisabled),
 			Text:      buttonTextColors(palette.Text, palette.Text, palette.Text, palette.TextDisabled),
-			Padding:   widget.Insets{Left: 12, Right: 12},
-			MinHeight: 34,
+			Padding:   widget.Insets{Left: px(12), Right: px(12)},
+			MinHeight: px(34),
 		},
 		SubtleButton: ARAMButtonStyle{
 			Image:     buttonImages(subtleIdle, subtleHover, subtlePressed, subtlePressed, commandDisabled),
 			Text:      buttonTextColors(palette.TextMuted, palette.Text, palette.Text, palette.TextDisabled),
-			Padding:   widget.Insets{Left: 8, Right: 8},
-			MinHeight: 30,
+			Padding:   widget.Insets{Left: px(8), Right: px(8)},
+			MinHeight: px(30),
 		},
 		PrimaryButton: ARAMButtonStyle{
 			Image:     buttonImages(primaryIdle, primaryHover, primaryPressed, primaryPressed, commandDisabled),
 			Text:      buttonTextColors(palette.OnAccent, palette.OnAccent, palette.OnAccent, palette.TextDisabled),
-			Padding:   widget.Insets{Left: 18, Right: 18},
-			MinHeight: 36,
+			Padding:   widget.Insets{Left: px(18), Right: px(18)},
+			MinHeight: px(36),
 		},
 		TouchButton: ARAMButtonStyle{
 			Image: buttonImages(touchIdle, touchHover, touchPressed, touchPressed, commandDisabled),
 			// Full ink at rest: a key legend is read mid-game, so it does not
 			// get the muted role the way a secondary label does.
 			Text:      buttonTextColors(palette.Text, palette.Text, palette.OnAccent, palette.TextDisabled),
-			Padding:   widget.Insets{Left: 10, Right: 10},
-			MinHeight: 44,
+			Padding:   widget.Insets{Left: px(10), Right: px(10)},
+			MinHeight: px(44),
 		},
 	}
 
 	return &ARAMDesignSystem{
 		Mode:       mode,
 		Family:     themeFamilyModern,
+		Scale:      scale,
 		Palette:    palette,
 		Space:      spacing,
 		Radius:     radius,
@@ -263,6 +283,13 @@ func newModernARAMDesignSystem(mode string) *ARAMDesignSystem {
 			DefaultTextColor: palette.Text,
 		},
 	}
+}
+
+func (d *ARAMDesignSystem) px(value int) int {
+	if d == nil {
+		return value
+	}
+	return scaledPixels(value, d.Scale)
 }
 
 func defaultARAMPalette() ARAMPalette {
@@ -367,35 +394,45 @@ func buttonTextColors(idle, hover, pressed, disabled color.Color) *widget.Button
 }
 
 func checkboxImages(palette ARAMPalette) *widget.CheckboxImage {
+	return scaledCheckboxImages(palette, 1)
+}
+
+func scaledCheckboxImages(palette ARAMPalette, scale float64) *widget.CheckboxImage {
 	unchecked := checkboxImage(
 		palette.SurfaceRaised,
 		palette.BorderStrong,
 		nil,
+		scale,
 	)
 	uncheckedHover := checkboxImage(
 		palette.SurfaceHover,
 		palette.Accent,
 		nil,
+		scale,
 	)
 	checked := checkboxImage(
 		palette.Accent,
 		palette.Accent,
 		palette.OnAccent,
+		scale,
 	)
 	checkedHover := checkboxImage(
 		palette.AccentHover,
 		palette.AccentHover,
 		palette.OnAccent,
+		scale,
 	)
 	uncheckedDisabled := checkboxImage(
 		palette.Surface,
 		palette.Border,
 		nil,
+		scale,
 	)
 	checkedDisabled := checkboxImage(
 		palette.Border,
 		palette.Border,
 		palette.TextDisabled,
+		scale,
 	)
 	return &widget.CheckboxImage{
 		Unchecked:         unchecked,
@@ -411,14 +448,16 @@ func checkboxImage(
 	fill color.Color,
 	border color.Color,
 	checkmark color.Color,
+	scale float64,
 ) *euiimage.NineSlice {
-	const size = 24
+	size := scaledPixels(24, scale)
 	result := ebiten.NewImage(size, size)
-	euiimage.NewBorderedNineSliceColor(fill, border, 2).
+	euiimage.NewBorderedNineSliceColor(fill, border, scaledPixels(2, scale)).
 		Draw(result, size, size, nil)
 	if checkmark != nil {
-		vector.StrokeLine(result, 5, 12, 10, 17, 2.5, checkmark, true)
-		vector.StrokeLine(result, 10, 17, 20, 7, 2.5, checkmark, true)
+		s := float32(normalizedRenderScale(scale))
+		vector.StrokeLine(result, 5*s, 12*s, 10*s, 17*s, 2.5*s, checkmark, true)
+		vector.StrokeLine(result, 10*s, 17*s, 20*s, 7*s, 2.5*s, checkmark, true)
 	}
 	return euiimage.NewFixedNineSlice(result)
 }
@@ -571,6 +610,9 @@ func (d *ARAMDesignSystem) button(
 		widget.ButtonOpts.TextPosition(position, widget.TextPositionCenter),
 		widget.ButtonOpts.TextPadding(&padding),
 		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
+			if d.buttonHaptic != nil {
+				d.buttonHaptic()
+			}
 			if clicked != nil {
 				clicked()
 			}

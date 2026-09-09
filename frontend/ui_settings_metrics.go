@@ -61,10 +61,11 @@ func settingsWindowSize(design *ARAMDesignSystem) (int, int) {
 }
 
 func (u *shellUI) settingsNavRailWidth() int {
-	if u.viewportWidth < 600 {
-		return settingsCompactNavWidth
+	width, _ := u.logicalViewportSize()
+	if width < 600 {
+		return u.design.px(settingsCompactNavWidth)
 	}
-	return settingsNavWidth
+	return u.design.px(settingsNavWidth)
 }
 
 func (u *shellUI) settingsContentLeft(design *ARAMDesignSystem) int {
@@ -79,7 +80,7 @@ func (u *shellUI) settingsContentLeft(design *ARAMDesignSystem) int {
 func (u *shellUI) settingsRowsWidth(design *ARAMDesignSystem) int {
 	width, _ := settingsWindowSize(design)
 	if u.viewportWidth > 0 {
-		width = min(width, max(1, u.viewportWidth-2*centeredWindowMargin))
+		width = min(width, max(1, u.viewportWidth-2*design.px(centeredWindowMargin)))
 	}
 	return max(1, width-u.settingsContentLeft(design)-design.Space.L)
 }
@@ -110,9 +111,9 @@ func (u *shellUI) settingsActionWidth(shell *Shell, models []settingsRowModel) i
 	// padding, and the dropdown needs room for its own frame.
 	width := int(widest) + 2*design.Space.M
 	rows := u.settingsRowsWidth(design)
-	minWidth, share := settingsActionMinWidth, settingsActionMaxShare
+	minWidth, share := design.px(settingsActionMinWidth), settingsActionMaxShare
 	if u.compact {
-		minWidth, share = settingsCompactActionMinWidth, settingsCompactActionMaxShare
+		minWidth, share = design.px(settingsCompactActionMinWidth), settingsCompactActionMaxShare
 	}
 	return clampInt(width, minWidth, int(float64(rows)*share))
 }
@@ -124,7 +125,7 @@ func (u *shellUI) settingsActionWidth(shell *Shell, models []settingsRowModel) i
 // side, and stacking there would be a surprise.
 func (u *shellUI) settingsRowStacks(design *ARAMDesignSystem, actionWidth int) bool {
 	rows := u.settingsRowsWidth(design)
-	return rows-design.Space.M-actionWidth-design.Space.L < settingsMinCopyWidth
+	return rows-design.Space.M-actionWidth-design.Space.L < design.px(settingsMinCopyWidth)
 }
 
 // settingsCopyWidth is the width a row's label and description have to work
@@ -132,9 +133,9 @@ func (u *shellUI) settingsRowStacks(design *ARAMDesignSystem, actionWidth int) b
 func (u *shellUI) settingsCopyWidth(design *ARAMDesignSystem, actionWidth int) int {
 	rows := u.settingsRowsWidth(design)
 	if u.settingsRowStacks(design, actionWidth) {
-		return max(80, rows-2*design.Space.M)
+		return max(design.px(80), rows-2*design.Space.M)
 	}
-	return max(80, rows-design.Space.M-actionWidth-design.Space.L)
+	return max(design.px(80), rows-design.Space.M-actionWidth-design.Space.L)
 }
 
 // fitTextToWidth trims a label with an ellipsis until it fits. The action

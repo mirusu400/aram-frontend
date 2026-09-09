@@ -21,12 +21,12 @@ func (s *Shell) drawWorkspace(screen *ebiten.Image) {
 	bounds := screen.Bounds()
 	viewport := s.guestViewportRect(bounds.Dx(), bounds.Dy())
 	viewportPanel := image.Rect(
-		viewport.Min.X-6,
-		viewport.Min.Y-6,
-		viewport.Max.X+6,
-		viewport.Max.Y+6,
+		viewport.Min.X-s.px(6),
+		viewport.Min.Y-s.px(6),
+		viewport.Max.X+s.px(6),
+		viewport.Max.Y+s.px(6),
 	)
-	if viewportPanel.Dx() < 32 || viewportPanel.Dy() < 32 {
+	if viewportPanel.Dx() < s.px(32) || viewportPanel.Dy() < s.px(32) {
 		return
 	}
 	ebitenutil.DrawRect(
@@ -39,10 +39,10 @@ func (s *Shell) drawWorkspace(screen *ebiten.Image) {
 	)
 	ebitenutil.DrawRect(
 		screen,
-		float64(viewportPanel.Min.X+1),
-		float64(viewportPanel.Min.Y+1),
-		float64(viewportPanel.Dx()-2),
-		float64(viewportPanel.Dy()-2),
+		float64(viewportPanel.Min.X+s.px(1)),
+		float64(viewportPanel.Min.Y+s.px(1)),
+		float64(viewportPanel.Dx()-s.px(2)),
+		float64(viewportPanel.Dy()-s.px(2)),
 		palette.Surface,
 	)
 	s.drawGuestViewport(screen, viewport)
@@ -53,10 +53,10 @@ func (s *Shell) drawWorkspace(screen *ebiten.Image) {
 // framing margins around the guest screen.
 func (s *Shell) drawImmersiveWorkspace(screen *ebiten.Image) {
 	bounds := screen.Bounds()
-	deckTop := bounds.Max.Y - statusBarHeight -
+	deckTop := bounds.Max.Y - s.px(statusBarHeight) -
 		s.touchDeckHeight(bounds.Dx(), bounds.Dy())
 	viewport := image.Rect(bounds.Min.X, bounds.Min.Y, bounds.Max.X, deckTop)
-	if viewport.Dx() < 32 || viewport.Dy() < 32 {
+	if viewport.Dx() < s.px(32) || viewport.Dy() < s.px(32) {
 		return
 	}
 	s.drawFilledGuestViewport(screen, viewport)
@@ -88,22 +88,22 @@ func (s *Shell) drawGuestViewport(screen *ebiten.Image, viewport image.Rectangle
 		bezel := s.design.Components.LCDBezel
 		bezel.Draw(
 			screen,
-			viewport.Dx()+2*retroSliceBorder,
-			viewport.Dy()+2*retroSliceBorder,
+			viewport.Dx()+2*s.px(retroSliceBorder),
+			viewport.Dy()+2*s.px(retroSliceBorder),
 			func(opts *ebiten.DrawImageOptions) {
 				opts.GeoM.Translate(
-					float64(viewport.Min.X-retroSliceBorder),
-					float64(viewport.Min.Y-retroSliceBorder),
+					float64(viewport.Min.X-s.px(retroSliceBorder)),
+					float64(viewport.Min.Y-s.px(retroSliceBorder)),
 				)
 			},
 		)
 	} else {
 		ebitenutil.DrawRect(
 			screen,
-			float64(viewport.Min.X-2),
-			float64(viewport.Min.Y-2),
-			float64(viewport.Dx()+4),
-			float64(viewport.Dy()+4),
+			float64(viewport.Min.X-s.px(2)),
+			float64(viewport.Min.Y-s.px(2)),
+			float64(viewport.Dx()+s.px(4)),
+			float64(viewport.Dy()+s.px(4)),
 			palette.BorderStrong,
 		)
 	}
@@ -1131,7 +1131,7 @@ func (s *Shell) drawEmptyViewport(screen *ebiten.Image, viewport image.Rectangle
 			float64(viewport.Min.X),
 			float64(viewport.Min.Y),
 			float64(viewport.Dx()),
-			4,
+			float64(s.px(4)),
 			palette.Fault,
 		)
 	}
@@ -1146,14 +1146,14 @@ func (s *Shell) drawEmptyViewport(screen *ebiten.Image, viewport image.Rectangle
 		return
 	}
 
-	blockHeight := 28 + len(details)*20
+	blockHeight := s.px(28 + len(details)*20)
 	y := viewport.Min.Y + (viewport.Dy()-blockHeight)/2
 	drawCenteredText(screen, title, s.design.Type.Display, palette.GuestInk, viewport, y)
-	y += 36
+	y += s.px(36)
 	detailInk := mixNRGBA(palette.GuestInk, palette.GuestSurface, 0.35)
 	for _, line := range details {
 		drawCenteredText(screen, line, s.design.Type.Body, detailInk, viewport, y)
-		y += 20
+		y += s.px(20)
 	}
 }
 

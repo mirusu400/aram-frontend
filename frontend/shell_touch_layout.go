@@ -23,7 +23,7 @@ func (s *Shell) touchDeckHeight(width, height int) int {
 		// already-rendered guest instead of seating them below it.
 		return 0
 	}
-	return touchDeckHeightWithOptions(width, height, s.touchLayoutOptions())
+	return touchDeckHeightWithRenderScale(width, height, s.touchLayoutOptions(), s.renderScale)
 }
 
 // touchDpadCircular reports whether the on-screen directional cross is drawn
@@ -50,6 +50,7 @@ func (s *Shell) touchLayoutOptions() touchLayoutOptions {
 	options := touchLayoutOptions{
 		Scale:      touchScaleFactor(s.settings.TouchControlScale),
 		Placements: s.settings.TouchLayout,
+		Circular:   s.settings.TouchDpadCircular && platformUsesTouchLayout(),
 		Keypad:     s.touchKeypadVisible(),
 		DeckRatio:  s.settings.TouchDeckRatio,
 		Hidden:     s.settings.TouchHidden,
@@ -248,7 +249,8 @@ func (s *Shell) handleTouchLayoutEditTouches() {
 	}
 	for _, id := range inpututil.AppendJustPressedTouchIDs(nil) {
 		x, y := ebiten.TouchPosition(id)
-		if action, ok := touchLayoutEditorActionAt(x, y, width); ok {
+		if action, ok := touchLayoutEditorActionAtScale(x, y, width, s.renderScale); ok {
+			s.buttonHaptic()
 			switch action {
 			case touchEditorSave:
 				s.saveTouchLayoutEdit()
@@ -277,6 +279,7 @@ func (s *Shell) handleTouchLayoutEditTouches() {
 		if !ok {
 			continue
 		}
+		s.buttonHaptic()
 		center := button.Bounds.Min.Add(button.Bounds.Size().Div(2))
 		s.touchLayoutDrag[id] = button.ID
 		s.touchLayoutDragOffset[id] = center.Sub(image.Pt(x, y))
@@ -291,7 +294,7 @@ func (s *Shell) handleTouchLayoutEditTouches() {
 			continue
 		}
 		offset := s.touchLayoutDragOffset[id]
-		step := s.touchEditorGridStep()
+		step := s.px(s.touchEditorGridStep())
 		s.touchLayoutDraft[buttonID] = normalizedTouchPlacement(
 			snapToGrid(x+offset.X, step),
 			snapToGrid(y+offset.Y, step),
@@ -305,12 +308,12 @@ func (s *Shell) handleTouchLayoutEditTouches() {
 // the tray, so both directions of the hide/restore gesture start the same way.
 func (s *Shell) touchEditorButtonAt(x, y, width, height int) (touchButton, bool) {
 	options := s.touchLayoutOptions()
-	for _, button := range touchEditorTrayButtons(width, height, options) {
+	for _, button := range touchEditorTrayButtonsAtScale(width, height, options, s.renderScale) {
 		if pointInRect(x, y, button.Bounds) {
 			return button, true
 		}
 	}
-	return touchButtonAtWithOptions(x, y, width, height, options)
+	return touchButtonAtWithRenderScale(x, y, width, height, options, s.renderScale)
 }
 
 // finishTouchLayoutDrag decides what a released drag meant: dropped in the
@@ -327,7 +330,7 @@ func (s *Shell) finishTouchLayoutDrag(id ebiten.TouchID, width, height int) {
 		return
 	}
 	options := s.touchLayoutOptions()
-	tray := touchEditorTrayBounds(width, height, options)
+	tray := touchEditorTrayBoundsAtScale(width, height, options, s.renderScale)
 	inTray := pointInRect(point.X, point.Y, tray)
 	wasHidden := s.touchHiddenDraft[buttonID]
 	switch {
@@ -336,7 +339,7 @@ func (s *Shell) finishTouchLayoutDrag(id ebiten.TouchID, width, height int) {
 		s.setStatus(s.trf("%s hidden", s.touchButtonName(buttonID)))
 	case !inTray && wasHidden:
 		s.setTouchButtonHidden(buttonID, false)
-		step := s.touchEditorGridStep()
+		step := s.px(s.touchEditorGridStep())
 		s.touchLayoutDraft[buttonID] = normalizedTouchPlacement(
 			snapToGrid(point.X+offset.X, step),
 			snapToGrid(point.Y+offset.Y, step),
@@ -351,7 +354,7 @@ func (s *Shell) finishTouchLayoutDrag(id ebiten.TouchID, width, height int) {
 func (s *Shell) touchButtonName(id string) string {
 	width, height := s.viewportSize()
 	options := s.touchLayoutOptions()
-	for _, button := range touchButtonCatalog(width, height, options) {
+	for _, button := range touchButtonCatalogAtScale(width, height, options, s.renderScale) {
 		if button.ID == id {
 			return s.tr(button.Label)
 		}

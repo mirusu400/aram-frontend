@@ -50,21 +50,21 @@ func (s *Shell) showHomeSurface() bool {
 // the Home widgets to match, so both agree on the same rectangle. It mirrors the
 // inset math in drawWorkspace.
 func (s *Shell) guestViewportRect(width, height int) image.Rectangle {
-	contentTop := menuHeight + applicationToolbarHeight + 12
-	contentBottom := height - statusHeight - 12
+	contentTop := s.px(menuHeight + applicationToolbarHeight + 12)
+	contentBottom := height - s.px(statusHeight+12)
 	if platformUsesTouchLayout() {
 		contentBottom -= s.touchDeckHeight(width, height)
 	}
-	contentRight := width - 12
+	contentRight := width - s.px(12)
 	if s.virtualKeypadVisible() {
 		contentRight -= virtualKeypadReservedWidthFor(width)
 	}
-	viewportPanel := image.Rect(12, contentTop, contentRight, contentBottom)
+	viewportPanel := image.Rect(s.px(12), contentTop, contentRight, contentBottom)
 	return image.Rect(
-		viewportPanel.Min.X+6,
-		viewportPanel.Min.Y+6,
-		viewportPanel.Max.X-6,
-		viewportPanel.Max.Y-6,
+		viewportPanel.Min.X+s.px(6),
+		viewportPanel.Min.Y+s.px(6),
+		viewportPanel.Max.X-s.px(6),
+		viewportPanel.Max.Y-s.px(6),
 	)
 }
 

@@ -18,19 +18,34 @@ func (u *shellUI) updateSettingsTouchScroll(shell *Shell) {
 	if !platformUsesTouchLayout() || scroll == nil ||
 		shell.panel == nil || shell.panel.Kind != "settings" {
 		u.settingsTouchActive = false
+		u.settingsTouchDragged = false
 		return
 	}
 	if u.settingsTouchActive {
 		if inpututil.IsTouchJustReleased(u.settingsTouchID) {
 			u.settingsTouchActive = false
+			u.settingsTouchDragged = false
 			return
 		}
-		_, y := ebiten.TouchPosition(u.settingsTouchID)
+		if !touchIDActive(u.settingsTouchID) {
+			u.settingsTouchActive = false
+			u.settingsTouchDragged = false
+			return
+		}
+		x, y := ebiten.TouchPosition(u.settingsTouchID)
+		if !u.settingsTouchDragged && touchScrollDragStarted(
+			x-u.settingsTouchStartX,
+			y-u.settingsTouchStartY,
+			shell.px(8),
+		) {
+			u.settingsTouchDragged = true
+			u.touchCursor.CancelTouch(u.settingsTouchID)
+		}
 		delta := y - u.settingsTouchLastY
-		if delta == 0 {
+		u.settingsTouchLastY = y
+		if !u.settingsTouchDragged || delta == 0 {
 			return
 		}
-		u.settingsTouchLastY = y
 		overflow := float64(scroll.ContentRect().Dy() - scroll.ViewRect().Dy())
 		if overflow <= 0 {
 			return
@@ -45,10 +60,29 @@ func (u *shellUI) updateSettingsTouchScroll(shell *Shell) {
 		if image.Pt(x, y).In(scroll.ViewRect()) {
 			u.settingsTouchID = id
 			u.settingsTouchActive = true
+			u.settingsTouchDragged = false
+			u.settingsTouchStartX = x
+			u.settingsTouchStartY = y
 			u.settingsTouchLastY = y
 			return
 		}
 	}
+}
+
+// touchScrollDragStarted distinguishes an intentional vertical scroll from a
+// slightly wobbly tap or a horizontal slider drag.
+func touchScrollDragStarted(dx, dy, slop int) bool {
+	if slop < 1 {
+		slop = 1
+	}
+	return absInt(dy) >= slop && absInt(dy) > absInt(dx)
+}
+
+func absInt(value int) int {
+	if value < 0 {
+		return -value
+	}
+	return value
 }
 
 func (u *shellUI) syncSettingsPanel(shell *Shell) {
@@ -145,7 +179,7 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 			design.Components.SubtleButton,
 			design.Type.Strong,
 			navWidth-design.Space.XL,
-			34,
+			design.px(34),
 			widget.TextPositionStart,
 			func() {
 				u.selectSettingsSection(u.owner, sectionName)
@@ -178,7 +212,7 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 				Left:   contentLeft,
 				Top:    design.Space.L,
 				Right:  design.Space.L,
-				Bottom: 64,
+				Bottom: design.px(64),
 			},
 		})),
 	)
@@ -221,7 +255,7 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 	// held only while the header was one line of the modern ramp; a wrapped or
 	// larger heading slid underneath the scroll container.
 	_, headerHeight := header.PreferredSize()
-	headerHeight = max(headerHeight+design.Space.S, 62)
+	headerHeight = max(headerHeight+design.Space.S, design.px(62))
 	rowsContent := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
@@ -273,7 +307,7 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 		shell.tr("Done"),
 		design.Components.PrimaryButton,
 		design.Type.Strong,
-		92,
+		design.px(92),
 		design.Components.PrimaryButton.MinHeight,
 		widget.TextPositionCenter,
 		func() {
@@ -313,14 +347,15 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 	settingsWindowWidth, settingsWindowHeight := settingsWindowSize(design)
 	settingsWindow = widget.NewWindow(
 		widget.WindowOpts.Contents(contents),
-		widget.WindowOpts.TitleBar(titleBar, 42),
+		widget.WindowOpts.TitleBar(titleBar, design.px(42)),
 		widget.WindowOpts.Modal(),
 		widget.WindowOpts.Draggable(),
-		widget.WindowOpts.Location(centeredWindowRect(
+		widget.WindowOpts.Location(centeredWindowRectAtScale(
 			u.viewportWidth,
 			u.viewportHeight,
 			settingsWindowWidth,
 			settingsWindowHeight,
+			design.Scale,
 		)),
 	)
 	u.panelWindow = settingsWindow

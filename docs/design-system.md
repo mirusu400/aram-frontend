@@ -26,6 +26,8 @@ The shell follows a restrained desktop-emulator layout:
   `TextMuted`, `Accent`, and `Fault`;
 - `ARAMSpacing` and `ARAMRadius` define layout rhythm and shape;
 - `ARAMTypography` owns embedded, platform-independent Go font faces;
+- `ARAMDesignSystem.Scale` converts density-independent UI measurements into
+  render pixels on HiDPI mobile surfaces;
 - `ARAMComponents` owns reusable EbitenUI nine-slices and button states.
 
 New UI should consume semantic roles rather than adding raw colors or
@@ -148,6 +150,15 @@ configuration categories scroll, and secondary metadata is hidden at compact
 desktop widths. The optional desktop virtual keypad scales within its right
 rail. On mobile, the touch deck overlays the guest viewport by default; its
 Controls option can switch back to a reserved dock below the guest.
+
+Mobile keeps two sizes deliberately. Ebitengine reports the native view in
+density-independent pixels, which drives compact breakpoints and preserves the
+same apparent control sizes across phones. `Shell.Layout` multiplies that size
+by the display scale factor for the render target; typography, spacing,
+geometry, touch hit regions, vector icons, and sprite assets then use the same
+scale. Text is therefore rasterized at physical-pixel resolution instead of
+being drawn into a low-resolution DIP buffer and enlarged by the final screen
+pass.
 
 ## Interaction contract
 

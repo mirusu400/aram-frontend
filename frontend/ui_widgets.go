@@ -15,6 +15,7 @@ func intPointer(value int) *int {
 
 func newToolFieldDropdown(
 	design *ARAMDesignSystem,
+	shell *Shell,
 	panel *Panel,
 	field ToolField,
 	translateLabel func(string) string,
@@ -38,10 +39,10 @@ func newToolFieldDropdown(
 	return widget.NewListComboButton(
 		widget.ListComboButtonOpts.Entries(entries),
 		widget.ListComboButtonOpts.InitialEntry(initial),
-		widget.ListComboButtonOpts.MaxContentHeight(132),
+		widget.ListComboButtonOpts.MaxContentHeight(design.px(132)),
 		widget.ListComboButtonOpts.WidgetOpts(
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
-			widget.WidgetOpts.MinSize(0, 34),
+			widget.WidgetOpts.MinSize(0, design.px(34)),
 		),
 		widget.ListComboButtonOpts.ButtonParams(&widget.ButtonParams{
 			Image: buttonImages(
@@ -60,7 +61,7 @@ func newToolFieldDropdown(
 				HTextPosition: widget.TextPositionStart,
 				VTextPosition: widget.TextPositionCenter,
 			},
-			MinSize: &image.Point{Y: 34},
+			MinSize: &image.Point{Y: design.px(34)},
 		}),
 		widget.ListComboButtonOpts.ListParams(&widget.ListParams{
 			ScrollContainerImage: design.Components.Scroll,
@@ -71,8 +72,8 @@ func newToolFieldDropdown(
 					Disabled: trackIdle,
 				},
 				HandleImage:   design.Components.TouchButton.Image,
-				MinHandleSize: intPointer(24),
-				TrackPadding:  &widget.Insets{Left: 3, Right: 3},
+				MinHandleSize: intPointer(design.px(24)),
+				TrackPadding:  &widget.Insets{Left: design.px(3), Right: design.px(3)},
 			},
 			EntryFace: design.Type.Body,
 			EntryColor: &widget.ListEntryColor{
@@ -93,7 +94,7 @@ func newToolFieldDropdown(
 				Right:  design.Space.S,
 				Bottom: design.Space.S,
 			},
-			MinSize: &image.Point{X: 240},
+			MinSize: &image.Point{X: design.px(240)},
 		}),
 		widget.ListComboButtonOpts.EntryLabelFunc(
 			func(entry any) string {
@@ -111,6 +112,7 @@ func newToolFieldDropdown(
 				if !ok {
 					return
 				}
+				shell.buttonHaptic()
 				if panel.FieldValues == nil {
 					panel.FieldValues = make(map[string]string)
 				}
@@ -160,10 +162,11 @@ func newToolFieldCheckbox(
 		),
 		widget.CheckboxOpts.WidgetOpts(
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
-			widget.WidgetOpts.MinSize(0, 34),
+			widget.WidgetOpts.MinSize(0, design.px(34)),
 		),
 		widget.CheckboxOpts.StateChangedHandler(
 			func(args *widget.CheckboxChangedEventArgs) {
+				shell.buttonHaptic()
 				if panel.FieldValues == nil {
 					panel.FieldValues = make(map[string]string)
 				}
@@ -210,10 +213,14 @@ func scrollContainerByWheel(sc *widget.ScrollContainer, wheelY float64) {
 const centeredWindowMargin = 18
 
 func centeredWindowRect(viewWidth, viewHeight, preferredWidth, preferredHeight int) image.Rectangle {
+	return centeredWindowRectAtScale(viewWidth, viewHeight, preferredWidth, preferredHeight, 1)
+}
+
+func centeredWindowRectAtScale(viewWidth, viewHeight, preferredWidth, preferredHeight int, scale float64) image.Rectangle {
 	if viewWidth <= 0 || viewHeight <= 0 {
-		viewWidth, viewHeight = logicalWidth, logicalHeight
+		viewWidth, viewHeight = scaledScreenSize(logicalWidth, logicalHeight, scale)
 	}
-	margin := centeredWindowMargin
+	margin := scaledPixels(centeredWindowMargin, scale)
 	width := min(preferredWidth, max(1, viewWidth-margin*2))
 	height := min(preferredHeight, max(1, viewHeight-margin*2))
 	x := max(0, (viewWidth-width)/2)

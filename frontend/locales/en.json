@@ -436,7 +436,7 @@
   "Buffer health": "Buffer health",
   "Current host fill and cumulative underrun / overrun events.": "Current host fill and cumulative underrun / overrun events.",
   "Vibration": "Vibration",
-  "Rumble a connected gamepad and vibrate the phone when a title requests it.": "Rumble a connected gamepad and vibrate the phone when a title requests it.",
+  "Give button taps subtle feedback, and rumble when a title requests it.": "Give button taps subtle feedback, and rumble when a title requests it.",
   "Input %s: %s": "Input %s: %s",
   "Input: %s": "Input: %s",
   "Inspecting %s...": "Inspecting %s...",

@@ -29,14 +29,15 @@ func (u *shellUI) syncWelcomePanel(shell *Shell) {
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 
-	compactActions := u.viewportWidth < 560
-	bodyBottom := 106
+	logicalWidth, _ := u.logicalViewportSize()
+	compactActions := logicalWidth < 560
+	bodyBottom := design.px(106)
 	actionDirection := widget.DirectionHorizontal
-	actionWidth := 154
+	actionWidth := design.px(154)
 	if compactActions {
-		bodyBottom = 202
+		bodyBottom = design.px(202)
 		actionDirection = widget.DirectionVertical
-		actionWidth = min(280, max(190, u.viewportWidth-88))
+		actionWidth = min(design.px(280), max(design.px(190), u.viewportWidth-design.px(88)))
 	}
 	bodyText := shell.tr(
 		"Choose the update channel for the integrated ARAM product.\n\n" +
@@ -73,7 +74,7 @@ func (u *shellUI) syncWelcomePanel(shell *Shell) {
 			design.Type.Body,
 			design.Palette.TextMuted,
 		),
-		widget.TextOpts.MaxWidth(float64(min(560, max(180, u.viewportWidth-88)))),
+		widget.TextOpts.MaxWidth(float64(min(design.px(560), max(design.px(180), u.viewportWidth-design.px(88))))),
 		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
 			VerticalPosition:   widget.AnchorLayoutPositionStart,
@@ -169,13 +170,14 @@ func (u *shellUI) syncWelcomePanel(shell *Shell) {
 	))
 	welcomeWindow = widget.NewWindow(
 		widget.WindowOpts.Contents(contents),
-		widget.WindowOpts.TitleBar(titleBar, 46),
+		widget.WindowOpts.TitleBar(titleBar, design.px(46)),
 		widget.WindowOpts.Modal(),
-		widget.WindowOpts.Location(centeredWindowRect(
+		widget.WindowOpts.Location(centeredWindowRectAtScale(
 			u.viewportWidth,
 			u.viewportHeight,
-			650,
-			470,
+			design.px(650),
+			design.px(470),
+			design.Scale,
 		)),
 	)
 	u.panelWindow = welcomeWindow

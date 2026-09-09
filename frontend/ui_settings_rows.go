@@ -284,7 +284,7 @@ func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 			},
 			{
 				label:       "Vibration",
-				description: "Rumble a connected gamepad and vibrate the phone when a title requests it.",
+				description: "Give button taps subtle feedback, and rumble when a title requests it.",
 				value:       onOff(shell.settings.VibrationEnabled),
 				action:      shell.toggleVibration,
 			},

@@ -7,6 +7,7 @@ import (
 	"image"
 	"image/color"
 	_ "image/png"
+	"math"
 	"sync"
 
 	euiimage "github.com/ebitenui/ebitenui/image"
@@ -78,10 +79,22 @@ func retroNineSlice(theme, name string) *euiimage.NineSlice {
 	return ns
 }
 
+func retroNineSliceAtScale(theme, name string, scale float64) *euiimage.NineSlice {
+	return retroScaledNineSlice(theme, name, retroRasterScale(scale))
+}
+
+func retroRasterScale(scale float64) int {
+	return max(1, int(math.Round(normalizedRenderScale(scale))))
+}
+
 // retroIconGraphic assembles a button icon: the normal ink glyph for idle,
 // the inverted (on-accent) glyph for the accent-filled pressed face, and a
 // faded copy for disabled controls.
 func retroIconGraphic(theme, name string) *widget.GraphicImage {
+	return retroIconGraphicAtScale(theme, name, 1)
+}
+
+func retroIconGraphicAtScale(theme, name string, scale float64) *widget.GraphicImage {
 	idle, err := retroSpriteImage(theme, "icon", name)
 	if err != nil {
 		panic(err)
@@ -90,11 +103,34 @@ func retroIconGraphic(theme, name string) *widget.GraphicImage {
 	if err != nil {
 		panic(err)
 	}
+	rasterScale := retroRasterScale(scale)
 	return &widget.GraphicImage{
-		Idle:     idle,
-		Pressed:  pressed,
-		Disabled: retroFadedIcon(theme, name, idle),
+		Idle:     retroScaleImage(idle, fmt.Sprintf("icon/%s/%s", theme, name), rasterScale),
+		Pressed:  retroScaleImage(pressed, fmt.Sprintf("icon-inv/%s/%s", theme, name), rasterScale),
+		Disabled: retroScaleImage(retroFadedIcon(theme, name, idle), fmt.Sprintf("icon-faded/%s/%s", theme, name), rasterScale),
 	}
+}
+
+func retroScaleImage(src *ebiten.Image, key string, scale int) *ebiten.Image {
+	if scale <= 1 {
+		return src
+	}
+	cacheKey := fmt.Sprintf("scaled/%s@%dx", key, scale)
+	retroMu.Lock()
+	if img, ok := retroImages[cacheKey]; ok {
+		retroMu.Unlock()
+		return img
+	}
+	retroMu.Unlock()
+	bounds := src.Bounds()
+	out := ebiten.NewImage(bounds.Dx()*scale, bounds.Dy()*scale)
+	op := &ebiten.DrawImageOptions{Filter: ebiten.FilterNearest}
+	op.GeoM.Scale(float64(scale), float64(scale))
+	out.DrawImage(src, op)
+	retroMu.Lock()
+	retroImages[cacheKey] = out
+	retroMu.Unlock()
+	return out
 }
 
 func retroFadedIcon(theme, name string, src *ebiten.Image) *ebiten.Image {
@@ -117,17 +153,22 @@ func retroFadedIcon(theme, name string, src *ebiten.Image) *ebiten.Image {
 // Shipped bases: "button" and "button_primary"; the primary variant reuses the
 // neutral disabled face so every control greys out alike.
 func retroButtonImage(theme, base string) *widget.ButtonImage {
+	return retroButtonImageAtScale(theme, base, 1)
+}
+
+func retroButtonImageAtScale(theme, base string, scale float64) *widget.ButtonImage {
 	disabledName := base + "_disabled"
 	if base != "button" {
 		disabledName = "button_disabled"
 	}
-	pressed := retroNineSlice(theme, base+"_pressed")
+	ns := func(name string) *euiimage.NineSlice { return retroNineSliceAtScale(theme, name, scale) }
+	pressed := ns(base + "_pressed")
 	return &widget.ButtonImage{
-		Idle:         retroNineSlice(theme, base+"_idle"),
-		Hover:        retroNineSlice(theme, base+"_hover"),
+		Idle:         ns(base + "_idle"),
+		Hover:        ns(base + "_hover"),
 		Pressed:      pressed,
 		PressedHover: pressed,
-		Disabled:     retroNineSlice(theme, disabledName),
+		Disabled:     ns(disabledName),
 	}
 }
 
@@ -171,12 +212,16 @@ func retroScaledNineSlice(theme, name string, scale int) *euiimage.NineSlice {
 // idle machine — and the pack ships a single ink per icon, so the reading has
 // to come from the color.
 func retroTintedIcon(theme, name string, tint color.Color) *ebiten.Image {
+	return retroTintedIconAtScale(theme, name, tint, 1)
+}
+
+func retroTintedIconAtScale(theme, name string, tint color.Color, scale float64) *ebiten.Image {
 	red, green, blue, alpha := tint.RGBA()
 	key := fmt.Sprintf("tint/%s/%s/%04x%04x%04x%04x", theme, name, red, green, blue, alpha)
 	retroMu.Lock()
 	if img, ok := retroImages[key]; ok {
 		retroMu.Unlock()
-		return img
+		return retroScaleImage(img, key, retroRasterScale(scale))
 	}
 	retroMu.Unlock()
 	src, err := retroDecodedSprite(theme, "icon", name)
@@ -209,7 +254,7 @@ func retroTintedIcon(theme, name string, tint color.Color) *ebiten.Image {
 	retroMu.Lock()
 	retroImages[key] = out
 	retroMu.Unlock()
-	return out
+	return retroScaleImage(out, key, retroRasterScale(scale))
 }
 
 // retroDecodedSprite returns the CPU-side decode of a pack sprite. Anything

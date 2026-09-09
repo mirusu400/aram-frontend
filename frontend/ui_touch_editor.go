@@ -44,35 +44,47 @@ const (
 
 // touchEditorStepperRow returns the y of one of the two stepper rows.
 func touchEditorStepperRow(index int) int {
-	return touchEditorActionGap*2 + touchEditorActionHeight +
-		index*(touchEditorActionHeight+touchEditorStepperGap)
+	return touchEditorStepperRowAtScale(index, 1)
+}
+
+func touchEditorStepperRowAtScale(index int, scale float64) int {
+	return scaledPixels(
+		touchEditorActionGap*2+touchEditorActionHeight+
+			index*(touchEditorActionHeight+touchEditorStepperGap),
+		scale,
+	)
 }
 
 // touchLayoutEditorSteppers lays out the deck-ratio and button-size controls
 // as a minus/plus pair per row, with the reading between them.
 func touchLayoutEditorSteppers(width int) []touchButton {
+	return touchLayoutEditorSteppersAtScale(width, 1)
+}
+
+func touchLayoutEditorSteppersAtScale(width int, scale float64) []touchButton {
+	px := func(value int) int { return scaledPixels(value, scale) }
 	rows := []struct{ minus, plus string }{
 		{touchEditorGuestSmaller, touchEditorGuestLarger},
 		{touchEditorSizeSmaller, touchEditorSizeLarger},
 		{touchEditorGridFiner, touchEditorGridCoarser},
 	}
-	span := min(width-touchEditorActionGap*2, 420)
-	left := max(touchEditorActionGap, (width-span)/2)
+	span := min(width-px(touchEditorActionGap)*2, px(420))
+	left := max(px(touchEditorActionGap), (width-span)/2)
 	buttons := make([]touchButton, 0, len(rows)*2)
 	for index, row := range rows {
-		y := touchEditorStepperRow(index)
+		y := px(touchEditorStepperRow(index))
 		buttons = append(buttons,
 			touchButton{
 				ID:    row.minus,
 				Label: "-",
 				Bounds: rectAt(left, y,
-					touchEditorStepperWidth, touchEditorActionHeight),
+					px(touchEditorStepperWidth), px(touchEditorActionHeight)),
 			},
 			touchButton{
 				ID:    row.plus,
 				Label: "+",
-				Bounds: rectAt(left+span-touchEditorStepperWidth, y,
-					touchEditorStepperWidth, touchEditorActionHeight),
+				Bounds: rectAt(left+span-px(touchEditorStepperWidth), y,
+					px(touchEditorStepperWidth), px(touchEditorActionHeight)),
 			},
 		)
 	}
@@ -82,15 +94,20 @@ func touchLayoutEditorSteppers(width int) []touchButton {
 // touchEditorTrayBounds is the strip that holds put-away buttons. Dropping a
 // button in it hides the button; dragging one out brings it back.
 func touchEditorTrayBounds(width, height int, options touchLayoutOptions) image.Rectangle {
-	top := touchEditorStepperRow(3) + 24
-	deckTop := height - statusBarHeight -
-		touchDeckHeightWithOptions(width, height, options)
-	bottom := min(top+touchEditorTrayChip*2+touchEditorTrayGap*3, max(top+1, deckTop-8))
+	return touchEditorTrayBoundsAtScale(width, height, options, 1)
+}
+
+func touchEditorTrayBoundsAtScale(width, height int, options touchLayoutOptions, scale float64) image.Rectangle {
+	px := func(value int) int { return scaledPixels(value, scale) }
+	top := px(touchEditorStepperRow(3) + 24)
+	deckTop := height - px(statusBarHeight) -
+		touchDeckHeightWithRenderScale(width, height, options, scale)
+	bottom := min(top+px(touchEditorTrayChip)*2+px(touchEditorTrayGap)*3, max(top+px(1), deckTop-px(8)))
 	return rectAt(
-		touchEditorActionGap,
+		px(touchEditorActionGap),
 		top,
-		max(1, width-touchEditorActionGap*2),
-		max(1, bottom-top),
+		max(px(1), width-px(touchEditorActionGap)*2),
+		max(px(1), bottom-top),
 	)
 }
 
@@ -100,14 +117,23 @@ func touchEditorTrayButtons(
 	width, height int,
 	options touchLayoutOptions,
 ) []touchButton {
+	return touchEditorTrayButtonsAtScale(width, height, options, 1)
+}
+
+func touchEditorTrayButtonsAtScale(
+	width, height int,
+	options touchLayoutOptions,
+	scale float64,
+) []touchButton {
 	if len(options.Hidden) == 0 {
 		return nil
 	}
-	tray := touchEditorTrayBounds(width, height, options)
-	columns := max(1, (tray.Dx()-touchEditorTrayGap)/(touchEditorTrayChip+touchEditorTrayGap))
+	px := func(value int) int { return scaledPixels(value, scale) }
+	tray := touchEditorTrayBoundsAtScale(width, height, options, scale)
+	columns := max(1, (tray.Dx()-px(touchEditorTrayGap))/(px(touchEditorTrayChip)+px(touchEditorTrayGap)))
 	buttons := make([]touchButton, 0, len(options.Hidden))
 	index := 0
-	for _, slot := range touchButtonCatalog(width, height, options) {
+	for _, slot := range touchButtonCatalogAtScale(width, height, options, scale) {
 		if !options.Hidden[slot.ID] {
 			continue
 		}
@@ -119,10 +145,10 @@ func touchEditorTrayButtons(
 			Label:   slot.Label,
 			Hidden:  true,
 			Bounds: rectAt(
-				tray.Min.X+touchEditorTrayGap+column*(touchEditorTrayChip+touchEditorTrayGap),
-				tray.Min.Y+touchEditorTrayGap+row*(touchEditorTrayChip+touchEditorTrayGap),
-				touchEditorTrayChip,
-				touchEditorTrayChip,
+				tray.Min.X+px(touchEditorTrayGap)+column*(px(touchEditorTrayChip)+px(touchEditorTrayGap)),
+				tray.Min.Y+px(touchEditorTrayGap)+row*(px(touchEditorTrayChip)+px(touchEditorTrayGap)),
+				px(touchEditorTrayChip),
+				px(touchEditorTrayChip),
 			),
 		})
 		index++
@@ -131,25 +157,34 @@ func touchEditorTrayButtons(
 }
 
 func touchLayoutEditorActions(width int) []touchButton {
-	buttonWidth := max(80, min(150, (width-touchEditorActionGap*4)/3))
-	total := buttonWidth*3 + touchEditorActionGap*2
-	x := max(touchEditorActionGap, (width-total)/2)
-	y := touchEditorActionGap
-	step := buttonWidth + touchEditorActionGap
+	return touchLayoutEditorActionsAtScale(width, 1)
+}
+
+func touchLayoutEditorActionsAtScale(width int, scale float64) []touchButton {
+	px := func(value int) int { return scaledPixels(value, scale) }
+	buttonWidth := max(px(80), min(px(150), (width-px(touchEditorActionGap)*4)/3))
+	total := buttonWidth*3 + px(touchEditorActionGap)*2
+	x := max(px(touchEditorActionGap), (width-total)/2)
+	y := px(touchEditorActionGap)
+	step := buttonWidth + px(touchEditorActionGap)
 	return []touchButton{
-		{ID: touchEditorSave, Label: "Save", Bounds: rectAt(x, y, buttonWidth, touchEditorActionHeight)},
-		{ID: touchEditorReset, Label: "Reset", Bounds: rectAt(x+step, y, buttonWidth, touchEditorActionHeight)},
-		{ID: touchEditorCancel, Label: "Cancel", Bounds: rectAt(x+step*2, y, buttonWidth, touchEditorActionHeight)},
+		{ID: touchEditorSave, Label: "Save", Bounds: rectAt(x, y, buttonWidth, px(touchEditorActionHeight))},
+		{ID: touchEditorReset, Label: "Reset", Bounds: rectAt(x+step, y, buttonWidth, px(touchEditorActionHeight))},
+		{ID: touchEditorCancel, Label: "Cancel", Bounds: rectAt(x+step*2, y, buttonWidth, px(touchEditorActionHeight))},
 	}
 }
 
 func touchLayoutEditorActionAt(x, y, width int) (string, bool) {
-	for _, button := range touchLayoutEditorActions(width) {
+	return touchLayoutEditorActionAtScale(x, y, width, 1)
+}
+
+func touchLayoutEditorActionAtScale(x, y, width int, scale float64) (string, bool) {
+	for _, button := range touchLayoutEditorActionsAtScale(width, scale) {
 		if pointInRect(x, y, button.Bounds) {
 			return button.ID, true
 		}
 	}
-	for _, button := range touchLayoutEditorSteppers(width) {
+	for _, button := range touchLayoutEditorSteppersAtScale(width, scale) {
 		if pointInRect(x, y, button.Bounds) {
 			return button.ID, true
 		}
@@ -169,7 +204,7 @@ func (s *Shell) drawTouchLayoutEditor(screen *ebiten.Image) {
 		color.NRGBA{A: 110},
 	)
 
-	if step := s.touchEditorGridStep(); step > 0 {
+	if step := s.px(s.touchEditorGridStep()); step > 0 {
 		s.drawTouchEditorGrid(screen, width, height, step)
 	}
 
@@ -179,13 +214,17 @@ func (s *Shell) drawTouchLayoutEditor(screen *ebiten.Image) {
 	}
 	options := s.touchLayoutOptions()
 	s.drawTouchEditorTray(screen, width, height, options, dragging)
-	for _, button := range touchControlButtonsWithOptions(width, height, options) {
+	for _, button := range touchControlButtonsWithRenderScale(width, height, options, s.renderScale) {
+		if button.ID == circularTouchPadID {
+			s.drawCircularPadBounds(screen, button.Bounds)
+			continue
+		}
 		s.drawTouchButton(screen, button, dragging[button.ID])
 	}
-	for _, button := range touchLayoutEditorActions(width) {
+	for _, button := range touchLayoutEditorActionsAtScale(width, s.renderScale) {
 		s.drawTouchButton(screen, button, false)
 	}
-	for _, button := range touchLayoutEditorSteppers(width) {
+	for _, button := range touchLayoutEditorSteppersAtScale(width, s.renderScale) {
 		s.drawTouchButton(screen, button, false)
 	}
 	if s.design == nil {
@@ -201,7 +240,7 @@ func (s *Shell) drawTouchLayoutEditor(screen *ebiten.Image) {
 		gridReading,
 	}
 	for index, reading := range readings {
-		row := rectAt(0, touchEditorStepperRow(index), width, touchEditorActionHeight)
+		row := rectAt(0, s.px(touchEditorStepperRow(index)), width, s.px(touchEditorActionHeight))
 		drawCenteredText(
 			screen,
 			reading,
@@ -211,7 +250,7 @@ func (s *Shell) drawTouchLayoutEditor(screen *ebiten.Image) {
 			centeredTextTop(s.design.Type.Strong, row, s.design.Type.CenterNudge),
 		)
 	}
-	hintBounds := rectAt(0, touchEditorStepperRow(3), width, 20)
+	hintBounds := rectAt(0, s.px(touchEditorStepperRow(3)), width, s.px(20))
 	drawCenteredText(
 		screen,
 		s.tr("Drag buttons to move them, or into the tray to put them away"),
@@ -231,12 +270,12 @@ func (s *Shell) drawTouchEditorGrid(screen *ebiten.Image, width, height, step in
 		tint := s.design.Palette.BorderStrong
 		line = color.NRGBA{R: tint.R, G: tint.G, B: tint.B, A: 0x30}
 	}
-	limit := height - statusBarHeight
+	limit := height - s.px(statusBarHeight)
 	for x := step; x < width; x += step {
-		ebitenutil.DrawRect(screen, float64(x), 0, 1, float64(limit), line)
+		ebitenutil.DrawRect(screen, float64(x), 0, float64(s.px(1)), float64(limit), line)
 	}
 	for y := step; y < limit; y += step {
-		ebitenutil.DrawRect(screen, 0, float64(y), float64(width), 1, line)
+		ebitenutil.DrawRect(screen, 0, float64(y), float64(width), float64(s.px(1)), line)
 	}
 }
 
@@ -249,8 +288,8 @@ func (s *Shell) drawTouchEditorTray(
 	options touchLayoutOptions,
 	dragging map[string]bool,
 ) {
-	tray := touchEditorTrayBounds(width, height, options)
-	if tray.Dy() < touchEditorTrayChip/2 {
+	tray := touchEditorTrayBoundsAtScale(width, height, options, s.renderScale)
+	if tray.Dy() < s.px(touchEditorTrayChip)/2 {
 		return
 	}
 	border := color.NRGBA{R: 0x80, G: 0x80, B: 0x80, A: 0xa0}
@@ -262,7 +301,7 @@ func (s *Shell) drawTouchEditorTray(
 	ebitenutil.DrawRect(screen,
 		float64(tray.Min.X), float64(tray.Min.Y),
 		float64(tray.Dx()), float64(tray.Dy()), fill)
-	drawRectOutline(screen, tray, border)
+	drawRectOutlineAtScale(screen, tray, border, s.renderScale)
 	if s.design != nil && len(options.Hidden) == 0 {
 		label := rectAt(tray.Min.X, tray.Min.Y, tray.Dx(), tray.Dy())
 		drawCenteredText(
@@ -274,7 +313,7 @@ func (s *Shell) drawTouchEditorTray(
 			centeredTextTop(s.design.Type.Caption, label, s.design.Type.CenterNudge),
 		)
 	}
-	for _, button := range touchEditorTrayButtons(width, height, options) {
+	for _, button := range touchEditorTrayButtonsAtScale(width, height, options, s.renderScale) {
 		s.drawTouchButton(screen, button, dragging[button.ID])
 	}
 }
@@ -282,10 +321,15 @@ func (s *Shell) drawTouchEditorTray(
 // drawRectOutline draws a one-pixel frame, which the tray uses to read as a
 // drop target rather than a panel.
 func drawRectOutline(screen *ebiten.Image, bounds image.Rectangle, stroke color.Color) {
+	drawRectOutlineAtScale(screen, bounds, stroke, 1)
+}
+
+func drawRectOutlineAtScale(screen *ebiten.Image, bounds image.Rectangle, stroke color.Color, scale float64) {
 	x, y := float64(bounds.Min.X), float64(bounds.Min.Y)
 	w, h := float64(bounds.Dx()), float64(bounds.Dy())
-	ebitenutil.DrawRect(screen, x, y, w, 1, stroke)
-	ebitenutil.DrawRect(screen, x, y+h-1, w, 1, stroke)
-	ebitenutil.DrawRect(screen, x, y, 1, h, stroke)
-	ebitenutil.DrawRect(screen, x+w-1, y, 1, h, stroke)
+	line := float64(scaledPixels(1, scale))
+	ebitenutil.DrawRect(screen, x, y, w, line, stroke)
+	ebitenutil.DrawRect(screen, x, y+h-line, w, line, stroke)
+	ebitenutil.DrawRect(screen, x, y, line, h, stroke)
+	ebitenutil.DrawRect(screen, x+w-line, y, line, h, stroke)
 }

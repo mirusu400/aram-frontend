@@ -103,6 +103,9 @@ type Shell struct {
 	settingsSection           string
 	layoutWidth               int
 	layoutHeight              int
+	outsideWidth              int
+	outsideHeight             int
+	renderScale               float64
 	logs                      []string
 	frame                     VideoFrame
 	frameImage                *ebiten.Image
@@ -251,6 +254,9 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		settingsSection:           "General",
 		layoutWidth:               logicalWidth,
 		layoutHeight:              logicalHeight,
+		outsideWidth:              logicalWidth,
+		outsideHeight:             logicalHeight,
+		renderScale:               1,
 		hostActive:                true,
 		controlState:              make(map[string]bool),
 		touchControls:             make(map[ebiten.TouchID]string),
@@ -296,7 +302,11 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		shell.openWelcome()
 	}
 	shell.menus = defaultMenus()
-	shell.design = newARAMDesignSystem(shell.settings.ThemeMode, shell.settings.ThemeFamily)
+	shell.design = newScaledARAMDesignSystem(
+		shell.settings.ThemeMode,
+		shell.settings.ThemeFamily,
+		shell.renderScale,
+	)
 	shell.interfaceUI = newShellUI(shell, shell.design)
 	if audio, ok := shell.backend.(AudioBackend); ok {
 		if err := audio.ConfigureAudio(shell.currentAudioSettings()); err != nil {
@@ -403,6 +413,9 @@ func (s *Shell) Update() error {
 	}
 	s.handleTouch()
 	s.syncDesignSystem()
+	if s.interfaceUI != nil {
+		s.interfaceUI.updateSettingsTouchScroll(s)
+	}
 	s.syncUIPointerSuppression()
 	if s.focusModeActive() || s.touchLayoutEditing ||
 		s.touchChromeHiddenActive() || s.uiPointerSuppressed {
@@ -426,10 +439,15 @@ func (s *Shell) Update() error {
 
 func (s *Shell) syncDesignSystem() {
 	if s.design != nil && s.design.Mode == s.settings.ThemeMode &&
-		s.design.Family == s.settings.ThemeFamily {
+		s.design.Family == s.settings.ThemeFamily &&
+		s.design.Scale == s.renderScale {
 		return
 	}
-	s.design = newARAMDesignSystem(s.settings.ThemeMode, s.settings.ThemeFamily)
+	s.design = newScaledARAMDesignSystem(
+		s.settings.ThemeMode,
+		s.settings.ThemeFamily,
+		s.renderScale,
+	)
 	s.interfaceUI = newShellUI(s, s.design)
 }
 
@@ -463,12 +481,22 @@ func (s *Shell) Draw(screen *ebiten.Image) {
 }
 
 func (s *Shell) Layout(outsideWidth, outsideHeight int) (int, int) {
+	return s.layoutAtScale(outsideWidth, outsideHeight, platformRenderScale())
+}
+
+func (s *Shell) layoutAtScale(outsideWidth, outsideHeight int, scale float64) (int, int) {
 	if outsideWidth <= 0 || outsideHeight <= 0 {
 		outsideWidth, outsideHeight = logicalWidth, logicalHeight
 	}
-	s.layoutWidth = outsideWidth
-	s.layoutHeight = outsideHeight
-	return outsideWidth, outsideHeight
+	s.outsideWidth = outsideWidth
+	s.outsideHeight = outsideHeight
+	s.renderScale = normalizedRenderScale(scale)
+	s.layoutWidth, s.layoutHeight = scaledScreenSize(
+		outsideWidth,
+		outsideHeight,
+		s.renderScale,
+	)
+	return s.layoutWidth, s.layoutHeight
 }
 
 func (s *Shell) viewportSize() (int, int) {
@@ -477,6 +505,18 @@ func (s *Shell) viewportSize() (int, int) {
 		return logicalWidth, logicalHeight
 	}
 	return width, height
+}
+
+func (s *Shell) outsideSize() (int, int) {
+	width, height := s.outsideWidth, s.outsideHeight
+	if width <= 0 || height <= 0 {
+		return logicalWidth, logicalHeight
+	}
+	return width, height
+}
+
+func (s *Shell) px(value int) int {
+	return scaledPixels(value, s.renderScale)
 }
 
 func (s *Shell) handleShortcuts() {

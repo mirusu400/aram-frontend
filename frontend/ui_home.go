@@ -130,9 +130,9 @@ func (u *shellUI) rebuildHomeContent(
 	}
 
 	installed := tab == homeTabInstalled
-	contentTop := homeTabBarHeight + 6
+	contentTop := u.design.px(homeTabBarHeight + 6)
 	if installed {
-		contentTop = homeTabBarHeight + homeSoftkeyHeight
+		contentTop = u.design.px(homeTabBarHeight + homeSoftkeyHeight)
 	}
 
 	selectedPath := u.homeSelectedPath
@@ -145,7 +145,7 @@ func (u *shellUI) rebuildHomeContent(
 	u.homeSelectedPath = selectedPath
 
 	u.homeBody.AddChild(u.homeTabBar(shell, tab))
-	u.homeBody.AddChild(homeDivider(homeTabBarHeight))
+	u.homeBody.AddChild(homeDividerAtScale(homeTabBarHeight, u.design.Scale))
 	if installed {
 		u.homeBody.AddChild(u.homeFolderBar(shell, folders))
 	}
@@ -160,7 +160,7 @@ func (u *shellUI) rebuildHomeContent(
 				HorizontalPosition: widget.AnchorLayoutPositionCenter,
 				VerticalPosition:   widget.AnchorLayoutPositionCenter,
 			},
-			max(240, rect.Dx()-64),
+			max(u.design.px(240), rect.Dx()-u.design.px(64)),
 		))
 	}
 
@@ -172,8 +172,8 @@ func (u *shellUI) homeTabBar(shell *Shell, active string) *widget.Container {
 	bar := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(28),
-			widget.RowLayoutOpts.Padding(&widget.Insets{Left: 22, Top: 6}),
+			widget.RowLayoutOpts.Spacing(u.design.px(28)),
+			widget.RowLayoutOpts.Padding(&widget.Insets{Left: u.design.px(22), Top: u.design.px(6)}),
 		)),
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
@@ -204,7 +204,7 @@ func (u *shellUI) homeTabCell(shell *Shell, tab, label string, active bool) *wid
 		widget.ContainerOpts.BackgroundImage(euiimage.NewNineSliceColor(homeColorTransparent)),
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
-			widget.RowLayoutOpts.Spacing(6),
+			widget.RowLayoutOpts.Spacing(u.design.px(6)),
 		)),
 		widget.ContainerOpts.WidgetOpts(
 			widget.WidgetOpts.MouseButtonReleasedHandler(func(args *widget.WidgetMouseButtonReleasedEventArgs) {
@@ -219,7 +219,7 @@ func (u *shellUI) homeTabCell(shell *Shell, tab, label string, active bool) *wid
 	cell.AddChild(widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(euiimage.NewNineSliceColor(underline)),
 		widget.ContainerOpts.WidgetOpts(
-			widget.WidgetOpts.MinSize(48, 3),
+			widget.WidgetOpts.MinSize(u.design.px(48), u.design.px(3)),
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
 		),
 	))
@@ -232,8 +232,8 @@ func (u *shellUI) homeFolderBar(shell *Shell, folders []string) *widget.Containe
 	bar := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(10),
-			widget.RowLayoutOpts.Padding(&widget.Insets{Left: 22, Top: homeTabBarHeight + 8}),
+			widget.RowLayoutOpts.Spacing(u.design.px(10)),
+			widget.RowLayoutOpts.Padding(&widget.Insets{Left: u.design.px(22), Top: u.design.px(homeTabBarHeight + 8)}),
 		)),
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
@@ -281,7 +281,7 @@ func (u *shellUI) homeRowScroll(shell *Shell, rows []homeRow, top int, selectedP
 			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 				StretchHorizontal: true,
 				StretchVertical:   true,
-				Padding:           &widget.Insets{Top: top, Bottom: homeSoftkeyHeight},
+				Padding:           &widget.Insets{Top: top, Bottom: u.design.px(homeSoftkeyHeight)},
 			}),
 			widget.WidgetOpts.ScrolledHandler(func(args *widget.WidgetScrolledEventArgs) {
 				scrollContainerByWheel(scroll, args.Y)
@@ -303,7 +303,7 @@ func (u *shellUI) homeRowWidget(shell *Shell, row homeRow, selected bool) *widge
 		widget.ContainerOpts.BackgroundImage(background),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 		widget.ContainerOpts.WidgetOpts(
-			widget.WidgetOpts.MinSize(0, homeRowHeight),
+			widget.WidgetOpts.MinSize(0, u.design.px(homeRowHeight)),
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
 			widget.WidgetOpts.MouseButtonReleasedHandler(func(args *widget.WidgetMouseButtonReleasedEventArgs) {
 				if args.Inside {
@@ -317,8 +317,8 @@ func (u *shellUI) homeRowWidget(shell *Shell, row homeRow, selected bool) *widge
 	left := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
 			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-			widget.RowLayoutOpts.Spacing(12),
-			widget.RowLayoutOpts.Padding(&widget.Insets{Left: 22}),
+			widget.RowLayoutOpts.Spacing(u.design.px(12)),
+			widget.RowLayoutOpts.Padding(&widget.Insets{Left: u.design.px(22)}),
 		)),
 		widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionStart,
@@ -327,7 +327,7 @@ func (u *shellUI) homeRowWidget(shell *Shell, row homeRow, selected bool) *widge
 	)
 	number := homeText(fmt.Sprintf("%02d", row.number), u.design.Type.Strong, homeColorNumber,
 		widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}, 0)
-	number.GetWidget().MinWidth = 26
+	number.GetWidget().MinWidth = u.design.px(26)
 	left.AddChild(number)
 	left.AddChild(u.homeIconWidget(shell, row.path, row.name))
 	left.AddChild(homeText(shorten(row.name, 48), u.design.Type.Body, homeColorName,
@@ -340,11 +340,11 @@ func (u *shellUI) homeRowWidget(shell *Shell, row homeRow, selected bool) *widge
 		container.AddChild(widget.NewContainer(
 			widget.ContainerOpts.BackgroundImage(euiimage.NewNineSliceColor(homeColorStar)),
 			widget.ContainerOpts.WidgetOpts(
-				widget.WidgetOpts.MinSize(12, 12),
+				widget.WidgetOpts.MinSize(u.design.px(12), u.design.px(12)),
 				widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 					HorizontalPosition: widget.AnchorLayoutPositionEnd,
 					VerticalPosition:   widget.AnchorLayoutPositionCenter,
-					Padding:            &widget.Insets{Right: 22},
+					Padding:            &widget.Insets{Right: u.design.px(22)},
 				}),
 			),
 		))
@@ -358,7 +358,7 @@ func (u *shellUI) homeSoftkeyBar(shell *Shell, selectedPath string) *widget.Cont
 		widget.ContainerOpts.BackgroundImage(euiimage.NewNineSliceColor(homeColorSoftbar)),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 		widget.ContainerOpts.WidgetOpts(
-			widget.WidgetOpts.MinSize(0, homeSoftkeyHeight),
+			widget.WidgetOpts.MinSize(0, u.design.px(homeSoftkeyHeight)),
 			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 				HorizontalPosition: widget.AnchorLayoutPositionStart,
 				VerticalPosition:   widget.AnchorLayoutPositionEnd,
@@ -373,7 +373,7 @@ func (u *shellUI) homeSoftkeyBar(shell *Shell, selectedPath string) *widget.Cont
 	fav.GetWidget().LayoutData = widget.AnchorLayoutData{
 		HorizontalPosition: widget.AnchorLayoutPositionStart,
 		VerticalPosition:   widget.AnchorLayoutPositionCenter,
-		Padding:            &widget.Insets{Left: 18},
+		Padding:            &widget.Insets{Left: u.design.px(18)},
 	}
 	bar.AddChild(fav)
 	u.homeFavButton = fav
@@ -385,7 +385,7 @@ func (u *shellUI) homeSoftkeyBar(shell *Shell, selectedPath string) *widget.Cont
 	open.GetWidget().LayoutData = widget.AnchorLayoutData{
 		HorizontalPosition: widget.AnchorLayoutPositionEnd,
 		VerticalPosition:   widget.AnchorLayoutPositionCenter,
-		Padding:            &widget.Insets{Right: 18},
+		Padding:            &widget.Insets{Right: u.design.px(18)},
 	}
 	bar.AddChild(open)
 	u.homeOpenButton = open
@@ -418,8 +418,9 @@ func homeFlatButton(u *shellUI, label string, textColor color.NRGBA, clicked fun
 			Idle:     textColor,
 			Disabled: homeColorMuted,
 		}),
-		widget.ButtonOpts.TextPadding(&widget.Insets{Left: 12, Right: 12, Top: 6, Bottom: 6}),
+		widget.ButtonOpts.TextPadding(&widget.Insets{Left: u.design.px(12), Right: u.design.px(12), Top: u.design.px(6), Bottom: u.design.px(6)}),
 		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
+			u.owner.buttonHaptic()
 			if clicked != nil {
 				clicked()
 			}
@@ -428,15 +429,19 @@ func homeFlatButton(u *shellUI, label string, textColor color.NRGBA, clicked fun
 }
 
 func homeDivider(top int) *widget.Container {
+	return homeDividerAtScale(top, 1)
+}
+
+func homeDividerAtScale(top int, scale float64) *widget.Container {
 	return widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(euiimage.NewNineSliceColor(homeColorDivider)),
 		widget.ContainerOpts.WidgetOpts(
-			widget.WidgetOpts.MinSize(0, 1),
+			widget.WidgetOpts.MinSize(0, scaledPixels(1, scale)),
 			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 				HorizontalPosition: widget.AnchorLayoutPositionStart,
 				VerticalPosition:   widget.AnchorLayoutPositionStart,
 				StretchHorizontal:  true,
-				Padding:            &widget.Insets{Top: top},
+				Padding:            &widget.Insets{Top: scaledPixels(top, scale)},
 			}),
 		),
 	)
@@ -456,12 +461,12 @@ func (u *shellUI) homeIconWidget(shell *Shell, path, name string) widget.Preferr
 	shell.requestHomeIcon(path)
 	icon := homeIconPlaceholder(u.design, path, name)
 	if loaded := shell.homeIcon(path); loaded != nil {
-		icon = scaleIconToTile(loaded)
+		icon = scaleIconToTileAtScale(loaded, u.design.Scale)
 	}
 	return widget.NewGraphic(
 		widget.GraphicOpts.Image(icon),
 		widget.GraphicOpts.WidgetOpts(
-			widget.WidgetOpts.MinSize(homeIconSize, homeIconSize),
+			widget.WidgetOpts.MinSize(u.design.px(homeIconSize), u.design.px(homeIconSize)),
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Position: widget.RowLayoutPositionCenter}),
 		),
 	)
@@ -475,7 +480,8 @@ func (u *shellUI) homeIconWidget(shell *Shell, path, name string) widget.Preferr
 // with the Open Recent dialog (ui_recent.go) so a title looks the same
 // wherever it is listed.
 func homeIconPlaceholder(design *ARAMDesignSystem, path, name string) *ebiten.Image {
-	tile := ebiten.NewImage(homeIconSize, homeIconSize)
+	tileSize := design.px(homeIconSize)
+	tile := ebiten.NewImage(tileSize, tileSize)
 	tile.Fill(homeIconColor(path))
 	letter := monogramLetter(name)
 	if letter == "" {
@@ -499,16 +505,21 @@ func monogramLetter(name string) string {
 
 // scaleIconToTile renders icon at the launcher tile size.
 func scaleIconToTile(icon *ebiten.Image) *ebiten.Image {
+	return scaleIconToTileAtScale(icon, 1)
+}
+
+func scaleIconToTileAtScale(icon *ebiten.Image, scale float64) *ebiten.Image {
+	tileSize := scaledPixels(homeIconSize, scale)
 	bounds := icon.Bounds()
 	if bounds.Dx() <= 0 || bounds.Dy() <= 0 ||
-		(bounds.Dx() == homeIconSize && bounds.Dy() == homeIconSize) {
+		(bounds.Dx() == tileSize && bounds.Dy() == tileSize) {
 		return icon
 	}
-	tile := ebiten.NewImage(homeIconSize, homeIconSize)
+	tile := ebiten.NewImage(tileSize, tileSize)
 	options := &ebiten.DrawImageOptions{Filter: ebiten.FilterLinear}
 	options.GeoM.Scale(
-		float64(homeIconSize)/float64(bounds.Dx()),
-		float64(homeIconSize)/float64(bounds.Dy()),
+		float64(tileSize)/float64(bounds.Dx()),
+		float64(tileSize)/float64(bounds.Dy()),
 	)
 	tile.DrawImage(icon, options)
 	return tile
