@@ -3,6 +3,7 @@ package frontend
 import (
 	"image"
 	"image/color"
+	"strings"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
@@ -460,6 +461,22 @@ func (s *Shell) drawTouchButton(screen *ebiten.Image, button touchButton, active
 		}
 		face := s.design.Type.Strong
 		top := centeredTextTop(face, bounds, s.design.Type.CenterNudge)
+		lines := strings.Split(label, "\n")
+		if len(lines) == 2 {
+			lineHeight := max(s.px(10), bounds.Dy()/3)
+			first := image.Rect(
+				bounds.Min.X, bounds.Min.Y+bounds.Dy()/2-lineHeight,
+				bounds.Max.X, bounds.Min.Y+bounds.Dy()/2,
+			)
+			second := image.Rect(
+				bounds.Min.X, first.Max.Y, bounds.Max.X, first.Max.Y+lineHeight,
+			)
+			drawCenteredText(screen, lines[0], face, textColor, first,
+				centeredTextTop(face, first, s.design.Type.CenterNudge))
+			drawCenteredText(screen, lines[1], s.design.Type.Caption, textColor, second,
+				centeredTextTop(s.design.Type.Caption, second, s.design.Type.CenterNudge))
+			return
+		}
 		if shadow, ok := retroKeyLegendShadow(s.design.Family, s.design.Palette); ok {
 			drawCenteredText(
 				screen, label, face, shadow,
@@ -486,10 +503,10 @@ func (s *Shell) drawTouchButton(screen *ebiten.Image, button touchButton, active
 // numericTouchKeys is the handset keypad in reading order: three columns of
 // digits and the star/zero/hash row that closes them.
 var numericTouchKeys = [4][3]struct{ id, label string }{
-	{{"num1", "1"}, {"num2", "2"}, {"num3", "3"}},
-	{{"num4", "4"}, {"num5", "5"}, {"num6", "6"}},
-	{{"num7", "7"}, {"num8", "8"}, {"num9", "9"}},
-	{{"star", "*"}, {"num0", "0"}, {"hash", "#"}},
+	{{"num1", "1\nㅣ"}, {"num2", "2\nㆍ"}, {"num3", "3\nㅡ"}},
+	{{"num4", "4\nㄱㅋ"}, {"num5", "5\nㄴㄹ"}, {"num6", "6\nㄷㅌ"}},
+	{{"num7", "7\nㅂㅍ"}, {"num8", "8\nㅅㅎ"}, {"num9", "9\nㅈㅊ"}},
+	{{"star", "*"}, {"num0", "0\nㅇㅁ"}, {"hash", "#"}},
 }
 
 // numericTouchButtons lays the keypad out as a centered 3x4 grid starting at

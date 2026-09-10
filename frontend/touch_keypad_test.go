@@ -62,6 +62,27 @@ func TestTouchDeckKeypadCoversEveryNumericControl(t *testing.T) {
 	}
 }
 
+func TestTouchKeypadShowsCheonjiinLegends(t *testing.T) {
+	want := map[string]string{
+		"num1": "1\nㅣ", "num2": "2\nㆍ", "num3": "3\nㅡ",
+		"num4": "4\nㄱㅋ", "num5": "5\nㄴㄹ", "num6": "6\nㄷㅌ",
+		"num7": "7\nㅂㅍ", "num8": "8\nㅅㅎ", "num9": "9\nㅈㅊ",
+		"num0": "0\nㅇㅁ",
+	}
+	buttons := touchControlButtonsWithOptions(1080, 2280, keypadOptions())
+	for _, button := range buttons {
+		if label, ok := want[button.Control]; ok {
+			if button.Label != label {
+				t.Errorf("%s label = %q, want %q", button.Control, button.Label, label)
+			}
+			delete(want, button.Control)
+		}
+	}
+	if len(want) != 0 {
+		t.Fatalf("missing Cheonjiin keys: %v", want)
+	}
+}
+
 // TestTouchKeypadButtonsAreSeparate guards against a keypad key landing on top
 // of another button, which would make one of them unpressable.
 func TestTouchKeypadButtonsAreSeparate(t *testing.T) {
