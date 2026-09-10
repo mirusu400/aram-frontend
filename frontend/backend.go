@@ -157,6 +157,10 @@ type AudioSettings struct {
 	// for CPU on weak hardware. Like MixMode, it is baked into the next machine
 	// created.
 	OutputSampleRate uint32
+	// OutputChannels selects the guest mixer's channel count for the next
+	// machine. Zero inherits the backend default; one selects mono and two
+	// stereo. Host playback may still use a stereo device stream.
+	OutputChannels uint8
 }
 
 type AudioDevice struct {

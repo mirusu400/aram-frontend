@@ -223,6 +223,12 @@ func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 				action:      shell.toggleAudioMixMode,
 			},
 			{
+				label:       "Audio channels",
+				description: "Mono centers all audio; Stereo preserves left and right separation. Applies when the next title opens.",
+				value:       shell.audioChannelsLabel(),
+				action:      shell.toggleAudioChannels,
+			},
+			{
 				label:       "Soften audio",
 				description: "Gentle low-pass that eases the harsh FM synth top end. Playback only.",
 				value:       onOff(shell.settings.AudioSoften),

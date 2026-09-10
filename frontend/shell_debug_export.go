@@ -74,6 +74,7 @@ func (s *Shell) captureDebugBundleSnapshot(createdAt time.Time) debugBundleSnaps
 			AudioMixMode:          s.settings.AudioMixMode,
 			AudioSoften:           s.settings.AudioSoften,
 			AudioLowPower:         s.settings.AudioLowPower,
+			AudioChannels:         s.settings.AudioChannels,
 			UIPriority:            s.settings.UIPriority,
 		},
 		Pacing:       s.debugPacingReport(),

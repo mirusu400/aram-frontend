@@ -46,7 +46,27 @@ func (s *Shell) currentAudioSettings() AudioSettings {
 		MixMode:          s.settings.AudioMixMode,
 		Soften:           s.settings.AudioSoften,
 		OutputSampleRate: sampleRate,
+		OutputChannels:   uint8(s.settings.AudioChannels),
 	}
+}
+
+// toggleAudioChannels switches the channel layout baked into the next machine.
+// The frontend's host player remains a stereo stream and duplicates mono PCM to
+// both speakers, while stereo selection preserves guest left/right separation.
+func (s *Shell) toggleAudioChannels() {
+	if s.settings.AudioChannels == 2 {
+		s.settings.AudioChannels = 1
+	} else {
+		s.settings.AudioChannels = 2
+	}
+	s.applyAudioSettings()
+}
+
+func (s *Shell) audioChannelsLabel() string {
+	if s.settings.AudioChannels == 2 {
+		return s.tr("Stereo")
+	}
+	return s.tr("Mono")
 }
 
 // toggleAudioSoften turns the output-softening low-pass on or off. It is a pure

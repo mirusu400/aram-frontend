@@ -385,6 +385,50 @@ func TestAudioDeviceSelectionReachesBackend(t *testing.T) {
 	}
 }
 
+func TestAudioChannelSelectionReachesBackendAndSettingsUI(t *testing.T) {
+	temporary := t.TempDir()
+	t.Setenv("APPDATA", temporary)
+	t.Setenv("XDG_CONFIG_HOME", temporary)
+	backend := &configurableAudioBackend{}
+	shell := NewShell(backend, nil, "")
+	shell.settings.Language = string(LanguageEnglish)
+
+	if settings := shell.currentAudioSettings(); settings.OutputChannels != 1 {
+		t.Fatalf("default backend output channels = %d, want mono", settings.OutputChannels)
+	}
+	u := &shellUI{settingsSection: "Audio"}
+	rows := u.settingsRowModels(shell)
+	var channelRow *settingsRowModel
+	for index := range rows {
+		if rows[index].label == "Audio channels" {
+			channelRow = &rows[index]
+			break
+		}
+	}
+	if channelRow == nil || channelRow.value != "Mono" || channelRow.action == nil {
+		t.Fatalf("audio channel settings row = %#v", channelRow)
+	}
+
+	channelRow.action()
+	if shell.settings.AudioChannels != 2 || backend.settings.OutputChannels != 2 ||
+		shell.audioChannelsLabel() != "Stereo" {
+		t.Fatalf(
+			"stereo selection = saved %d backend %d label %q",
+			shell.settings.AudioChannels,
+			backend.settings.OutputChannels,
+			shell.audioChannelsLabel(),
+		)
+	}
+	channelRow.action()
+	if shell.settings.AudioChannels != 1 || backend.settings.OutputChannels != 1 {
+		t.Fatalf(
+			"mono selection = saved %d backend %d",
+			shell.settings.AudioChannels,
+			backend.settings.OutputChannels,
+		)
+	}
+}
+
 type lifecycleBackend struct {
 	mu       sync.Mutex
 	state    BackendState

@@ -102,6 +102,23 @@ func TestSettingsNormalizePreservesMutedZeroVolume(t *testing.T) {
 	}
 }
 
+func TestAudioChannelsDefaultToMonoAndNormalizeInvalidValues(t *testing.T) {
+	settings := defaultSettings()
+	if settings.AudioChannels != 1 {
+		t.Fatalf("default audio channels = %d, want mono", settings.AudioChannels)
+	}
+	settings.AudioChannels = 2
+	settings.normalize()
+	if settings.AudioChannels != 2 {
+		t.Fatalf("stereo normalized to %d", settings.AudioChannels)
+	}
+	settings.AudioChannels = 7
+	settings.normalize()
+	if settings.AudioChannels != 1 {
+		t.Fatalf("invalid audio channels normalized to %d, want mono", settings.AudioChannels)
+	}
+}
+
 func TestSettingsNormalizeRepairsDisplayOptions(t *testing.T) {
 	settings := defaultSettings()
 	settings.Language = "fr"

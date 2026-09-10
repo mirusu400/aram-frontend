@@ -143,6 +143,7 @@ type Settings struct {
 	AudioDeviceID         string                    `json:"audio_device_id,omitempty"`
 	AudioMixMode          bool                      `json:"audio_mix_mode"`
 	AudioSoften           bool                      `json:"audio_soften"`
+	AudioChannels         int                       `json:"audio_channels"`
 	// AudioLowPower trades audio fidelity for CPU on weak hardware by rendering
 	// SMAF FM synthesis at a reduced sample rate. False (the default) renders
 	// at full quality. Baked into the next machine created, like AudioMixMode.
@@ -302,6 +303,7 @@ func defaultSettings() Settings {
 		Volume:                100,
 		AudioLatencyMS:        60,
 		AudioSoften:           true,
+		AudioChannels:         1,
 		GamepadEnabled:        true,
 		GamepadLayout:         "standard",
 		GamepadAnalog:         true,
@@ -390,6 +392,9 @@ func (s *Settings) normalize() {
 	}
 	if s.AudioLatencyMS < 20 || s.AudioLatencyMS > 250 {
 		s.AudioLatencyMS = 60
+	}
+	if s.AudioChannels != 1 && s.AudioChannels != 2 {
+		s.AudioChannels = 1
 	}
 	if s.GamepadLayout != "standard" &&
 		s.GamepadLayout != "swapped" &&
