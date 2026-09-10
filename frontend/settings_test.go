@@ -112,7 +112,7 @@ func TestSettingsNormalizeRepairsDisplayOptions(t *testing.T) {
 	settings.DisplayEffect = "broken"
 	settings.DisplayEffectStrength = 140
 	settings.StateSlot = 99
-	settings.Speed = 3.7
+	settings.Speed = 4.5
 	settings.normalize()
 	if settings.Rotation != 0 ||
 		settings.Language != string(LanguageEnglish) ||
@@ -124,6 +124,15 @@ func TestSettingsNormalizeRepairsDisplayOptions(t *testing.T) {
 		settings.StateSlot != 0 ||
 		settings.Speed != 1 {
 		t.Fatalf("normalized settings = %#v", settings)
+	}
+}
+
+func TestSettingsNormalizePreservesTenthSpeed(t *testing.T) {
+	settings := defaultSettings()
+	settings.Speed = 3.7
+	settings.normalize()
+	if settings.Speed != 3.7 {
+		t.Fatalf("normalized speed = %g, want 3.7", settings.Speed)
 	}
 }
 
@@ -535,14 +544,55 @@ func TestSpeedPresetIndexPicksClosest(t *testing.T) {
 		speed float64
 		index int
 	}{
-		{0.5, 0}, {1, 1}, {1.5, 2}, {2, 3}, {2.5, 4}, {3, 5}, {4, 6},
-		{0, 0}, {1.4, 2}, {3.9, 6}, {100, 6},
+		{0.5, 0}, {1, 5}, {1.1, 6}, {1.5, 10}, {2, 15}, {2.5, 20}, {3, 25}, {4, 35},
+		{0, 0}, {1.44, 9}, {3.94, 34}, {100, 35},
 	}
 	for _, c := range cases {
 		if got := speedPresetIndex(c.speed); got != c.index {
 			t.Fatalf("speedPresetIndex(%g) = %d, want %d", c.speed, got, c.index)
 		}
 	}
+}
+
+func TestSpeedPresetsAdvanceInTenths(t *testing.T) {
+	if len(speedPresets) != 36 {
+		t.Fatalf("len(speedPresets) = %d, want 36", len(speedPresets))
+	}
+	for index, speed := range speedPresets {
+		want := float64(index+5) / 10
+		if speed != want {
+			t.Fatalf("speedPresets[%d] = %g, want %g", index, speed, want)
+		}
+	}
+}
+
+func TestGeneralSettingsSpeedSliderUsesTenths(t *testing.T) {
+	temporary := t.TempDir()
+	t.Setenv("APPDATA", temporary)
+	t.Setenv("XDG_CONFIG_HOME", temporary)
+	shell := &Shell{settings: defaultSettings()}
+	u := &shellUI{settingsSection: "General"}
+
+	for _, row := range u.settingsRowModels(shell) {
+		if row.label != "Emulation speed" {
+			continue
+		}
+		if row.slider == nil {
+			t.Fatal("Emulation speed is not a slider")
+		}
+		if row.slider.min != 0 || row.slider.max != 35 || row.slider.value() != 5 {
+			t.Fatalf("speed slider range/value = %d..%d/%d, want 0..35/5", row.slider.min, row.slider.max, row.slider.value())
+		}
+		if got := row.slider.format(6); got != "1.1x" {
+			t.Fatalf("speed slider step 6 label = %q, want %q", got, "1.1x")
+		}
+		row.slider.apply(6)
+		if shell.settings.Speed != 1.1 {
+			t.Fatalf("speed slider step 6 applied %g, want 1.1", shell.settings.Speed)
+		}
+		return
+	}
+	t.Fatal("General settings is missing the Emulation speed slider")
 }
 
 func TestCycleSpeedAdvancesThroughPresets(t *testing.T) {
@@ -552,12 +602,18 @@ func TestCycleSpeedAdvancesThroughPresets(t *testing.T) {
 	shell := &Shell{settings: defaultSettings()}
 	shell.settings.Speed = 1
 
-	expected := []float64{1.5, 2, 2.5, 3, 4, 0.5, 1}
+	expected := []float64{1.1, 1.2, 1.3}
 	for _, want := range expected {
 		shell.cycleSpeed()
 		if shell.settings.Speed != want {
 			t.Fatalf("cycleSpeed advanced to %g, want %g", shell.settings.Speed, want)
 		}
+	}
+
+	shell.settings.Speed = 4
+	shell.cycleSpeed()
+	if shell.settings.Speed != 0.5 {
+		t.Fatalf("cycleSpeed wrapped to %g, want 0.5", shell.settings.Speed)
 	}
 }
 

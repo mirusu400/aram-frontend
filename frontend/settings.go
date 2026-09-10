@@ -57,7 +57,19 @@ func displayEffectIndex(effect string) int {
 }
 
 // speedPresets are the emulation speeds the control offers, in slider order.
-var speedPresets = []float64{0.5, 1, 1.5, 2, 2.5, 3, 4}
+// Build them from integer tenths so every UI step changes the requested speed
+// by exactly 0.1x without accumulating floating-point additions.
+var speedPresets = func() []float64 {
+	const (
+		minimumTenths = 5
+		maximumTenths = 40
+	)
+	presets := make([]float64, 0, maximumTenths-minimumTenths+1)
+	for tenths := minimumTenths; tenths <= maximumTenths; tenths++ {
+		presets = append(presets, float64(tenths)/10)
+	}
+	return presets
+}()
 
 // speedPresetIndex returns the preset closest to speed, so values saved by
 // older builds still land on a valid slider position.
