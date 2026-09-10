@@ -1,6 +1,9 @@
 package frontend
 
-import "errors"
+import (
+	"errors"
+	"slices"
+)
 
 var (
 	ErrPickerCanceled    = errors.New("file selection canceled")
@@ -22,11 +25,30 @@ type languageAwarePicker interface {
 }
 
 func supportedInputPatterns() []string {
-	return append(wipiPackagePatterns(), firmwareImagePatterns()...)
+	patterns := wipiPackagePatterns()
+	// ZIP and JAR are shared containers, not evidence of a platform. The core
+	// inspects the selected bytes and chooses the application implementation.
+	for _, pattern := range append(j2mePackagePatterns(), gvmInputPatterns()...) {
+		if !slices.Contains(patterns, pattern) {
+			patterns = append(patterns, pattern)
+		}
+	}
+	return append(patterns, firmwareImagePatterns()...)
 }
 
 func wipiPackagePatterns() []string {
 	return []string{"*.dat", "*.jar", "*.zip", "*.ZIP"}
+}
+
+func j2mePackagePatterns() []string {
+	// Standalone JAD files are not supported: companion document access must
+	// be explicit, and descriptor URLs must never cause automatic downloads.
+	return []string{"*.jar", "*.JAR", "*.zip", "*.ZIP"}
+}
+
+func gvmInputPatterns() []string {
+	// These inputs have a validated recognition path, not an execution backend.
+	return []string{"*.sgs", "*.SGS", "*.zip", "*.ZIP"}
 }
 
 func firmwareImagePatterns() []string {
