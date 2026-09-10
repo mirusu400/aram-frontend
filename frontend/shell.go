@@ -186,6 +186,7 @@ type Shell struct {
 	faultReportRequests       chan string
 	openStageResults          chan OpenStage
 	externalOpen              chan OpenRequest
+	externalOpenStatus        chan string
 	externalCommands          chan string
 	externalSelectionCanceled chan struct{}
 	externalSaveBackups       chan string
@@ -274,6 +275,7 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		faultReportRequests:       make(chan string, 1),
 		openStageResults:          make(chan OpenStage, 4),
 		externalOpen:              make(chan OpenRequest, 2),
+		externalOpenStatus:        make(chan string, 4),
 		externalCommands:          make(chan string, 4),
 		externalSelectionCanceled: make(chan struct{}, 1),
 		externalSaveBackups:       make(chan string, 2),
@@ -354,6 +356,12 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 // file or another handle understood by its Backend implementation.
 func (s *Shell) OpenExternalDocument(path, displayName string, firmware bool) {
 	request := OpenRequest{Path: path, DisplayName: displayName, Firmware: firmware}
+	s.OpenExternalRequest(request)
+}
+
+// OpenExternalRequest is the native-host entry point for a fully described
+// request, including an expected digest for integrity-pinned remote packages.
+func (s *Shell) OpenExternalRequest(request OpenRequest) {
 	select {
 	case s.externalOpen <- request:
 	default:
@@ -368,6 +376,16 @@ func (s *Shell) OpenExternalBytes(displayName string, data []byte, firmware bool
 	request := OpenRequest{DisplayName: displayName, Data: data, Firmware: firmware}
 	select {
 	case s.externalOpen <- request:
+	default:
+	}
+}
+
+// ReportExternalOpenStatus lets a native product host surface work that occurs
+// before an OpenRequest exists, such as downloading and verifying a deep-linked
+// package. The game loop owns the actual status mutation.
+func (s *Shell) ReportExternalOpenStatus(message string) {
+	select {
+	case s.externalOpenStatus <- message:
 	default:
 	}
 }

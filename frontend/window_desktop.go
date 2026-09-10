@@ -27,6 +27,17 @@ func Run(backend Backend, initialPath string) error {
 	return RunWithOptions(backend, initialPath, false)
 }
 
+// RunWithDesktopShell is the desktop product bootstrap for hosts that receive
+// asynchronous operating-system events after launch, such as a macOS URL-open
+// Apple Event. ready runs after the Shell exists and before the game loop starts.
+func RunWithDesktopShell(
+	backend Backend,
+	initialPath string,
+	ready func(*Shell),
+) error {
+	return runDesktop(backend, initialPath, ready)
+}
+
 // RunWithOptions is the integrated desktop bootstrap entry point. The trailing
 // bool once reopened the native file picker after the bootstrap installed and
 // relaunched a selected update channel; that unsolicited popup was removed, so
@@ -37,12 +48,19 @@ func RunWithOptions(
 	initialPath string,
 	_ bool,
 ) error {
+	return runDesktop(backend, initialPath, nil)
+}
+
+func runDesktop(backend Backend, initialPath string, ready func(*Shell)) error {
 	ebiten.SetWindowTitle("ARAM - Archived Runtime for ARM Mobiles")
 	ebiten.SetWindowIcon(appIcons())
 	ebiten.SetWindowSize(logicalWidth, logicalHeight)
 	ebiten.SetWindowSizeLimits(720, 540, -1, -1)
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 	shell := NewShell(backend, NewPlatformPicker(), initialPath)
+	if ready != nil {
+		ready(shell)
+	}
 	// Enable the native fault dialog on the real desktop run only. Tests build
 	// their shells with NewShell directly and must never raise a real dialog.
 	shell.faultPrompter = platformReportPrompter

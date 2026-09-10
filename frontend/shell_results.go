@@ -10,6 +10,8 @@ func (s *Shell) consumeResults() {
 		select {
 		case request := <-s.externalOpen:
 			s.openRequest(request)
+		case message := <-s.externalOpenStatus:
+			s.setStatus(message)
 		case commandID := <-s.externalCommands:
 			s.dispatchCommand(commandID)
 		case path := <-s.externalSaveBackups:

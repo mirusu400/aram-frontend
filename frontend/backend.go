@@ -29,6 +29,10 @@ type OpenRequest struct {
 	DisplayName string
 	Firmware    bool
 	Temporary   bool
+	// ExpectedSHA256, when set by a host that fetched a remote input, pins the
+	// exact bytes the adapter is allowed to execute. The adapter rechecks it from
+	// the same open descriptor it hands to the machine.
+	ExpectedSHA256 string
 	// Data carries the input bytes in-band for a host that has no readable
 	// filesystem path for the selection - the web/wasm build, whose picker
 	// reads a browser File into memory rather than a disk path. When Data is
