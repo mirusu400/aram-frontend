@@ -220,8 +220,8 @@ func TestExportSaveDataOffersTheBackupToTheHost(t *testing.T) {
 	}
 }
 
-// TestOfferArtifactIgnoresArtifactsWithoutAShareType keeps screenshots, logs
-// and debug bundles on their existing "saved: path" behaviour.
+// TestOfferArtifactIgnoresArtifactsWithoutAShareType keeps screenshots and
+// logs on their existing "saved: path" behaviour.
 func TestOfferArtifactIgnoresArtifactsWithoutAShareType(t *testing.T) {
 	host := &recordingShareHost{}
 	useShareHost(t, host)
@@ -230,5 +230,64 @@ func TestOfferArtifactIgnoresArtifactsWithoutAShareType(t *testing.T) {
 	shell.offerArtifact(artifactResult{kind: "Screenshot", path: "aram.png"})
 	if len(host.paths) != 0 {
 		t.Fatalf("host was handed %v for an artifact with no share type", host.paths)
+	}
+}
+
+func TestSaveDebugBundleOffersZIPToTheHost(t *testing.T) {
+	config := t.TempDir()
+	t.Setenv("APPDATA", config)
+	t.Setenv("XDG_CONFIG_HOME", config)
+	t.Setenv("HOME", config)
+
+	host := &recordingShareHost{}
+	useShareHost(t, host)
+
+	shell := newSaveShell(NullBackend{})
+	shell.saveDebugBundle()
+	result := <-shell.artifactResults
+	if result.err != nil {
+		t.Fatalf("debug export reported error: %v", result.err)
+	}
+	if result.shareMIME != debugBundleMIMEType {
+		t.Fatalf("shareMIME = %q, want %q", result.shareMIME, debugBundleMIMEType)
+	}
+	shell.offerArtifact(result)
+	if len(host.paths) != 1 || host.paths[0] != result.path {
+		t.Fatalf("host was handed %v, want %q", host.paths, result.path)
+	}
+}
+
+func TestOpenDebugBundleFolderOffersNewestZIPOnMobile(t *testing.T) {
+	config := t.TempDir()
+	t.Setenv("APPDATA", config)
+	t.Setenv("XDG_CONFIG_HOME", config)
+	t.Setenv("HOME", config)
+
+	directory, err := artifactDirectory("debug")
+	if err != nil {
+		t.Fatal(err)
+	}
+	older := filepath.Join(directory, "aram-debug-20260101-000000.000.zip")
+	newer := filepath.Join(directory, "aram-debug-20260102-000000.000.zip")
+	for _, path := range []string{older, newer} {
+		if err := os.WriteFile(path, []byte("ZIP"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	previousFolder := openArtifactFolder
+	openArtifactFolder = func(string) error { return ErrFolderBrowserUnavailable }
+	t.Cleanup(func() { openArtifactFolder = previousFolder })
+
+	host := &recordingShareHost{}
+	useShareHost(t, host)
+
+	shell := newSaveShell(NullBackend{})
+	shell.openDebugBundleFolder()
+	if len(host.paths) != 1 || host.paths[0] != newer {
+		t.Fatalf("host was handed %v, want newest debug bundle %q", host.paths, newer)
+	}
+	if len(host.mimes) != 1 || host.mimes[0] != debugBundleMIMEType {
+		t.Fatalf("host MIME types = %v, want %q", host.mimes, debugBundleMIMEType)
 	}
 }

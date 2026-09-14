@@ -12,10 +12,11 @@ func (s *Shell) saveDebugBundle() {
 	go func() {
 		path, warning, err := collectDebugBundle(snapshot, backend)
 		s.artifactResults <- artifactResult{
-			kind:    "Debug bundle",
-			path:    path,
-			warning: warning,
-			err:     err,
+			kind:      "Debug bundle",
+			path:      path,
+			warning:   warning,
+			shareMIME: debugBundleMIMEType,
+			err:       err,
 		}
 	}()
 }

@@ -119,6 +119,7 @@ func (s *Shell) consumeResults() {
 					result.path,
 					result.warning,
 				))
+				s.offerArtifact(result)
 				continue
 			}
 			s.setStatus(s.trf(

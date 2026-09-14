@@ -24,6 +24,9 @@ type Host interface {
 	// RequestDocument receives one of frontend.DocumentKindInput,
 	// frontend.DocumentKindFirmware, or frontend.DocumentKindSaveBackup.
 	RequestDocument(kind string)
+	// ShareFile exports an app-private artifact through the platform document
+	// UI so the user can keep it in accessible storage.
+	ShareFile(path, mimeType, title string) error
 	RequestTextInput(requestID int64, label, hint, text string)
 }
 
@@ -32,8 +35,15 @@ func init() {
 }
 
 func SetHost(host Host) {
+	if host == nil {
+		frontend.SetNativePickerHost(nil)
+		frontend.SetNativeTextInputHost(nil)
+		frontend.SetNativeShareHost(nil)
+		return
+	}
 	frontend.SetNativePickerHost(host)
 	frontend.SetNativeTextInputHost(host)
+	frontend.SetNativeShareHost(host)
 }
 
 // SubmitTextInput reports the text the native editor accepted for the field
