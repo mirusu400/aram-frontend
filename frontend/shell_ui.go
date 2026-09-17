@@ -279,21 +279,32 @@ func (u *shellUI) syncPanel(shell *Shell) {
 		widget.ContainerOpts.BackgroundImage(design.Components.DialogBody),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
-	body := widget.NewText(
-		widget.TextOpts.Text(strings.Join(lines, "\n"), design.Type.Body, design.Palette.TextMuted),
-		widget.TextOpts.MaxWidth(float64(design.px(680))),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-			HorizontalPosition: widget.AnchorLayoutPositionStart,
-			VerticalPosition:   widget.AnchorLayoutPositionStart,
-			Padding: &widget.Insets{
-				Left:   design.Space.XL,
-				Top:    design.Space.XL,
-				Right:  design.Space.XL,
-				Bottom: design.px(72),
-			},
-		})),
-	)
-	contents.AddChild(body)
+	bodyLayout := widget.AnchorLayoutData{
+		HorizontalPosition: widget.AnchorLayoutPositionStart,
+		VerticalPosition:   widget.AnchorLayoutPositionStart,
+		Padding: &widget.Insets{
+			Left:   design.Space.XL,
+			Top:    design.Space.XL,
+			Right:  design.Space.XL,
+			Bottom: design.px(72),
+		},
+	}
+	if shell.panel.Kind == "logs" {
+		contents.AddChild(newSelectableText(
+			design,
+			strings.Join(lines, "\n"),
+			design.px(680),
+			design.px(430),
+			bodyLayout,
+		))
+	} else {
+		body := widget.NewText(
+			widget.TextOpts.Text(strings.Join(lines, "\n"), design.Type.Body, design.Palette.TextMuted),
+			widget.TextOpts.MaxWidth(float64(design.px(680))),
+			widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(bodyLayout)),
+		)
+		contents.AddChild(body)
+	}
 	footer := shell.tr(shell.panelFooter())
 	if footer != "" {
 		contents.AddChild(design.text(

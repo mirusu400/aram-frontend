@@ -532,7 +532,7 @@
   "Choose Stable or Nightly; aram-core runtime is already included.": "Choose Stable or Nightly; aram-core runtime is already included.",
   "S: save report  Esc: close": "S: save report  Esc: close",
   "R: refresh from backend  Esc: close": "R: refresh from backend  Esc: close",
-  "Ctrl+S: save log  Esc: close": "Ctrl+S: save log  Esc: close",
+  "Ctrl+A: select all  Ctrl+C: copy  Ctrl+S: save log  Esc: close": "Ctrl+A: select all  Ctrl+C: copy  Ctrl+S: save log  Esc: close",
   "Esc: close": "Esc: close",
   "Slot %d": "Slot %d",
   "Download": "Download",

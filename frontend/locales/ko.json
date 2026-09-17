@@ -532,7 +532,7 @@
   "Choose Stable or Nightly; aram-core runtime is already included.": "안정 또는 나이틀리 채널을 선택하세요. aram-core 런타임은 이미 포함되어 있습니다.",
   "S: save report  Esc: close": "S: 보고서 저장  Esc: 닫기",
   "R: refresh from backend  Esc: close": "R: 백엔드에서 새로 고침  Esc: 닫기",
-  "Ctrl+S: save log  Esc: close": "Ctrl+S: 로그 저장  Esc: 닫기",
+  "Ctrl+A: select all  Ctrl+C: copy  Ctrl+S: save log  Esc: close": "Ctrl+A: 전체 선택  Ctrl+C: 복사  Ctrl+S: 로그 저장  Esc: 닫기",
   "Esc: close": "Esc: 닫기",
   "Slot %d": "%d번 슬롯",
   "Download": "다운로드",

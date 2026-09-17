@@ -111,7 +111,7 @@ func (s *Shell) panelFooter() string {
 	case "tool":
 		return "R: refresh from backend  Esc: close"
 	case "logs":
-		return "Ctrl+S: save log  Esc: close"
+		return "Ctrl+A: select all  Ctrl+C: copy  Ctrl+S: save log  Esc: close"
 	default:
 		return "Esc: close"
 	}
