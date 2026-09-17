@@ -29,6 +29,10 @@ type OpenRequest struct {
 	DisplayName string
 	Firmware    bool
 	Temporary   bool
+	// ProfileID optionally requests a backend-owned compatibility profile.
+	// Empty preserves automatic selection. Hosts must not infer a carrier from
+	// the filename or container extension. InputInfo reports the resolved ID.
+	ProfileID string
 	// ExpectedSHA256, when set by a host that fetched a remote input, pins the
 	// exact bytes the adapter is allowed to execute. The adapter rechecks it from
 	// the same open descriptor it hands to the machine.
