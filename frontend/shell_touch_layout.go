@@ -17,10 +17,11 @@ func (s *Shell) touchDeckHeight(width, height int) int {
 		// game panel keeps its whole height with no deck reserved.
 		return 0
 	}
-	if s.settings.TouchControlsOverlay {
-		// Overlay mode leaves the guest viewport at full height. The controls
-		// keep their normal bottom-deck geometry, but Draw paints them over the
-		// already-rendered guest instead of seating them below it.
+	if s.settings.TouchControlsOverlay && !s.showHomeSurface() {
+		// Overlay mode leaves a running guest viewport at full height. Home is
+		// an EbitenUI surface drawn after the controls, so letting it fill that
+		// same space would cover the deck and consume its touch input. Keep the
+		// deck docked while choosing a title, then overlay it once one is loaded.
 		return 0
 	}
 	return touchDeckHeightWithRenderScale(width, height, s.touchLayoutOptions(), s.renderScale)

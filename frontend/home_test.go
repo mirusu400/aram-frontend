@@ -22,6 +22,30 @@ func TestIdleLaunchShowsHomeSurface(t *testing.T) {
 	}
 }
 
+// Overlay controls belong over a running guest, not over the Home launcher.
+// Home is an EbitenUI surface drawn after the controls; if it consumes the
+// full viewport it both paints over the deck and takes its touch input.
+func TestHomeSurfaceReservesTouchDeckInOverlayMode(t *testing.T) {
+	isolateSettledSettings(t)
+	shell := NewShell(NullBackend{}, nil, "")
+	shell.settings.TouchControlsOverlay = true
+	const width, height = 1080, 2280
+
+	want := touchDeckHeightWithOptions(
+		width,
+		height,
+		shell.touchLayoutOptions(),
+	)
+	if got := shell.touchDeckHeight(width, height); got != want {
+		t.Fatalf("Home overlay deck height = %d, want reserved height %d", got, want)
+	}
+
+	shell.input = &InputInfo{DisplayName: "loaded.dat"}
+	if got := shell.touchDeckHeight(width, height); got != 0 {
+		t.Fatalf("running guest overlay reserved %d pixels, want 0", got)
+	}
+}
+
 func TestHomeTabsListTheirOwnEntries(t *testing.T) {
 	isolateSettledSettings(t)
 	shell := NewShell(NullBackend{}, nil, "")

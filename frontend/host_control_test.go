@@ -109,6 +109,7 @@ func TestTouchControlsOverlayDefaultsOnAndPersistsOff(t *testing.T) {
 func TestTouchControlsOverlayToggleAndDeckReservation(t *testing.T) {
 	isolateSettings(t)
 	shell := &Shell{settings: defaultSettings()}
+	shell.input = &InputInfo{DisplayName: "loaded.dat"}
 	shell.settings.ShowVirtualKeypad = true
 	const width, height = 1080, 2280
 	if got := shell.touchDeckHeight(width, height); got != 0 {
