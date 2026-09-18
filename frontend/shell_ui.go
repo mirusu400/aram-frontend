@@ -15,6 +15,7 @@ type shellUI struct {
 	ui                   *ebitenui.UI
 	design               *ARAMDesignSystem
 	menuButtons          []*widget.Button
+	mobileMenuButton     *widget.Button
 	menuWindow           *widget.Window
 	menuIndex            int
 	commandButtons       map[string]*widget.Button
@@ -101,8 +102,12 @@ func newShellUI(shell *Shell, design *ARAMDesignSystem) *shellUI {
 	view.touchCursor = installTouchCursorUpdater()
 
 	root := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewAnchorLayout()))
-	topBar := view.buildTopBar(shell)
-	toolbar := view.buildApplicationToolbar(shell)
+	var chrome []widget.PreferredSizeLocateableWidget
+	if platformUsesTouchLayout() {
+		chrome = append(chrome, view.buildMobileAppBar(shell))
+	} else {
+		chrome = append(chrome, view.buildTopBar(shell), view.buildApplicationToolbar(shell))
+	}
 	statusBar := view.buildStatusBar()
 	view.scrim = widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(design.Components.Scrim),
@@ -123,7 +128,9 @@ func newShellUI(shell *Shell, design *ARAMDesignSystem) *shellUI {
 	)
 	view.homeContainer.GetWidget().SetVisibility(widget.Visibility_Hide)
 
-	root.AddChild(view.homeContainer, topBar, toolbar, statusBar, view.scrim)
+	root.AddChild(view.homeContainer)
+	root.AddChild(chrome...)
+	root.AddChild(statusBar, view.scrim)
 	view.ui = &ebitenui.UI{
 		Container:           root,
 		DisableDefaultFocus: false,
@@ -146,7 +153,9 @@ func (u *shellUI) sync(shell *Shell) {
 		u.panelSignature = ""
 		u.closeMenu()
 	}
-	u.toolbarTitle.GetWidget().SetVisibility(visibility(outsideWidth >= 760))
+	u.toolbarTitle.GetWidget().SetVisibility(visibility(
+		platformUsesTouchLayout() || outsideWidth >= 760,
+	))
 	if u.buildStampText != nil {
 		u.buildStampText.GetWidget().SetVisibility(visibility(outsideWidth >= 700))
 	}

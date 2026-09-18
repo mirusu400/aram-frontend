@@ -67,6 +67,7 @@ type Shell struct {
 	activeMenu           int
 	focusMode            bool
 	touchChromeHidden    bool
+	touchMenuImmersive   bool
 	touchChromeSyncState FrontendState
 	fillGuestViewport    bool
 	uiPointerSuppressed  bool
@@ -624,6 +625,10 @@ func (s *Shell) handlePointerPress(x, y int) {
 		return
 	}
 	if s.activeMenu < 0 {
+		return
+	}
+	if s.activeMenu >= len(s.menus) {
+		s.activeMenu = -1
 		return
 	}
 	startX := menuStartX(s.menus, s.activeMenu)
