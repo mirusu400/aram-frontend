@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -639,9 +640,10 @@ func TestCycleSpeedAdvancesThroughPresets(t *testing.T) {
 // "jit" default forward. Naming a core in the stored settings is what made the
 // choice wrong on platforms that do not have it and stale once a faster core
 // landed; "fastest" is resolved by the backend at open time and always exists.
-func TestCPUProfilingDefaultsOnAndPersistsOff(t *testing.T) {
-	if !defaultSettings().CPUProfile {
-		t.Fatal("CPU profiling should default on")
+func TestCPUProfilingDefaultMatchesPlatformAndPersistsOff(t *testing.T) {
+	want := runtime.GOOS == "windows" || runtime.GOOS == "darwin"
+	if got := defaultSettings().CPUProfile; got != want {
+		t.Fatalf("CPU profiling default on %s = %t, want %t", runtime.GOOS, got, want)
 	}
 	// Dropping omitempty is what lets an explicit off survive a save/load
 	// round trip instead of being omitted and defaulting back on.

@@ -7,8 +7,9 @@ import (
 )
 
 // cpuProfileState holds a continuously running CPU profile that the debug
-// bundle can snapshot on demand. Profiling carries real runtime overhead, so it
-// is opt-in through settings and off by default.
+// bundle can snapshot on demand. Profiling carries real runtime overhead. It
+// defaults on for native Windows and macOS builds, where the sampler is useful
+// for product diagnostics, and off for Android, WebAssembly, and other hosts.
 type cpuProfileState struct {
 	mu      sync.Mutex
 	buf     *bytes.Buffer

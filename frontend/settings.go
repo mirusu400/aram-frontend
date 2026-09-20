@@ -313,7 +313,7 @@ func defaultSettings() Settings {
 		VibrationEnabled:      true,
 		TouchControlsOverlay:  true,
 		TouchDpadCircular:     true,
-		CPUProfile:            true,
+		CPUProfile:            defaultCPUProfilingEnabled(),
 		DisplaySync:           true,
 		AnalyticsEnabled:      true,
 	}
