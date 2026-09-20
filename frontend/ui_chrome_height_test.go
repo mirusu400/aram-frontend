@@ -54,15 +54,15 @@ func TestTopChromeStaysDesktopSized(t *testing.T) {
 	}
 }
 
-// The chrome toggle sits inside the toolbar band when the chrome is shown, so
-// it may not hang below it into the guest viewport.
-func TestChromeToggleStaysInsideTheToolbar(t *testing.T) {
+// The chrome toggle sits inside the compact mobile app bar when chrome is
+// shown, so it may not hang below it into the guest viewport.
+func TestChromeToggleStaysInsideTheMobileAppBar(t *testing.T) {
 	bounds := touchChromeToggleBounds(1080, false)
-	if bounds.Min.Y < menuBarHeight {
-		t.Fatalf("toggle top %d rides up into the menu bar", bounds.Min.Y)
+	if bounds.Min.Y < 0 {
+		t.Fatalf("toggle top %d leaves the app bar", bounds.Min.Y)
 	}
-	if bounds.Max.Y > menuBarHeight+applicationToolbarHeight {
-		t.Fatalf("toggle bottom %d hangs below the toolbar band %d",
-			bounds.Max.Y, menuBarHeight+applicationToolbarHeight)
+	if bounds.Max.Y > mobileAppBarHeight {
+		t.Fatalf("toggle bottom %d hangs below the mobile app bar %d",
+			bounds.Max.Y, mobileAppBarHeight)
 	}
 }

@@ -50,7 +50,7 @@ func (s *Shell) showHomeSurface() bool {
 // the Home widgets to match, so both agree on the same rectangle. It mirrors the
 // inset math in drawWorkspace.
 func (s *Shell) guestViewportRect(width, height int) image.Rectangle {
-	contentTop := s.px(menuHeight + applicationToolbarHeight + 12)
+	contentTop := s.px(topChromeHeightForLayout(platformUsesTouchLayout()) + 12)
 	contentBottom := height - s.px(statusHeight+12)
 	if platformUsesTouchLayout() {
 		contentBottom -= s.touchDeckHeight(width, height)

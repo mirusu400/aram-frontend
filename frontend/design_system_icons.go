@@ -55,6 +55,10 @@ func drawModernIconAtScale(name string, ink color.Color, scale float64) *ebiten.
 	f := float32(scale)
 	img := ebiten.NewImage(s, s)
 	switch name {
+	case "menu":
+		for _, y := range []float32{7, 12, 17} {
+			vector.StrokeLine(img, 5*f, y*f, 19*f, y*f, 2.1*f, ink, true)
+		}
 	case "open":
 		// A folder with a raised tab.
 		fillIconPathScaled(img, ink, scale, func(p *vector.Path) {

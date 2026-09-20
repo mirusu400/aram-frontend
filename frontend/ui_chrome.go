@@ -15,6 +15,7 @@ const (
 	// touch-sized rows a handset needs.
 	menuBarHeight            = 24
 	applicationToolbarHeight = 30
+	mobileAppBarHeight       = 52
 	statusBarHeight          = 28
 	settingsNavWidth         = 168
 	// menuRowHeight and toolbarButtonHeight are what those bars actually
@@ -24,6 +25,13 @@ const (
 	toolbarButtonHeight = 26
 	toolbarButtonWidth  = 28
 )
+
+func topChromeHeightForLayout(touch bool) int {
+	if touch {
+		return mobileAppBarHeight
+	}
+	return menuBarHeight + applicationToolbarHeight
+}
 
 func (u *shellUI) buildTopBar(shell *Shell) *widget.Container {
 	design := u.design
@@ -365,6 +373,16 @@ func (u *shellUI) toggleMenu(index int) {
 }
 
 func (u *shellUI) openMenu(index int) {
+	if platformUsesTouchLayout() {
+		if index == mobileMenuRootIndex(u.owner.menus) {
+			u.openMobileMenuRoot()
+			return
+		}
+		if index >= 0 && index < len(u.owner.menus) {
+			u.openMobileMenuCategory(index)
+		}
+		return
+	}
 	if index < 0 || index >= len(u.owner.menus) {
 		return
 	}
@@ -398,66 +416,25 @@ func (u *shellUI) openMenu(index int) {
 		return button
 	}
 
-	var contents *widget.Container
-	var location image.Rectangle
-	if platformUsesTouchLayout() {
-		// Touch layouts show the menu as a centered modal sheet instead of
-		// an anchored dropdown that can run past a phone screen. Commands
-		// flow into extra columns when one column would not fit the height.
-		viewWidth, viewHeight := u.owner.viewportSize()
-		layout := touchMenuLayoutForScale(
-			viewWidth,
-			viewHeight,
-			itemHeight,
-			design.Space.L,
-			len(commands),
-			design.Scale,
-		)
-		location = layout.window
-		contents = widget.NewContainer(
-			widget.ContainerOpts.BackgroundImage(design.Components.Dropdown),
-			widget.ContainerOpts.Layout(widget.NewRowLayout(
-				widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
-				widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(design.Space.S)),
-				widget.RowLayoutOpts.Spacing(design.Space.XS),
-			)),
-		)
-		buttonWidth := (layout.window.Dx() -
-			design.Space.L - (layout.columns-1)*design.Space.XS) / layout.columns
-		var column *widget.Container
-		for position, command := range commands {
-			if position%layout.perColumn == 0 {
-				column = widget.NewContainer(
-					widget.ContainerOpts.Layout(widget.NewRowLayout(
-						widget.RowLayoutOpts.Direction(widget.DirectionVertical),
-						widget.RowLayoutOpts.Spacing(design.Space.XS),
-					)),
-				)
-				contents.AddChild(column)
-			}
-			column.AddChild(newCommandButton(command, buttonWidth))
-		}
-	} else {
-		contents = widget.NewContainer(
-			widget.ContainerOpts.BackgroundImage(design.Components.Dropdown),
-			widget.ContainerOpts.Layout(widget.NewRowLayout(
-				widget.RowLayoutOpts.Direction(widget.DirectionVertical),
-				widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(design.Space.S)),
-				widget.RowLayoutOpts.Spacing(design.Space.XS),
-			)),
-		)
-		for _, command := range commands {
-			contents.AddChild(newCommandButton(command, design.px(dropdownWidth)-design.Space.L))
-		}
-		startX := menuUIStartX(u.owner.menus, index, design)
-		height := design.Space.L + len(commands)*itemHeight
-		location = image.Rect(
-			startX,
-			design.px(menuBarHeight)+design.Space.XS,
-			startX+design.px(dropdownWidth),
-			design.px(menuBarHeight)+design.Space.XS+height,
-		)
+	contents := widget.NewContainer(
+		widget.ContainerOpts.BackgroundImage(design.Components.Dropdown),
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
+			widget.RowLayoutOpts.Padding(widget.NewInsetsSimple(design.Space.S)),
+			widget.RowLayoutOpts.Spacing(design.Space.XS),
+		)),
+	)
+	for _, command := range commands {
+		contents.AddChild(newCommandButton(command, design.px(dropdownWidth)-design.Space.L))
 	}
+	startX := menuUIStartX(u.owner.menus, index, design)
+	height := design.Space.L + len(commands)*itemHeight
+	location := image.Rect(
+		startX,
+		design.px(menuBarHeight)+design.Space.XS,
+		startX+design.px(dropdownWidth),
+		design.px(menuBarHeight)+design.Space.XS+height,
+	)
 
 	var window *widget.Window
 	window = widget.NewWindow(
@@ -522,49 +499,4 @@ func menuUIStartX(menus []Menu, index int, design *ARAMDesignSystem) int {
 		x += design.px(widths[current]) + design.Space.XS
 	}
 	return x
-}
-
-// touchMenuLayout describes the centered modal command sheet used by touch
-// layouts in place of the desktop dropdown.
-type touchMenuLayout struct {
-	columns     int
-	perColumn   int
-	columnWidth int
-	window      image.Rectangle
-}
-
-func touchMenuLayoutFor(
-	viewWidth, viewHeight, itemHeight, framePadding, count int,
-) touchMenuLayout {
-	return touchMenuLayoutForScale(viewWidth, viewHeight, itemHeight, framePadding, count, 1)
-}
-
-func touchMenuLayoutForScale(
-	viewWidth, viewHeight, itemHeight, framePadding, count int,
-	scale float64,
-) touchMenuLayout {
-	if viewWidth <= 0 || viewHeight <= 0 {
-		viewWidth, viewHeight = scaledScreenSize(logicalWidth, logicalHeight, scale)
-	}
-	count = max(1, count)
-	itemHeight = max(1, itemHeight)
-	margin := scaledPixels(18, scale)
-	minColumnWidth := scaledPixels(160, scale)
-	available := max(itemHeight, viewHeight-scaledPixels(menuBarHeight+statusBarHeight, scale)-margin*2)
-	maxRows := max(1, (available-framePadding)/itemHeight)
-	columns := (count + maxRows - 1) / maxRows
-	maxColumns := max(1, (viewWidth-margin*2)/minColumnWidth)
-	columns = max(1, min(columns, maxColumns))
-	perColumn := (count + columns - 1) / columns
-	columnWidth := min(scaledPixels(dropdownWidth, scale), (viewWidth-margin*2)/columns)
-	width := columnWidth * columns
-	height := min(available, framePadding+perColumn*itemHeight)
-	x := max(0, (viewWidth-width)/2)
-	y := scaledPixels(menuBarHeight, scale) + margin + max(0, (available-height)/2)
-	return touchMenuLayout{
-		columns:     columns,
-		perColumn:   perColumn,
-		columnWidth: columnWidth,
-		window:      image.Rect(x, y, x+width, y+height),
-	}
 }
