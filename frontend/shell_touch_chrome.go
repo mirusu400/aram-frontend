@@ -50,8 +50,13 @@ func (s *Shell) toggleTouchChromeForLayout(touch bool) {
 }
 
 func (s *Shell) finishTouchMenu() {
-	if s.touchMenuImmersive {
+	// A command such as Close Title can synchronously remove the guest while
+	// the drawer is open. Only return to immersive chrome when there is still
+	// a title to return to; otherwise leave the Home interface visible.
+	if s.touchMenuImmersive && s.input != nil {
 		s.touchChromeHidden = true
+	} else if s.input == nil {
+		s.touchChromeHidden = false
 	}
 	s.touchMenuImmersive = false
 }

@@ -173,8 +173,8 @@ func (u *shellUI) mobileCommandButton(command Command) *widget.Button {
 		func() {
 			u.owner.activeMenu = -1
 			u.closeMenu()
-			u.owner.finishTouchMenu()
 			u.owner.dispatchCommand(commandID)
+			u.owner.finishTouchMenu()
 		},
 	)
 	button.GetWidget().Disabled = !command.IsEnabled(u.owner)

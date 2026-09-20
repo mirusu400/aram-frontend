@@ -29,6 +29,7 @@ func TestHiddenTouchChromeOpensUnifiedMenuAndReturnsToGame(t *testing.T) {
 		menus:             defaultMenus(),
 		activeMenu:        -1,
 		touchChromeHidden: true,
+		input:             &InputInfo{},
 	}
 	shell.toggleTouchChromeForLayout(true)
 	if shell.touchChromeHidden {
@@ -45,5 +46,17 @@ func TestHiddenTouchChromeOpensUnifiedMenuAndReturnsToGame(t *testing.T) {
 	shell.finishTouchMenu()
 	if !shell.touchChromeHidden || shell.touchMenuImmersive {
 		t.Fatalf("dismissed menu = hidden:%t return:%t", shell.touchChromeHidden, shell.touchMenuImmersive)
+	}
+}
+
+func TestTouchMenuDoesNotHideHomeAfterTitleCloses(t *testing.T) {
+	shell := &Shell{
+		touchMenuImmersive: true,
+		input:              nil,
+	}
+	shell.finishTouchMenu()
+	if shell.touchChromeHidden || shell.touchMenuImmersive {
+		t.Fatalf("closed title left immersive state = hidden:%t return:%t",
+			shell.touchChromeHidden, shell.touchMenuImmersive)
 	}
 }
