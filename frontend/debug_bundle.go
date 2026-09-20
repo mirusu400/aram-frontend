@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"image"
 	"image/png"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -170,9 +171,39 @@ type debugBundleFile struct {
 	data      []byte
 }
 
+type debugBundleSink func(time.Time, []debugBundleFile) (string, error)
+
 func collectDebugBundle(
 	snapshot debugBundleSnapshot,
 	backend Backend,
+) (string, string, error) {
+	return collectDebugBundleWithSink(snapshot, backend, writeDebugZIP)
+}
+
+func collectDebugBundleData(
+	snapshot debugBundleSnapshot,
+	backend Backend,
+) (string, []byte, string, error) {
+	var data []byte
+	name, warning, err := collectDebugBundleWithSink(
+		snapshot,
+		backend,
+		func(createdAt time.Time, files []debugBundleFile) (string, error) {
+			var buffer bytes.Buffer
+			if err := writeDebugZIPArchive(&buffer, createdAt, files); err != nil {
+				return "", err
+			}
+			data = buffer.Bytes()
+			return timestampedName("aram-debug", ".zip"), nil
+		},
+	)
+	return name, data, warning, err
+}
+
+func collectDebugBundleWithSink(
+	snapshot debugBundleSnapshot,
+	backend Backend,
+	sink debugBundleSink,
 ) (string, string, error) {
 	var (
 		artifacts  []DebugArtifact
@@ -186,13 +217,27 @@ func collectDebugBundle(
 		artifacts, collectErr = exporter.DebugArtifacts(ctx)
 		cancel()
 	}
-	return writeDebugBundle(snapshot, artifacts, collectErr)
+	return buildDebugBundle(snapshot, artifacts, collectErr, sink)
 }
 
 func writeDebugBundle(
 	snapshot debugBundleSnapshot,
 	backendArtifacts []DebugArtifact,
 	backendErr error,
+) (string, string, error) {
+	return buildDebugBundle(
+		snapshot,
+		backendArtifacts,
+		backendErr,
+		writeDebugZIP,
+	)
+}
+
+func buildDebugBundle(
+	snapshot debugBundleSnapshot,
+	backendArtifacts []DebugArtifact,
+	backendErr error,
+	sink debugBundleSink,
 ) (string, string, error) {
 	frontendLog := []byte(strings.Join(snapshot.FrontendLogs, "\n"))
 	if len(frontendLog) != 0 {
@@ -309,7 +354,7 @@ func writeDebugBundle(
 		data:      manifestData,
 	}}, files...)
 
-	path, err := writeDebugZIP(snapshot.CreatedAt, files)
+	path, err := sink(snapshot.CreatedAt, files)
 	if err != nil {
 		return "", "", err
 	}
@@ -412,6 +457,20 @@ func writeDebugZIP(
 		}
 	}()
 
+	if err := writeDebugZIPArchive(output, createdAt, files); err != nil {
+		return "", err
+	}
+	if err := output.Close(); err != nil {
+		return "", fmt.Errorf("close debug bundle file: %w", err)
+	}
+	return path, nil
+}
+
+func writeDebugZIPArchive(
+	output io.Writer,
+	createdAt time.Time,
+	files []debugBundleFile,
+) error {
 	archive := zip.NewWriter(output)
 	for _, file := range files {
 		header := &zip.FileHeader{
@@ -423,7 +482,7 @@ func writeDebugZIP(
 		entry, createErr := archive.CreateHeader(header)
 		if createErr != nil {
 			_ = archive.Close()
-			return "", fmt.Errorf(
+			return fmt.Errorf(
 				"create debug bundle entry %q: %w",
 				file.name,
 				createErr,
@@ -431,7 +490,7 @@ func writeDebugZIP(
 		}
 		if _, writeErr := entry.Write(file.data); writeErr != nil {
 			_ = archive.Close()
-			return "", fmt.Errorf(
+			return fmt.Errorf(
 				"write debug bundle entry %q: %w",
 				file.name,
 				writeErr,
@@ -439,12 +498,9 @@ func writeDebugZIP(
 		}
 	}
 	if err := archive.Close(); err != nil {
-		return "", fmt.Errorf("close debug bundle: %w", err)
+		return fmt.Errorf("close debug bundle: %w", err)
 	}
-	if err := output.Close(); err != nil {
-		return "", fmt.Errorf("close debug bundle file: %w", err)
-	}
-	return path, nil
+	return nil
 }
 
 func debugInput(input *InputInfo) *debugInputReport {

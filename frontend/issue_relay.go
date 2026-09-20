@@ -38,6 +38,8 @@ type issueRelaySubmission struct {
 	Backend        string
 	State          FrontendState
 	BundlePath     string
+	BundleName     string
+	BundleData     []byte
 	Warning        string
 	IdempotencyKey string
 }
@@ -107,7 +109,11 @@ func (c *issueRelayClient) Submit(
 	if submission.IdempotencyKey == "" {
 		return issueRelayReport{}, errors.New("missing report idempotency key")
 	}
-	screenshot, err := readIssueScreenshot(submission.BundlePath)
+	bundle, bundleName, err := readIssueBundle(submission)
+	if err != nil {
+		return issueRelayReport{}, err
+	}
+	screenshot, err := readIssueScreenshot(bundle)
 	if err != nil {
 		return issueRelayReport{}, err
 	}
@@ -117,7 +123,8 @@ func (c *issueRelayClient) Submit(
 	}
 	body, contentType := streamIssueMultipart(
 		ctx,
-		submission.BundlePath,
+		bundleName,
+		bundle,
 		metadata,
 		screenshot,
 	)
@@ -257,12 +264,26 @@ func currentIssueReportVersion() string {
 	return currentApplicationVersion()
 }
 
-func readIssueScreenshot(bundlePath string) ([]byte, error) {
-	archive, err := zip.OpenReader(bundlePath)
+func readIssueBundle(submission issueRelaySubmission) ([]byte, string, error) {
+	if len(submission.BundleData) != 0 {
+		name := filepath.Base(strings.TrimSpace(submission.BundleName))
+		if name == "." || name == "" {
+			name = "aram-debug.zip"
+		}
+		return submission.BundleData, name, nil
+	}
+	data, err := os.ReadFile(submission.BundlePath)
+	if err != nil {
+		return nil, "", fmt.Errorf("open debug bundle for upload: %w", err)
+	}
+	return data, filepath.Base(submission.BundlePath), nil
+}
+
+func readIssueScreenshot(bundle []byte) ([]byte, error) {
+	archive, err := zip.NewReader(bytes.NewReader(bundle), int64(len(bundle)))
 	if err != nil {
 		return nil, fmt.Errorf("open debug bundle for upload: %w", err)
 	}
-	defer archive.Close()
 	for _, file := range archive.File {
 		if file.Name != "screenshot.png" || file.FileInfo().IsDir() {
 			continue
@@ -296,7 +317,8 @@ func readIssueScreenshot(bundlePath string) ([]byte, error) {
 
 func streamIssueMultipart(
 	ctx context.Context,
-	bundlePath string,
+	bundleName string,
+	bundle []byte,
 	metadata []byte,
 	screenshot []byte,
 ) (io.ReadCloser, string) {
@@ -307,7 +329,8 @@ func streamIssueMultipart(
 		err := writeIssueMultipart(
 			ctx,
 			multipartWriter,
-			bundlePath,
+			bundleName,
+			bundle,
 			metadata,
 			screenshot,
 		)
@@ -322,7 +345,8 @@ func streamIssueMultipart(
 func writeIssueMultipart(
 	ctx context.Context,
 	writer *multipart.Writer,
-	bundlePath string,
+	bundleName string,
+	bundle []byte,
 	metadata []byte,
 	screenshot []byte,
 ) error {
@@ -337,19 +361,14 @@ func writeIssueMultipart(
 		return fmt.Errorf("write report metadata: %w", err)
 	}
 
-	bundle, err := os.Open(bundlePath)
-	if err != nil {
-		return fmt.Errorf("open debug bundle: %w", err)
-	}
-	defer bundle.Close()
 	bundlePart, err := writer.CreateFormFile(
 		"bundle",
-		filepath.Base(bundlePath),
+		bundleName,
 	)
 	if err != nil {
 		return fmt.Errorf("create debug bundle part: %w", err)
 	}
-	if _, err := io.Copy(bundlePart, bundle); err != nil {
+	if _, err := bundlePart.Write(bundle); err != nil {
 		return fmt.Errorf("write debug bundle: %w", err)
 	}
 

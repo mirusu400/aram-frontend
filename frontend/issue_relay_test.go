@@ -15,6 +15,10 @@ import (
 
 func TestIssueRelayUploadsMultipartReport(t *testing.T) {
 	bundlePath := writeIssueRelayTestBundle(t, true)
+	bundleData, err := os.ReadFile(bundlePath)
+	if err != nil {
+		t.Fatal(err)
+	}
 	idempotencyKey := "22222222-2222-4222-8222-222222222222"
 	var received issueRelayMetadata
 
@@ -44,7 +48,7 @@ func TestIssueRelayUploadsMultipartReport(t *testing.T) {
 			return
 		}
 		for _, name := range []string{"bundle", "screenshot"} {
-			file, _, err := request.FormFile(name)
+			file, header, err := request.FormFile(name)
 			if err != nil {
 				http.Error(response, err.Error(), http.StatusBadRequest)
 				return
@@ -53,6 +57,10 @@ func TestIssueRelayUploadsMultipartReport(t *testing.T) {
 			_ = file.Close()
 			if readErr != nil || len(data) < 4 {
 				http.Error(response, "empty upload", http.StatusBadRequest)
+				return
+			}
+			if name == "bundle" && header.Filename != "browser-debug.zip" {
+				http.Error(response, "unexpected bundle name", http.StatusBadRequest)
 				return
 			}
 		}
@@ -85,7 +93,8 @@ func TestIssueRelayUploadsMultipartReport(t *testing.T) {
 		},
 		Backend:        "aram-core",
 		State:          FrontendRunning,
-		BundlePath:     bundlePath,
+		BundleName:     "browser-debug.zip",
+		BundleData:     bundleData,
 		Warning:        "partial backend diagnostics",
 		IdempotencyKey: idempotencyKey,
 	})

@@ -14,6 +14,8 @@ type issueReportResult struct {
 	backend        string
 	state          FrontendState
 	path           string
+	bundleName     string
+	bundleData     []byte
 	warning        string
 	report         issueRelayReport
 	relayErr       error
@@ -171,13 +173,15 @@ func (s *Shell) prepareIssueReport(fields map[string]string) {
 		relay = newIssueRelayClient()
 	}
 	go func() {
-		path, warning, bundleErr := collectDebugBundle(snapshot, backend)
+		bundle, warning, bundleErr := prepareIssueDebugBundle(snapshot, backend)
 		result := issueReportResult{
 			draft:          draft,
 			input:          snapshot.Input,
 			backend:        snapshot.Backend,
 			state:          snapshot.FrontendState,
-			path:           path,
+			path:           bundle.path,
+			bundleName:     bundle.name,
+			bundleData:     bundle.data,
 			warning:        warning,
 			createdAt:      createdAt,
 			idempotencyKey: idempotencyKey,
@@ -191,7 +195,9 @@ func (s *Shell) prepareIssueReport(fields map[string]string) {
 					Input:          snapshot.Input,
 					Backend:        snapshot.Backend,
 					State:          snapshot.FrontendState,
-					BundlePath:     path,
+					BundlePath:     bundle.path,
+					BundleName:     bundle.name,
+					BundleData:     bundle.data,
 					Warning:        warning,
 					IdempotencyKey: idempotencyKey,
 				},
@@ -258,13 +264,16 @@ func (s *Shell) consumeUploadedIssueReport(result issueReportResult) {
 }
 
 func (s *Shell) consumeIssueReportFallback(result issueReportResult) {
-
+	bundleReference := result.path
+	if bundleReference == "" {
+		bundleReference = result.bundleName
+	}
 	draftURL, err := buildIssueDraftURL(
 		result.draft,
 		result.input,
 		result.backend,
 		result.state,
-		result.path,
+		bundleReference,
 		result.warning,
 	)
 	if err != nil {
@@ -274,7 +283,10 @@ func (s *Shell) consumeIssueReportFallback(result issueReportResult) {
 	}
 	s.appendLog(s.tr("Issue report: ") + result.relayErr.Error())
 	openErr := openExternalURL(draftURL)
-	folderErr := openArtifactFolder(filepath.Dir(result.path))
+	var folderErr error
+	if result.path != "" {
+		folderErr = openArtifactFolder(filepath.Dir(result.path))
+	}
 
 	if s.panel != nil && s.panel.Kind == "issue-report" {
 		if s.panel.FieldValues == nil {
@@ -287,10 +299,16 @@ func (s *Shell) consumeIssueReportFallback(result issueReportResult) {
 		s.panel.Lines = []string{
 			"Automatic upload failed; a manual GitHub draft was opened.",
 			s.trf("Upload error: %s", result.relayErr.Error()),
-			s.trf(
+		}
+		if result.path != "" {
+			s.panel.Lines = append(s.panel.Lines, s.trf(
 				"Attach %s to the GitHub draft, review it, then submit.",
 				filepath.Base(result.path),
-			),
+			))
+		} else {
+			s.panel.Lines = append(s.panel.Lines,
+				"Retry the upload to include the in-memory debug bundle.",
+			)
 		}
 		s.panel.Actions = []ToolAction{
 			{
@@ -299,15 +317,17 @@ func (s *Shell) consumeIssueReportFallback(result issueReportResult) {
 				Enabled: true,
 			},
 			{
-				ID:      issueReportFolderAction,
-				Label:   "Open Bundle Folder",
-				Enabled: true,
-			},
-			{
 				ID:      issueReportDraftAction,
 				Label:   "Open Draft Again",
 				Enabled: true,
 			},
+		}
+		if result.path != "" {
+			s.panel.Actions = append(s.panel.Actions, ToolAction{
+				ID:      issueReportFolderAction,
+				Label:   "Open Bundle Folder",
+				Enabled: true,
+			})
 		}
 	}
 
