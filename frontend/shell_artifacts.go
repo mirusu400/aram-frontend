@@ -12,10 +12,9 @@ type artifactResult struct {
 	kind    string
 	path    string
 	warning string
-	// shareMIME, when set, asks the shell to offer the written file to another
-	// app on a host that can. An artifact below app-private storage is
-	// otherwise unreachable on a handset, which is where a save backup has to
-	// go to survive losing the app.
+	// shareMIME, when set, asks the shell to offer the written file to the
+	// native export UI. An artifact below app-private storage is otherwise
+	// unreachable on a handset.
 	shareMIME string
 	err       error
 }
@@ -31,10 +30,10 @@ func (s *Shell) offerArtifact(result artifactResult) {
 	err := shareNativeFile(result.path, result.shareMIME, name)
 	switch {
 	case err == nil:
-		s.setStatus(s.trf("Sharing save backup: %s", name))
+		s.setStatus(s.trf("Exporting %s: %s", s.tr(settingValueLabel(result.kind)), name))
 	case errors.Is(err, ErrShareUnavailable):
 	default:
-		s.setStatus(s.tr("Save backup folder: ") + err.Error())
+		s.setStatus(s.tr(settingValueLabel(result.kind)) + ": " + err.Error())
 	}
 }
 
@@ -115,6 +114,10 @@ func (s *Shell) openDebugBundleFolder() {
 	if err == nil {
 		err = openArtifactFolder(path)
 	}
+	if errors.Is(err, ErrFolderBrowserUnavailable) {
+		s.shareNewestDebugBundle(path)
+		return
+	}
 	if err != nil {
 		message := s.tr("Debug bundle folder: ") + err.Error()
 		s.appendLog(message)
@@ -124,4 +127,22 @@ func (s *Shell) openDebugBundleFolder() {
 	message := s.trf("Debug bundle folder opened: %s", path)
 	s.appendLog(message)
 	s.setStatus(message)
+}
+
+func (s *Shell) shareNewestDebugBundle(directory string) {
+	path, err := newestArtifact(directory, ".zip")
+	if err != nil {
+		s.setStatus(s.tr("Debug bundle folder: ") + err.Error())
+		return
+	}
+	if path == "" {
+		s.setStatus(s.tr("Debug bundle: no bundle has been made yet"))
+		return
+	}
+	name := filepath.Base(path)
+	if err := shareNativeFile(path, debugBundleMIMEType, name); err != nil {
+		s.setStatus(s.tr("Debug bundle folder: ") + err.Error())
+		return
+	}
+	s.setStatus(s.trf("Exporting Debug bundle: %s", name))
 }

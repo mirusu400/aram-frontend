@@ -32,12 +32,19 @@ Activity owns:
 - persisted URI permissions;
 - pause/resume and audio-focus lifecycle;
 - gamepad and touch-overlay settings;
-- scoped storage and share intents.
+- scoped storage and create-document exports.
 
 The native layer passes a document handle or copied cache file to the shared
 frontend. Its document picker must include `application/zip` so direct WIPI
 ZIP packages reach the same backend open request as desktop inputs. Desktop
 Zenity code is excluded by build tags.
+
+Artifacts are first assembled atomically below app-private configuration
+storage. The host's `ShareFile` callback then uses Android's Storage Access
+Framework create-document flow to copy save backups and debug ZIPs to the
+user-selected Documents, Downloads, or cloud-provider location. The callback
+is also the mobile fallback for commands that would open an artifact folder on
+desktop.
 
 The generated binding exposes `mobile.SetHost`. The native Activity implements
 `RequestDocument`, then completes the asynchronous request with

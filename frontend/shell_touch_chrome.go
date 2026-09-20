@@ -29,12 +29,36 @@ func (s *Shell) touchChromeToggleAvailable() bool {
 }
 
 func (s *Shell) toggleTouchChrome() {
+	s.toggleTouchChromeForLayout(platformUsesTouchLayout())
+}
+
+func (s *Shell) toggleTouchChromeForLayout(touch bool) {
+	if touch && s.touchChromeHidden {
+		s.touchChromeHidden = false
+		s.touchMenuImmersive = true
+		s.activeMenu = mobileMenuRootIndex(s.menus)
+		s.uiPointerSuppressed = true
+		return
+	}
 	s.touchChromeHidden = !s.touchChromeHidden
+	s.touchMenuImmersive = false
 	s.activeMenu = -1
 	// The tap that revealed the chrome must not also press whatever chrome
 	// widget now sits under the same finger, so the interface UI stays
 	// deaf until that touch is released.
 	s.uiPointerSuppressed = true
+}
+
+func (s *Shell) finishTouchMenu() {
+	// A command such as Close Title can synchronously remove the guest while
+	// the drawer is open. Only return to immersive chrome when there is still
+	// a title to return to; otherwise leave the Home interface visible.
+	if s.touchMenuImmersive && s.input != nil {
+		s.touchChromeHidden = true
+	} else if s.input == nil {
+		s.touchChromeHidden = false
+	}
+	s.touchMenuImmersive = false
 }
 
 // syncUIPointerSuppression lifts the post-toggle input hold once every

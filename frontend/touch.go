@@ -304,12 +304,7 @@ func touchChromeToggleBoundsAtScale(width int, hidden bool, scale float64) image
 	if hidden {
 		return rectAt(width-px(12)-px(44), px(12), px(44), px(44))
 	}
-	return rectAt(
-		width-px(8)-px(76),
-		px(menuBarHeight)+px(applicationToolbarHeight-toolbarButtonHeight)/2,
-		px(76),
-		px(toolbarButtonHeight),
-	)
+	return rectAt(width-px(8)-px(76), px(13), px(76), px(toolbarButtonHeight))
 }
 
 func rectAt(x, y, width, height int) image.Rectangle {

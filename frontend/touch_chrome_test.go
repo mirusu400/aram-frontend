@@ -26,9 +26,8 @@ func TestTouchChromeToggleBoundsStayClearOfTheDeck(t *testing.T) {
 			}
 		}
 		visible := touchChromeToggleBounds(width, false)
-		if visible.Min.Y < menuBarHeight ||
-			visible.Max.Y > menuBarHeight+applicationToolbarHeight {
-			t.Fatalf("visible-chrome toggle leaves the toolbar row: %v", visible)
+		if visible.Min.Y < 0 || visible.Max.Y > mobileAppBarHeight {
+			t.Fatalf("visible-chrome toggle leaves the mobile app bar: %v", visible)
 		}
 	}
 }

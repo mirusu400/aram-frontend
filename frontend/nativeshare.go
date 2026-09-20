@@ -17,16 +17,21 @@ var (
 	ErrShareUnavailable = errors.New("the native host cannot share a file")
 )
 
-// saveBackupMIMEType is what a host advertises when it offers an .aramsave
-// file to another app. The format is ARAM's own, so the generic binary type is
-// the honest answer; it keeps every target app (cloud drive, messenger, the
-// system file manager) in the chooser.
-const saveBackupMIMEType = "application/octet-stream"
+const (
+	// saveBackupMIMEType is what a host advertises when it exports an
+	// .aramsave file. The format is ARAM's own, so the generic binary type is
+	// the honest answer.
+	saveBackupMIMEType = "application/octet-stream"
+	// debugBundleMIMEType lets Android's document provider offer an ordinary
+	// ZIP destination instead of leaving the bundle trapped in app-private
+	// storage.
+	debugBundleMIMEType = "application/zip"
+)
 
-// NativeShareHost is implemented by a mobile application layer that can hand a
-// file below the app's private storage to another app - Android's share sheet,
-// iOS's activity view. It is the only way a save backup written into private
-// storage can reach a place that survives uninstalling the app.
+// NativeShareHost is implemented by a mobile application layer that can export
+// a file below the app's private storage. Android uses a Storage Access
+// Framework create-document request and iOS uses its document/activity UI. It
+// is how a generated artifact reaches user-controlled storage.
 type NativeShareHost interface {
 	ShareFile(path, mimeType, title string) error
 }
@@ -50,7 +55,7 @@ func currentNativeShareHost() NativeShareHost {
 	return nativeShareBridge.host
 }
 
-// shareNativeFile offers one file to another app. It reports
+// shareNativeFile offers one file to the native export UI. It reports
 // ErrShareUnavailable when the platform has no such host, so a caller can fall
 // back to a desktop behaviour without treating the absence as a failure.
 var shareNativeFile = func(path, mimeType, title string) error {

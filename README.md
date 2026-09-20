@@ -64,6 +64,10 @@ backend diagnostic files. It excludes the selected game and firmware bytes,
 guest memory, save data, and other proprietary media.
 `Tools > Open Debug Bundle Folder` creates that directory when necessary and
 opens it in Explorer, Finder, or the desktop file manager.
+On Android, exporting a debug bundle or opening that folder presents the
+system create-document screen instead, so the ZIP is copied to a user-selected
+Documents, Downloads, or cloud-provider location rather than remaining in
+app-private storage. Save backups use the same document export path.
 `Help > Report Issue` collects the situation, game title, carrier, and expected
 ARAM repository in-app. Submitting creates the same redacted debug ZIP,
 uploads it and the current screenshot when available through the ARAM Report
@@ -138,8 +142,8 @@ picker, lifecycle, and packaging. iOS uses the equivalent generated
 XCFramework and native document picker.
 
 The generated mobile API accepts a native `Host` callback for document-picker
-requests and exposes completion, cancellation, lifecycle, and audio-focus
-entry points.
+and artifact-export requests and exposes completion, cancellation, lifecycle,
+and audio-focus entry points.
 
 Every push and pull request tests, vets, and builds the standalone frontend on
 Windows x64, Linux x64, and macOS arm64. Branch and pull-request builds skip

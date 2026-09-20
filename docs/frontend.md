@@ -76,6 +76,10 @@ Entries lead with the filename instead of a shared directory prefix, and the
 selected entry shows its wrapped full path before it is opened.
 `Open Debug Bundle Folder` creates the shared debug artifact directory when it
 does not exist and opens it with Explorer, Finder, or `xdg-open`.
+On Android, where that directory is app-private, exporting a bundle and the
+open-folder fallback both invoke the host's create-document UI for the newest
+ZIP. Save backups follow the same path, giving the user an ordinary accessible
+document without broad storage permissions.
 Checked backends can expose `ToolField` and `ToolAction` descriptors in a
 snapshot. The frontend renders those fields and actions and sends a
 `ToolRequest` through `ToolActionBackend`; guest memory is never accessed

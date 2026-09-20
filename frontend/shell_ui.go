@@ -15,6 +15,7 @@ type shellUI struct {
 	ui                   *ebitenui.UI
 	design               *ARAMDesignSystem
 	menuButtons          []*widget.Button
+	mobileMenuButton     *widget.Button
 	menuWindow           *widget.Window
 	menuIndex            int
 	commandButtons       map[string]*widget.Button
@@ -101,8 +102,12 @@ func newShellUI(shell *Shell, design *ARAMDesignSystem) *shellUI {
 	view.touchCursor = installTouchCursorUpdater()
 
 	root := widget.NewContainer(widget.ContainerOpts.Layout(widget.NewAnchorLayout()))
-	topBar := view.buildTopBar(shell)
-	toolbar := view.buildApplicationToolbar(shell)
+	var chrome []widget.PreferredSizeLocateableWidget
+	if platformUsesTouchLayout() {
+		chrome = append(chrome, view.buildMobileAppBar(shell))
+	} else {
+		chrome = append(chrome, view.buildTopBar(shell), view.buildApplicationToolbar(shell))
+	}
 	statusBar := view.buildStatusBar()
 	view.scrim = widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(design.Components.Scrim),
@@ -123,7 +128,9 @@ func newShellUI(shell *Shell, design *ARAMDesignSystem) *shellUI {
 	)
 	view.homeContainer.GetWidget().SetVisibility(widget.Visibility_Hide)
 
-	root.AddChild(view.homeContainer, topBar, toolbar, statusBar, view.scrim)
+	root.AddChild(view.homeContainer)
+	root.AddChild(chrome...)
+	root.AddChild(statusBar, view.scrim)
 	view.ui = &ebitenui.UI{
 		Container:           root,
 		DisableDefaultFocus: false,
@@ -146,7 +153,9 @@ func (u *shellUI) sync(shell *Shell) {
 		u.panelSignature = ""
 		u.closeMenu()
 	}
-	u.toolbarTitle.GetWidget().SetVisibility(visibility(outsideWidth >= 760))
+	u.toolbarTitle.GetWidget().SetVisibility(visibility(
+		platformUsesTouchLayout() || outsideWidth >= 760,
+	))
 	if u.buildStampText != nil {
 		u.buildStampText.GetWidget().SetVisibility(visibility(outsideWidth >= 700))
 	}
@@ -279,21 +288,32 @@ func (u *shellUI) syncPanel(shell *Shell) {
 		widget.ContainerOpts.BackgroundImage(design.Components.DialogBody),
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
-	body := widget.NewText(
-		widget.TextOpts.Text(strings.Join(lines, "\n"), design.Type.Body, design.Palette.TextMuted),
-		widget.TextOpts.MaxWidth(float64(design.px(680))),
-		widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
-			HorizontalPosition: widget.AnchorLayoutPositionStart,
-			VerticalPosition:   widget.AnchorLayoutPositionStart,
-			Padding: &widget.Insets{
-				Left:   design.Space.XL,
-				Top:    design.Space.XL,
-				Right:  design.Space.XL,
-				Bottom: design.px(72),
-			},
-		})),
-	)
-	contents.AddChild(body)
+	bodyLayout := widget.AnchorLayoutData{
+		HorizontalPosition: widget.AnchorLayoutPositionStart,
+		VerticalPosition:   widget.AnchorLayoutPositionStart,
+		Padding: &widget.Insets{
+			Left:   design.Space.XL,
+			Top:    design.Space.XL,
+			Right:  design.Space.XL,
+			Bottom: design.px(72),
+		},
+	}
+	if shell.panel.Kind == "logs" {
+		contents.AddChild(newSelectableText(
+			design,
+			strings.Join(lines, "\n"),
+			design.px(680),
+			design.px(430),
+			bodyLayout,
+		))
+	} else {
+		body := widget.NewText(
+			widget.TextOpts.Text(strings.Join(lines, "\n"), design.Type.Body, design.Palette.TextMuted),
+			widget.TextOpts.MaxWidth(float64(design.px(680))),
+			widget.TextOpts.WidgetOpts(widget.WidgetOpts.LayoutData(bodyLayout)),
+		)
+		contents.AddChild(body)
+	}
 	footer := shell.tr(shell.panelFooter())
 	if footer != "" {
 		contents.AddChild(design.text(

@@ -101,13 +101,20 @@ func (s *Shell) shareNewestSaveBackup(directory string) {
 // newestSaveBackup returns the most recently written .aramsave file in
 // directory, or an empty path when the folder holds none.
 func newestSaveBackup(directory string) (string, error) {
+	return newestArtifact(directory, ".aramsave")
+}
+
+// newestArtifact returns the last timestamp-named artifact with extension.
+// Artifact names sort chronologically, so this does not need to stat every
+// file in a potentially long-lived export folder.
+func newestArtifact(directory, extension string) (string, error) {
 	entries, err := os.ReadDir(directory)
 	if err != nil {
 		return "", err
 	}
 	names := make([]string, 0, len(entries))
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.EqualFold(filepath.Ext(entry.Name()), ".aramsave") {
+		if entry.IsDir() || !strings.EqualFold(filepath.Ext(entry.Name()), extension) {
 			continue
 		}
 		names = append(names, entry.Name())
