@@ -9,6 +9,7 @@ import (
 const mobileDrawerMaxWidth = 360
 
 var mobileQuickCommands = []string{
+	"emu.configure",
 	"emu.pause",
 	"emu.save_state",
 	"emu.stop",
@@ -99,6 +100,9 @@ func (u *shellUI) openMobileMenuRoot() {
 		command, found := u.owner.findCommand(id)
 		if !found {
 			continue
+		}
+		if id == "emu.configure" {
+			command.Label = "Settings"
 		}
 		body.AddChild(u.mobileCommandButton(command))
 	}
