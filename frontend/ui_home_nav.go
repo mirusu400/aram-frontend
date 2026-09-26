@@ -39,6 +39,9 @@ func (u *shellUI) highlightHomeRow(path string) {
 	if u.homeFavButton != nil {
 		u.homeFavButton.GetWidget().Disabled = !enabled
 	}
+	if u.homeShortcutButton != nil {
+		u.homeShortcutButton.GetWidget().Disabled = !enabled
+	}
 }
 
 // homeSelectedIndex is the row index of the current selection, or -1.

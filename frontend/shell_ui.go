@@ -65,6 +65,7 @@ type shellUI struct {
 	homeRowContainers    map[string]*widget.Container
 	homeOpenButton       *widget.Button
 	homeFavButton        *widget.Button
+	homeShortcutButton   *widget.Button
 	homeSelectedPath     string
 	homeSignature        string
 	welcomeStableButton  *widget.Button

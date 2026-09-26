@@ -377,6 +377,20 @@ func (u *shellUI) homeSoftkeyBar(shell *Shell, selectedPath string) *widget.Cont
 	}
 	bar.AddChild(fav)
 	u.homeFavButton = fav
+	if currentNativeShortcutHost() != nil {
+		shortcut := homeFlatButton(u, shell.tr("Shortcut"), homeColorName, func() {
+			shell.pinHomeShortcut(u.homeSelectedPath)
+		})
+		shortcut.GetWidget().Disabled = selectedPath == ""
+		shortcut.GetWidget().LayoutData = widget.AnchorLayoutData{
+			HorizontalPosition: widget.AnchorLayoutPositionCenter,
+			VerticalPosition:   widget.AnchorLayoutPositionCenter,
+		}
+		bar.AddChild(shortcut)
+		u.homeShortcutButton = shortcut
+	} else {
+		u.homeShortcutButton = nil
+	}
 
 	open := homeFlatButton(u, shell.tr("Open"), homeColorTabActive, func() {
 		shell.homeOpenPath(u.homeSelectedPath)
@@ -565,6 +579,9 @@ func homeEmptyMessage(shell *Shell, tab string, folders []string, scanning bool)
 func homeSignature(shell *Shell, tab string, rect image.Rectangle, entries []LibraryEntry, folders []string) string {
 	builder := make([]byte, 0, 128)
 	builder = fmt.Appendf(builder, "home|%dx%d|%s|scan=%t|", rect.Dx(), rect.Dy(), tab, shell.libraryScanning)
+	if currentNativeShortcutHost() != nil {
+		builder = append(builder, 'S')
+	}
 	for _, folder := range folders {
 		builder = append(builder, folder...)
 		builder = append(builder, 0x1f)
