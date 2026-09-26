@@ -65,3 +65,31 @@ func writeIconCache(key string, data []byte) error {
 func decodeIconPNG(data []byte) (image.Image, error) {
 	return png.Decode(bytes.NewReader(data))
 }
+
+// loadShortcutIconPNG keeps the game's PNG bytes intact for a launcher
+// shortcut. A missing or invalid game icon is not replaced with app artwork.
+func loadShortcutIconPNG(source IconBackend, path string) []byte {
+	key := iconCacheKey(path)
+	if data, ok := readIconCache(key); ok && validShortcutIconPNG(data) {
+		return data
+	}
+	data, err := source.Icon(path)
+	if err != nil || !validShortcutIconPNG(data) {
+		return nil
+	}
+	_ = writeIconCache(key, data)
+	return data
+}
+
+func validShortcutIconPNG(data []byte) bool {
+	if len(data) == 0 || len(data) > 512*1024 {
+		return false
+	}
+	config, err := png.DecodeConfig(bytes.NewReader(data))
+	if err != nil || config.Width < 1 || config.Height < 1 ||
+		config.Width > 1024 || config.Height > 1024 {
+		return false
+	}
+	_, err = decodeIconPNG(data)
+	return err == nil
+}

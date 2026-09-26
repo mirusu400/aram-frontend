@@ -1,5 +1,6 @@
 {
-  "Shortcut": "바로가기",
+  "Create shortcut": "홈 화면 바로가기 만들기",
+  "Game icon unavailable; cannot create Home screen shortcut": "게임 아이콘이 없어 홈 화면 바로가기를 만들 수 없습니다",
   "Adding %s to Home screen...": "%s 홈 화면에 추가 중...",
   "Home": "홈",
   "ARAM Home": "ARAM 홈",

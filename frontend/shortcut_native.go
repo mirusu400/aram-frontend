@@ -4,7 +4,7 @@ import "sync"
 
 // NativeShortcutHost pins one title to the device launcher. The native host
 // owns the launcher API and keeps the title's private path out of shortcut
-// intents; the shared frontend only supplies the selected title and icon.
+// intents; iconPNG must contain the selected game's own PNG icon.
 type NativeShortcutHost interface {
 	PinGameShortcut(path, title string, iconPNG []byte) error
 }

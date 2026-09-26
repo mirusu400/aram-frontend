@@ -42,11 +42,12 @@ var homeIconPalette = []color.NRGBA{
 }
 
 const (
-	homeTabBarHeight   = 46
-	homeSoftkeyHeight  = 44
-	homeRowHeight      = 44
-	homeIconSize       = 26
-	homeMaxFolderChips = 3
+	homeTabBarHeight      = 46
+	homeSoftkeyHeight     = 44
+	homeShortcutRowHeight = 32
+	homeRowHeight         = 44
+	homeIconSize          = 26
+	homeMaxFolderChips    = 3
 )
 
 func homeBackgroundImage() *euiimage.NineSlice {
@@ -281,7 +282,7 @@ func (u *shellUI) homeRowScroll(shell *Shell, rows []homeRow, top int, selectedP
 			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 				StretchHorizontal: true,
 				StretchVertical:   true,
-				Padding:           &widget.Insets{Top: top, Bottom: u.design.px(homeSoftkeyHeight)},
+				Padding:           &widget.Insets{Top: top, Bottom: u.design.px(homeBottomBarHeight())},
 			}),
 			widget.WidgetOpts.ScrolledHandler(func(args *widget.WidgetScrolledEventArgs) {
 				scrollContainerByWheel(scroll, args.Y)
@@ -352,10 +353,29 @@ func (u *shellUI) homeRowWidget(shell *Shell, row homeRow, selected bool) *widge
 	return container
 }
 
-// homeSoftkeyBar is the bottom bar: Favorite (left) and Open (right).
+func homeBottomBarHeight() int {
+	if currentNativeShortcutHost() != nil {
+		return homeSoftkeyHeight + homeShortcutRowHeight
+	}
+	return homeSoftkeyHeight
+}
+
+// homeSoftkeyBar keeps the long shortcut action above Favorite and Open so it
+// remains readable on narrow phones.
 func (u *shellUI) homeSoftkeyBar(shell *Shell, selectedPath string) *widget.Container {
 	bar := widget.NewContainer(
 		widget.ContainerOpts.BackgroundImage(euiimage.NewNineSliceColor(homeColorSoftbar)),
+		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
+		widget.ContainerOpts.WidgetOpts(
+			widget.WidgetOpts.MinSize(0, u.design.px(homeBottomBarHeight())),
+			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+				HorizontalPosition: widget.AnchorLayoutPositionStart,
+				VerticalPosition:   widget.AnchorLayoutPositionEnd,
+				StretchHorizontal:  true,
+			}),
+		),
+	)
+	bottom := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 		widget.ContainerOpts.WidgetOpts(
 			widget.WidgetOpts.MinSize(0, u.design.px(homeSoftkeyHeight)),
@@ -375,16 +395,17 @@ func (u *shellUI) homeSoftkeyBar(shell *Shell, selectedPath string) *widget.Cont
 		VerticalPosition:   widget.AnchorLayoutPositionCenter,
 		Padding:            &widget.Insets{Left: u.design.px(18)},
 	}
-	bar.AddChild(fav)
+	bottom.AddChild(fav)
 	u.homeFavButton = fav
 	if currentNativeShortcutHost() != nil {
-		shortcut := homeFlatButton(u, shell.tr("Shortcut"), homeColorName, func() {
+		shortcut := homeFlatButton(u, shell.tr("Create shortcut"), homeColorName, func() {
 			shell.pinHomeShortcut(u.homeSelectedPath)
 		})
 		shortcut.GetWidget().Disabled = selectedPath == ""
 		shortcut.GetWidget().LayoutData = widget.AnchorLayoutData{
 			HorizontalPosition: widget.AnchorLayoutPositionCenter,
-			VerticalPosition:   widget.AnchorLayoutPositionCenter,
+			VerticalPosition:   widget.AnchorLayoutPositionStart,
+			Padding:            &widget.Insets{Top: u.design.px(2)},
 		}
 		bar.AddChild(shortcut)
 		u.homeShortcutButton = shortcut
@@ -401,8 +422,9 @@ func (u *shellUI) homeSoftkeyBar(shell *Shell, selectedPath string) *widget.Cont
 		VerticalPosition:   widget.AnchorLayoutPositionCenter,
 		Padding:            &widget.Insets{Right: u.design.px(18)},
 	}
-	bar.AddChild(open)
+	bottom.AddChild(open)
 	u.homeOpenButton = open
+	bar.AddChild(bottom)
 	return bar
 }
 
