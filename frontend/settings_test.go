@@ -584,7 +584,7 @@ func TestSpeedPresetsAdvanceInTenths(t *testing.T) {
 	}
 }
 
-func TestGeneralSettingsSpeedSliderUsesTenths(t *testing.T) {
+func TestDesktopSettingsSpeedSliderUsesTenths(t *testing.T) {
 	temporary := t.TempDir()
 	t.Setenv("APPDATA", temporary)
 	t.Setenv("XDG_CONFIG_HOME", temporary)
@@ -611,6 +611,77 @@ func TestGeneralSettingsSpeedSliderUsesTenths(t *testing.T) {
 		return
 	}
 	t.Fatal("General settings is missing the Emulation speed slider")
+}
+
+func TestTouchSettingsUseDropdownsInsteadOfSliders(t *testing.T) {
+	temporary := t.TempDir()
+	t.Setenv("APPDATA", temporary)
+	t.Setenv("XDG_CONFIG_HOME", temporary)
+	shell := &Shell{settings: defaultSettings()}
+	u := &shellUI{}
+	wantCounts := map[string]int{
+		"Emulation speed":   36,
+		"Filter strength":   11,
+		"Volume":            41,
+		"Requested latency": 24,
+		"Touch button size": 7,
+	}
+	var speed, latency *settingsDropdownModel
+	for _, section := range []string{"General", "Graphics", "Audio", "Controls"} {
+		u.settingsSection = section
+		for _, row := range u.settingsRowModelsForLayout(shell, true) {
+			if row.slider != nil {
+				t.Errorf("touch %q unexpectedly uses a slider", row.label)
+			}
+			want, ok := wantCounts[row.label]
+			if !ok {
+				continue
+			}
+			if row.dropdown == nil {
+				t.Errorf("touch %q is not a dropdown", row.label)
+				continue
+			}
+			if row.dropdown.count != want {
+				t.Errorf("touch %q dropdown count = %d, want %d",
+					row.label, row.dropdown.count, want)
+			}
+			switch row.label {
+			case "Emulation speed":
+				speed = row.dropdown
+			case "Requested latency":
+				latency = row.dropdown
+			}
+			delete(wantCounts, row.label)
+		}
+	}
+	if len(wantCounts) != 0 {
+		t.Fatalf("touch settings are missing converted controls: %v", wantCounts)
+	}
+	if speed.value() != 5 {
+		t.Fatalf("speed dropdown value = %d, want 5", speed.value())
+	}
+	if got := speed.label(6); got != "1.1x" {
+		t.Fatalf("speed dropdown entry 6 label = %q, want %q", got, "1.1x")
+	}
+	speed.apply(25)
+	if shell.settings.Speed != 3 {
+		t.Fatalf("speed dropdown entry 25 applied %g, want 3", shell.settings.Speed)
+	}
+	if latency.value() != 4 {
+		t.Fatalf("latency dropdown value = %d, want 4", latency.value())
+	}
+	if got := latency.label(0); got != "20 ms" {
+		t.Fatalf("latency dropdown entry 0 label = %q, want %q", got, "20 ms")
+	}
+	latency.apply(23)
+	if shell.settings.AudioLatencyMS != 250 {
+		t.Fatalf("latency dropdown entry 23 applied %d ms, want 250 ms",
+			shell.settings.AudioLatencyMS)
+	}
+	if speed.count != 36 || speed.value() != 25 {
+		t.Fatalf("speed dropdown count/value = %d/%d, want 36/25",
+			speed.count, speed.value())
+	}
 }
 
 func TestCycleSpeedAdvancesThroughPresets(t *testing.T) {

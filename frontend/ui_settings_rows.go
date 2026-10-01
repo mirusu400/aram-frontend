@@ -64,6 +64,13 @@ func (u *shellUI) settingsRows(shell *Shell) []*widget.Container {
 // the widget construction so the panel can measure a section before laying it
 // out, and so tests can check that geometry without a running UI.
 func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
+	return u.settingsRowModelsForLayout(shell, platformUsesTouchLayout())
+}
+
+func (u *shellUI) settingsRowModelsForLayout(
+	shell *Shell,
+	touchLayout bool,
+) []settingsRowModel {
 	var rows []settingsRowModel
 	profile := shell.controllerProfile()
 	display := shell.displayProfile()
@@ -298,7 +305,7 @@ func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 		// Phone-facing controls come before the advanced physical-controller
 		// rows so a small touch screen reaches its overlay and layout choices
 		// without first scrolling through desktop/gamepad diagnostics.
-		if platformUsesTouchLayout() {
+		if touchLayout {
 			rows = append(rows,
 				settingsRowModel{
 					label:       "Touch controls overlay",
@@ -521,7 +528,44 @@ func (u *shellUI) settingsRowModels(shell *Shell) []settingsRowModel {
 		}
 	}
 
+	return settingsRowsForLayout(rows, touchLayout)
+}
+
+// settingsRowsForLayout keeps sliders on pointer-driven layouts and turns
+// every slider into the existing scrollable dropdown on touch layouts. A tap
+// on an EbitenUI slider track moves only one page, which otherwise forces phone
+// users to repeat the same tap for every step of a long range.
+func settingsRowsForLayout(
+	rows []settingsRowModel,
+	touchLayout bool,
+) []settingsRowModel {
+	if !touchLayout {
+		return rows
+	}
+	for index := range rows {
+		slider := rows[index].slider
+		if slider == nil {
+			continue
+		}
+		rows[index].slider = nil
+		rows[index].dropdown = settingsDropdownFromSlider(slider)
+	}
 	return rows
+}
+
+func settingsDropdownFromSlider(slider *settingsSliderModel) *settingsDropdownModel {
+	return &settingsDropdownModel{
+		count: slider.max - slider.min + 1,
+		label: func(index int) string {
+			return slider.format(clampInt(index+slider.min, slider.min, slider.max))
+		},
+		value: func() int {
+			return clampInt(slider.value(), slider.min, slider.max) - slider.min
+		},
+		apply: func(index int) {
+			slider.apply(clampInt(index+slider.min, slider.min, slider.max))
+		},
+	}
 }
 
 func updateSettingsRowModels(shell *Shell) []settingsRowModel {

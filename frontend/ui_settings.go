@@ -21,6 +21,16 @@ func (u *shellUI) updateSettingsTouchScroll(shell *Shell) {
 		u.settingsTouchDragged = false
 		return
 	}
+	// An open dropdown owns vertical drags so its scrollbar remains usable.
+	// Letting the settings page recognizer see the same finger would cancel the
+	// dropdown interaction and move the page behind it instead.
+	for _, binding := range u.settingsDropdowns {
+		if binding.dropdown.ContentVisible() {
+			u.settingsTouchActive = false
+			u.settingsTouchDragged = false
+			return
+		}
+	}
 	if u.settingsTouchActive {
 		if inpututil.IsTouchJustReleased(u.settingsTouchID) {
 			u.settingsTouchActive = false
