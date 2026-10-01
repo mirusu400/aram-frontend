@@ -176,7 +176,6 @@ func TestDisplayEffectPresetsHaveAStableCycleOrder(t *testing.T) {
 func TestDisplayEffectPresetChoicesMatchTheProductOrder(t *testing.T) {
 	want := []string{
 		displayEffectOff,
-		displayEffectCrispFit,
 		displayEffectFeaturePhoneTFT,
 		displayEffectFeaturePhoneSTN,
 		displayEffectSmoothPixel,
@@ -189,6 +188,59 @@ func TestDisplayEffectPresetChoicesMatchTheProductOrder(t *testing.T) {
 		if displayEffectValueLabel(effect) == "" {
 			t.Errorf("display effect %q has no label", effect)
 		}
+	}
+}
+
+func TestTextureFilterChoicesIncludeCrispFit(t *testing.T) {
+	want := []string{
+		textureFilterNearest,
+		textureFilterLinear,
+		textureFilterCrispFit,
+	}
+	if got := textureFilterChoices(); !slices.Equal(got, want) {
+		t.Fatalf("texture filter choices = %q, want %q", got, want)
+	}
+	for _, filter := range want {
+		if textureFilterValueLabel(filter) == "" {
+			t.Errorf("texture filter %q has no label", filter)
+		}
+	}
+}
+
+func TestTextureFilterCyclesIndependentlyFromDisplayEffect(t *testing.T) {
+	temporary := t.TempDir()
+	t.Setenv("APPDATA", temporary)
+	t.Setenv("XDG_CONFIG_HOME", temporary)
+	shell := &Shell{settings: defaultSettings()}
+	shell.settings.Language = string(LanguageEnglish)
+	want := []string{
+		textureFilterLinear,
+		textureFilterCrispFit,
+		textureFilterNearest,
+	}
+	for _, filter := range want {
+		shell.cycleFilter()
+		profile := shell.displayProfile()
+		if profile.Filter != filter {
+			t.Fatalf("cycled texture filter = %q, want %q", profile.Filter, filter)
+		}
+		if profile.DisplayEffect != displayEffectFeaturePhoneTFT {
+			t.Fatalf("texture filter changed display effect to %q", profile.DisplayEffect)
+		}
+	}
+	if got := shell.displayPresentationValueLabel(); got != "Feature Phone TFT + Nearest" {
+		t.Fatalf("combined display label = %q", got)
+	}
+}
+
+func TestLegacyCrispFitEffectMigratesToTextureFilter(t *testing.T) {
+	settings := defaultSettings()
+	settings.Filter = textureFilterLinear
+	settings.DisplayEffect = legacyDisplayEffectCrispFit
+	settings.normalize()
+	if settings.Filter != textureFilterCrispFit ||
+		settings.DisplayEffect != displayEffectOff {
+		t.Fatalf("migrated Crisp Fit settings = %#v", settings)
 	}
 }
 
@@ -555,6 +607,34 @@ func TestGraphicsDisplayFilterRowIsADropdown(t *testing.T) {
 	if got := row.dropdown.value(); got != target {
 		t.Fatalf("dropdown value() = %d, want %d", got, target)
 	}
+}
+
+func TestGraphicsTextureFilterIsIndependentDropdown(t *testing.T) {
+	temporary := t.TempDir()
+	t.Setenv("APPDATA", temporary)
+	t.Setenv("XDG_CONFIG_HOME", temporary)
+	shell := &Shell{settings: defaultSettings()}
+	u := &shellUI{settingsSection: "Graphics"}
+
+	for _, row := range u.settingsRowModels(shell) {
+		if row.label != "Texture filter" {
+			continue
+		}
+		if row.disabled || row.dropdown == nil || row.action != nil {
+			t.Fatalf("texture filter row = %#v", row)
+		}
+		if row.dropdown.count != len(textureFilterChoices()) {
+			t.Fatalf("texture filter dropdown count = %d, want %d",
+				row.dropdown.count, len(textureFilterChoices()))
+		}
+		row.dropdown.apply(textureFilterIndex(textureFilterLinear))
+		if got := shell.displayProfile(); got.Filter != textureFilterLinear ||
+			got.DisplayEffect != displayEffectFeaturePhoneTFT {
+			t.Fatalf("combined display profile = %#v", got)
+		}
+		return
+	}
+	t.Fatal("Graphics section is missing the Texture filter row")
 }
 
 func TestSpeedPresetIndexPicksClosest(t *testing.T) {

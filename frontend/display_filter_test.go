@@ -68,6 +68,64 @@ func TestSharpBilinearScaleFollowsSourceAxesAfterRotation(t *testing.T) {
 	}
 }
 
+func TestTextureDrawOptionsSelectNearestAndLinear(t *testing.T) {
+	source := image.Rect(0, 0, 240, 320)
+	destination := image.Rect(10, 20, 730, 980)
+	nearest := textureDrawOptions(
+		source,
+		destination,
+		0,
+		textureFilterNearest,
+	)
+	linear := textureDrawOptions(
+		source,
+		destination,
+		0,
+		textureFilterLinear,
+	)
+	if nearest.Filter != ebiten.FilterNearest {
+		t.Fatalf("nearest texture filter = %v", nearest.Filter)
+	}
+	if linear.Filter != ebiten.FilterLinear {
+		t.Fatalf("linear texture filter = %v", linear.Filter)
+	}
+}
+
+func TestCrispFitTextureFilterUsesSharpBilinear(t *testing.T) {
+	source := ebiten.NewImage(24, 32)
+	target := ebiten.NewImage(72, 96)
+	if err := drawTextureFilteredImage(
+		target,
+		source,
+		source.Bounds(),
+		0,
+		textureFilterCrispFit,
+	); err != nil {
+		t.Fatalf("draw Crisp Fit texture: %v", err)
+	}
+}
+
+func TestEveryTextureFilterCombinesWithEveryDisplayEffect(t *testing.T) {
+	shell := &Shell{
+		settings:   defaultSettings(),
+		frame:      VideoFrame{Sequence: 1, Generation: 1},
+		frameImage: ebiten.NewImage(24, 32),
+	}
+	screen := ebiten.NewImage(72, 96)
+	destination := screen.Bounds()
+
+	for _, filter := range textureFilterChoices() {
+		for _, effect := range displayEffectChoices() {
+			t.Run(filter+"/"+effect, func(t *testing.T) {
+				screen.Clear()
+				shell.settings.Filter = filter
+				shell.settings.DisplayEffect = effect
+				shell.drawGuestFrame(screen, destination, shell.frameImage.Bounds())
+			})
+		}
+	}
+}
+
 func TestDisplayQuadMapsClockwiseRotationToSourceCorners(t *testing.T) {
 	source := image.Rect(10, 20, 250, 340)
 	want := map[int][4][2]float32{

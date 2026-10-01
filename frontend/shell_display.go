@@ -55,14 +55,23 @@ func (s *Shell) cycleScreenLayout() {
 
 func (s *Shell) cycleFilter() {
 	profile := s.displayProfile()
-	if profile.Filter == "nearest" {
-		profile.Filter = "linear"
-	} else {
-		profile.Filter = "nearest"
-	}
+	choices := textureFilterChoices()
+	profile.Filter = choices[(textureFilterIndex(profile.Filter)+1)%len(choices)]
 	s.saveDisplayProfile(profile, s.trf(
 		"Filter: %s",
-		s.tr(settingValueLabel(profile.Filter)),
+		s.tr(textureFilterValueLabel(profile.Filter)),
+	))
+}
+
+func (s *Shell) setTextureFilter(filter string) {
+	if !isTextureFilterChoice(filter) {
+		return
+	}
+	profile := s.displayProfile()
+	profile.Filter = filter
+	s.saveDisplayProfile(profile, s.trf(
+		"Filter: %s",
+		s.tr(textureFilterValueLabel(profile.Filter)),
 	))
 }
 
@@ -163,8 +172,6 @@ func displayEffectSupportsStrength(effect string) bool {
 
 func displayEffectValueLabel(effect string) string {
 	switch effect {
-	case displayEffectCrispFit:
-		return "Crisp Fit"
 	case displayEffectFeaturePhoneTFT:
 		return "Feature Phone TFT"
 	case displayEffectFeaturePhoneSTN:
@@ -178,12 +185,20 @@ func displayEffectValueLabel(effect string) string {
 	}
 }
 
+func textureFilterValueLabel(filter string) string {
+	if filter == textureFilterCrispFit {
+		return "Crisp Fit"
+	}
+	return settingValueLabel(filter)
+}
+
 func (s *Shell) displayPresentationValueLabel() string {
 	profile := s.displayProfile()
+	filter := s.tr(textureFilterValueLabel(profile.Filter))
 	if profile.DisplayEffect == displayEffectOff {
-		return settingValueLabel(profile.Filter)
+		return filter
 	}
-	return displayEffectValueLabel(profile.DisplayEffect)
+	return s.tr(displayEffectValueLabel(profile.DisplayEffect)) + " + " + filter
 }
 
 func (s *Shell) cycleStateSlot() {

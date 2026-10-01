@@ -132,11 +132,10 @@ func (s *Shell) drawGuestViewport(screen *ebiten.Image, viewport image.Rectangle
 	s.drawGuestFrame(screen, destination, sourceBounds)
 }
 
-// drawGuestFrame keeps the guest-native texture immutable and builds each
-// presentation preset from it. Original preserves the user's texture-filter
-// choice. Crisp Fit and handset panels use sharp bilinear sampling so integer
-// pixels stay flat while fractional window fits blend only at cell boundaries.
-// Smooth Pixel first builds a cached edge-aware 2x image in guest coordinates.
+// drawGuestFrame keeps the guest-native texture immutable. Texture filtering
+// fits either that texture or Smooth Pixel's cached 2x result to the viewport;
+// the selected display effect is then applied independently to the fitted
+// surface.
 func (s *Shell) drawGuestFrame(
 	screen *ebiten.Image,
 	destination image.Rectangle,
@@ -144,7 +143,8 @@ func (s *Shell) drawGuestFrame(
 ) {
 	display := s.displayProfile()
 	effect := display.DisplayEffect
-	if effect == displayEffectOff || !isDisplayEffectChoice(effect) {
+	if (effect == displayEffectOff || !isDisplayEffectChoice(effect)) &&
+		display.Filter != textureFilterCrispFit {
 		s.resetDisplayHistory()
 		screen.DrawImage(s.frameImage, s.guestFrameDrawOptions(sourceBounds, destination))
 		return
@@ -153,21 +153,27 @@ func (s *Shell) drawGuestFrame(
 	target := s.ensureDisplayEffectImage(destination.Dx(), destination.Dy())
 	target.Clear()
 	if effect == displayEffectSmoothPixel {
-		if err := s.drawSmoothPixel(target); err != nil {
-			if fallbackErr := s.drawSharpBilinear(target); fallbackErr != nil {
-				local := image.Rect(0, 0, destination.Dx(), destination.Dy())
-				target.DrawImage(s.frameImage, s.guestFrameDrawOptions(sourceBounds, local))
-			}
+		var err error
+		if displayEffectStrength(display) == 0 {
+			err = s.drawGuestTexture(target)
+		} else {
+			err = s.drawSmoothPixel(target)
+		}
+		if err != nil {
+			s.drawGuestTextureFallback(target, sourceBounds)
 		}
 		s.resetDisplayHistory()
 		drawDisplaySurface(screen, target, destination)
 		return
 	}
-	if err := s.drawSharpBilinear(target); err != nil {
-		// Fixed shader compilation is tested, but the frame must remain visible
-		// if a platform rejects it at runtime.
-		local := image.Rect(0, 0, destination.Dx(), destination.Dy())
-		target.DrawImage(s.frameImage, s.guestFrameDrawOptions(sourceBounds, local))
+	if err := s.drawGuestTexture(target); err != nil {
+		s.drawGuestTextureFallback(target, sourceBounds)
+	}
+
+	if effect == displayEffectOff || !isDisplayEffectChoice(effect) {
+		s.resetDisplayHistory()
+		drawDisplaySurface(screen, target, destination)
+		return
 	}
 
 	if effect == displayEffectFeaturePhoneTFT ||
@@ -212,16 +218,48 @@ func (s *Shell) drawGuestFrame(
 
 var displayQuadIndices = []uint16{0, 1, 2, 1, 3, 2}
 
-func (s *Shell) drawSharpBilinear(
-	target *ebiten.Image,
-) error {
+func (s *Shell) drawGuestTexture(target *ebiten.Image) error {
 	display := s.displayProfile()
-	return drawSharpBilinearImage(
+	return drawTextureFilteredImage(
 		target,
 		s.frameImage,
 		s.frameImage.Bounds(),
 		display.Rotation,
+		display.Filter,
 	)
+}
+
+// drawGuestTextureFallback keeps a frame visible if a shader-backed texture
+// filter fails to compile on a particular GPU. Nearest uses no custom shader.
+func (s *Shell) drawGuestTextureFallback(
+	target *ebiten.Image,
+	sourceBounds image.Rectangle,
+) {
+	target.DrawImage(s.frameImage, textureDrawOptions(
+		sourceBounds,
+		target.Bounds(),
+		s.displayProfile().Rotation,
+		textureFilterNearest,
+	))
+}
+
+func drawTextureFilteredImage(
+	target *ebiten.Image,
+	source *ebiten.Image,
+	sourceBounds image.Rectangle,
+	rotation int,
+	filter string,
+) error {
+	if filter == textureFilterCrispFit {
+		return drawSharpBilinearImage(target, source, sourceBounds, rotation)
+	}
+	target.DrawImage(source, textureDrawOptions(
+		sourceBounds,
+		target.Bounds(),
+		rotation,
+		filter,
+	))
+	return nil
 }
 
 func drawSharpBilinearImage(
@@ -269,11 +307,12 @@ func (s *Shell) drawSmoothPixel(target *ebiten.Image) error {
 		return err
 	}
 	display := s.displayProfile()
-	return drawSharpBilinearImage(
+	return drawTextureFilteredImage(
 		target,
 		scaled,
 		scaled.Bounds(),
 		display.Rotation,
+		display.Filter,
 	)
 }
 
@@ -553,9 +592,23 @@ func (s *Shell) guestFrameDrawOptions(
 	destination image.Rectangle,
 ) *ebiten.DrawImageOptions {
 	display := s.displayProfile()
+	return textureDrawOptions(
+		sourceBounds,
+		destination,
+		display.Rotation,
+		display.Filter,
+	)
+}
+
+func textureDrawOptions(
+	sourceBounds image.Rectangle,
+	destination image.Rectangle,
+	rotation int,
+	filter string,
+) *ebiten.DrawImageOptions {
 	sourceWidth, sourceHeight := sourceBounds.Dx(), sourceBounds.Dy()
 	rotatedWidth, rotatedHeight := sourceWidth, sourceHeight
-	if display.Rotation == 90 || display.Rotation == 270 {
+	if rotation == 90 || rotation == 270 {
 		rotatedWidth, rotatedHeight = sourceHeight, sourceWidth
 	}
 	scaleX := float64(destination.Dx()) / float64(rotatedWidth)
@@ -563,7 +616,7 @@ func (s *Shell) guestFrameDrawOptions(
 
 	options := &ebiten.DrawImageOptions{}
 	options.GeoM.Translate(float64(-sourceBounds.Min.X), float64(-sourceBounds.Min.Y))
-	switch display.Rotation {
+	switch rotation {
 	case 90:
 		options.GeoM.Rotate(math.Pi / 2)
 		options.GeoM.Translate(float64(sourceHeight), 0)
@@ -576,7 +629,7 @@ func (s *Shell) guestFrameDrawOptions(
 	}
 	options.GeoM.Scale(scaleX, scaleY)
 	options.GeoM.Translate(float64(destination.Min.X), float64(destination.Min.Y))
-	if display.Filter == "linear" {
+	if filter == textureFilterLinear {
 		options.Filter = ebiten.FilterLinear
 	} else {
 		options.Filter = ebiten.FilterNearest

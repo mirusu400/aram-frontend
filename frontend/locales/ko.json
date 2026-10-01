@@ -231,7 +231,7 @@
   "Rotation": "회전",
   "Rotate the guest display clockwise.": "게스트 화면을 시계 방향으로 회전합니다.",
   "Texture filter": "텍스처 필터",
-  "Choose nearest or linear sampling.": "최근접 또는 선형 샘플링을 선택합니다.",
+  "Choose nearest, linear, or crisp-fit scaling.": "최근접, 선형 또는 또렷하게 맞춤 확대 방식을 선택합니다.",
   "Display filter": "디스플레이 필터",
   "Choose original pixels, feature-phone panels, xBRZ-style smoothing, or an NTSC CRT TV.": "원본 픽셀, 피처폰 패널, xBRZ 방식 보정 또는 NTSC 브라운관 TV를 선택합니다.",
   "Filter strength": "필터 강도",

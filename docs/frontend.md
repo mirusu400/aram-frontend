@@ -37,9 +37,9 @@ mobile hosts should include `application/zip` in their document picker.
 - Fit Window (`Ctrl+0`)
 - Rotation
 - Screen Layout
-- Nearest/linear filter
-- Display filter: Original, Crisp Fit, Feature Phone TFT, Feature Phone STN,
-  Smooth Pixel, and CRT TV
+- Texture scaling: Nearest, Linear, or Crisp Fit
+- Display effects: Original, Feature Phone TFT, Feature Phone STN, Smooth Pixel,
+  and CRT TV; each combines with the selected texture scaling
 - Adjustable display-filter strength
 - Native-resolution Screenshot (`Ctrl+Shift+S`)
 
@@ -220,21 +220,22 @@ persistent texture is rebuilt only when the guest changes resolution. A
 backend that hands over tightly packed RGBA is uploaded without an intermediate
 copy.
 
-Feature Phone TFT is the default display filter. Crisp Fit uses sharp bilinear
+Texture scaling and display effects are independent. Nearest preserves hard
+pixel edges, Linear smooths the fitted image, and Crisp Fit uses sharp bilinear
 sampling: source-pixel centers remain flat while fractional-size boundaries
-blend across one output pixel. The TFT preset adds RGB565 colour, subtle LCD
-cell seams, uneven backlighting, and an exponential response history driven by
-display time, so moving pixels leave a real previous-frame trail and then
-settle even when the guest frame becomes static. Feature Phone STN uses a
-longer 75 ms response half-life, reduced saturation and contrast, a stronger
-green-yellow cast, and visible cell crosstalk to reproduce older passive-matrix
-panels. Smooth Pixel runs an independently implemented, edge-aware xBRZ-style
-2x pass before fitting the image; isolated pixels and thin glyph strokes are
-protected so small Hangul remains legible. Original keeps the separate
-nearest/linear texture setting. CRT TV keeps luma detail while low-pass
-filtering NTSC I/Q colour horizontally, then adds guest-row scanlines and a
-3x2 RGB shadow mask at final display resolution. All presets affect
-presentation only; native-resolution screenshots remain untouched.
+blend across one output pixel. Feature Phone TFT is the default display effect;
+it adds RGB565 colour, subtle LCD cell seams, uneven backlighting, and an
+exponential response history driven by display time, so moving pixels leave a
+real previous-frame trail and then settle even when the guest frame becomes
+static. Feature Phone STN uses a longer 75 ms response half-life, reduced
+saturation and contrast, a stronger green-yellow cast, and visible cell
+crosstalk to reproduce older passive-matrix panels. Smooth Pixel runs an
+independently implemented, edge-aware xBRZ-style 2x pass before the selected
+texture scaling; isolated pixels and thin glyph strokes are protected so small
+Hangul remains legible. CRT TV keeps luma detail while low-pass filtering NTSC
+I/Q colour horizontally, then adds guest-row scanlines and a 3x2 RGB shadow
+mask at final display resolution. All effects affect presentation only;
+native-resolution screenshots remain untouched.
 
 The TFT, STN, Smooth Pixel, and CRT TV presets expose a 0-100% strength. The
 default 100% preserves their authored appearance; lower values blend their

@@ -182,7 +182,7 @@ func defaultMenus() []Menu {
 					DynamicLabel: func(shell *Shell) string {
 						return shell.trf(
 							"Filter: %s",
-							shell.tr(settingValueLabel(shell.displayProfile().Filter)),
+							shell.tr(textureFilterValueLabel(shell.displayProfile().Filter)),
 						)
 					},
 				},

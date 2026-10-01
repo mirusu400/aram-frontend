@@ -231,7 +231,7 @@
   "Rotation": "Rotation",
   "Rotate the guest display clockwise.": "Rotate the guest display clockwise.",
   "Texture filter": "Texture filter",
-  "Choose nearest or linear sampling.": "Choose nearest or linear sampling.",
+  "Choose nearest, linear, or crisp-fit scaling.": "Choose nearest, linear, or crisp-fit scaling.",
   "Display filter": "Display filter",
   "Choose original pixels, feature-phone panels, xBRZ-style smoothing, or an NTSC CRT TV.": "Choose original pixels, feature-phone panels, xBRZ-style smoothing, or an NTSC CRT TV.",
   "Filter strength": "Filter strength",

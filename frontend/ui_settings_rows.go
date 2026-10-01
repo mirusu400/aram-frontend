@@ -168,10 +168,26 @@ func (u *shellUI) settingsRowModelsForLayout(
 			},
 			{
 				label:       "Texture filter",
-				description: "Choose nearest or linear sampling.",
-				value:       strings.Title(display.Filter),
-				action:      func() { shell.dispatchCommand("view.filter") },
-				disabled:    display.DisplayEffect != displayEffectOff,
+				description: "Choose nearest, linear, or crisp-fit scaling.",
+				dropdown: &settingsDropdownModel{
+					count: len(textureFilterChoices()),
+					label: func(i int) string {
+						choices := textureFilterChoices()
+						if i < 0 || i >= len(choices) {
+							return ""
+						}
+						return shell.tr(textureFilterValueLabel(choices[i]))
+					},
+					value: func() int {
+						return textureFilterIndex(shell.displayProfile().Filter)
+					},
+					apply: func(i int) {
+						choices := textureFilterChoices()
+						if i >= 0 && i < len(choices) {
+							shell.setTextureFilter(choices[i])
+						}
+					},
+				},
 			},
 			{
 				label:       "Display filter",

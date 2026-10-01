@@ -17,18 +17,21 @@ const (
 
 const (
 	displayEffectOff                = "off"
-	displayEffectCrispFit           = "crisp-fit"
 	displayEffectFeaturePhoneTFT    = "feature-phone-tft"
 	displayEffectFeaturePhoneSTN    = "feature-phone-stn"
 	displayEffectSmoothPixel        = "smooth-pixel"
 	displayEffectCRTTV              = "crt-tv"
 	displayEffectFeaturePhoneLegacy = "feature-phone"
+	legacyDisplayEffectCrispFit     = "crisp-fit"
+
+	textureFilterNearest  = "nearest"
+	textureFilterLinear   = "linear"
+	textureFilterCrispFit = "crisp-fit"
 )
 
 func displayEffectChoices() []string {
 	return []string{
 		displayEffectOff,
-		displayEffectCrispFit,
 		displayEffectFeaturePhoneTFT,
 		displayEffectFeaturePhoneSTN,
 		displayEffectSmoothPixel,
@@ -50,6 +53,32 @@ func isDisplayEffectChoice(effect string) bool {
 func displayEffectIndex(effect string) int {
 	for index, choice := range displayEffectChoices() {
 		if choice == effect {
+			return index
+		}
+	}
+	return 0
+}
+
+func textureFilterChoices() []string {
+	return []string{
+		textureFilterNearest,
+		textureFilterLinear,
+		textureFilterCrispFit,
+	}
+}
+
+func isTextureFilterChoice(filter string) bool {
+	for _, choice := range textureFilterChoices() {
+		if filter == choice {
+			return true
+		}
+	}
+	return false
+}
+
+func textureFilterIndex(filter string) int {
+	for index, choice := range textureFilterChoices() {
+		if choice == filter {
 			return index
 		}
 	}
@@ -292,7 +321,7 @@ func defaultSettings() Settings {
 		IntegerScaling:        true,
 		PreserveAspect:        true,
 		ScreenLayout:          "center",
-		Filter:                "nearest",
+		Filter:                textureFilterNearest,
 		DisplayEffect:         displayEffectFeaturePhoneTFT,
 		DisplayEffectStrength: displayEffectStrengthDefault,
 		TitleDisplays:         make(map[string]DisplayProfile),
@@ -451,8 +480,15 @@ func (profile *DisplayProfile) normalize() {
 	if profile.ScreenLayout != "center" && profile.ScreenLayout != "stretch" {
 		profile.ScreenLayout = "center"
 	}
-	if profile.Filter != "nearest" && profile.Filter != "linear" {
-		profile.Filter = "nearest"
+	// Crisp Fit used to be a display-effect preset even though it only chooses
+	// how the guest texture is enlarged. Move saved profiles to the independent
+	// texture-filter axis so their picture stays identical after the split.
+	if profile.DisplayEffect == legacyDisplayEffectCrispFit {
+		profile.DisplayEffect = displayEffectOff
+		profile.Filter = textureFilterCrispFit
+	}
+	if !isTextureFilterChoice(profile.Filter) {
+		profile.Filter = textureFilterNearest
 	}
 	if profile.DisplayEffect == displayEffectFeaturePhoneLegacy {
 		profile.DisplayEffect = displayEffectFeaturePhoneTFT
