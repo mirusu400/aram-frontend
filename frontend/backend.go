@@ -195,6 +195,9 @@ type ToolSnapshot struct {
 	Lines   []string
 	Fields  []ToolField
 	Actions []ToolAction
+	// Session identifies the loaded memory session for asynchronous requests.
+	Session uint64
+	Memory  *MemorySnapshot
 	// AllowGuestInput keeps host input reaching the guest while this panel is
 	// open. A panel meant to be used mid-play, such as cheats, sets it; one
 	// with text entry must not, or typing would drive the game as well.
@@ -227,9 +230,33 @@ type ToolAction struct {
 }
 
 type ToolRequest struct {
-	Kind   ToolKind
-	Action string
-	Fields map[string]string
+	Kind    ToolKind
+	Action  string
+	Fields  map[string]string
+	Session uint64
+}
+
+// MemorySnapshot is a bounded page of guest scalars. The backend owns the scan
+// and its previous-value baseline; presentation only retains this page.
+type MemorySnapshot struct {
+	Active   bool
+	Type     string
+	Total    int
+	Offset   int
+	PageSize int
+	Results  []MemoryResult
+	Selected *MemoryResult
+	Status   string
+}
+
+type MemoryResult struct {
+	Address  uint32
+	Region   string
+	Value    string
+	Type     string
+	Writable bool
+	// Expected is an opaque exact-value token returned unchanged when writing.
+	Expected string
 }
 
 // DebugArtifact is a backend-owned diagnostic file for a user-exported debug

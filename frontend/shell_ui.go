@@ -35,6 +35,8 @@ type shellUI struct {
 	panelDropdowns       map[string]*widget.ListComboButton
 	panelCheckboxes      map[string]*widget.Checkbox
 	panelTextInputs      map[string]*imeTextInput
+	memoryScroll         *widget.ScrollContainer
+	memoryResultButtons  []*widget.Button
 	settingsSection      string
 	bindingDevice        bindingDevice
 	scrim                *widget.Container
@@ -391,6 +393,8 @@ func (u *shellUI) syncPanel(shell *Shell) {
 }
 
 func (u *shellUI) closePanel() {
+	u.memoryScroll = nil
+	u.memoryResultButtons = nil
 	window := u.panelWindow
 	u.panelWindow = nil
 	u.panelSignature = ""

@@ -42,6 +42,10 @@ func (s *Shell) releaseCurrentInput(deleteTemporary bool) error {
 	s.problem = nil
 	s.hostPaused = false
 	s.frameGeneration++
+	s.toolGeneration++
+	if s.panel != nil && s.panel.Tool == ToolMemory {
+		s.panel = nil
+	}
 	s.frameRunPending = false
 	s.clearMeasuredSpeed()
 	s.frame = VideoFrame{}

@@ -42,6 +42,9 @@ func (s *Shell) consumeResults() {
 			s.consumeBackendResult(result)
 		case result := <-s.commandResults:
 			delete(s.busyCommands, result.command)
+			if memoryLifecycleCommand(result.command) && s.panel != nil && s.panel.Tool == ToolMemory {
+				s.openToolPanel(ToolMemory)
+			}
 			if isAudioDiscontinuityCommand(result.command) {
 				s.finishAudioDiscontinuity(s.backend.State())
 			}

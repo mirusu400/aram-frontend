@@ -17,6 +17,8 @@ type Panel struct {
 	FieldValues     map[string]string
 	Busy            bool
 	AllowGuestInput bool
+	Session         uint64
+	Memory          *MemorySnapshot
 }
 
 // guestInputAllowed reports whether host controls still reach the guest. Any
@@ -27,9 +29,12 @@ func (s *Shell) guestInputAllowed() bool {
 }
 
 type toolResult struct {
-	kind     ToolKind
-	snapshot ToolSnapshot
-	err      error
+	kind           ToolKind
+	snapshot       ToolSnapshot
+	err            error
+	panel          *Panel
+	generation     uint64
+	toolGeneration uint64
 }
 
 func (s *Shell) openToolPanel(kind ToolKind) {
@@ -57,17 +62,26 @@ func (s *Shell) openToolPanel(kind ToolKind) {
 		}
 		return
 	}
+	panel, generation, toolGeneration := s.panel, s.frameGeneration, s.toolGeneration
 	go func() {
 		snapshot, err := backend.ToolSnapshot(context.Background(), kind)
-		s.toolResults <- toolResult{kind: kind, snapshot: snapshot, err: err}
+		s.toolResults <- toolResult{kind: kind, snapshot: snapshot, err: err, panel: panel, generation: generation, toolGeneration: toolGeneration}
 	}()
 }
 
 func (s *Shell) consumeToolResult(result toolResult) {
-	if s.panel == nil || s.panel.Tool != result.kind {
+	if s.panel == nil || s.panel.Tool != result.kind || s.panel != result.panel {
 		return
 	}
-	if result.err != nil {
+	if result.toolGeneration != s.toolGeneration {
+		return
+	}
+	if s.frameGeneration != result.generation {
+		// Reopen against the current game after a lifecycle discontinuity.
+		s.openToolPanel(result.kind)
+		return
+	}
+	if result.err != nil && result.snapshot.Memory == nil {
 		s.panel.Busy = false
 		s.panel.Lines = []string{
 			"Backend tool request failed:",
@@ -88,11 +102,24 @@ func (s *Shell) consumeToolResult(result toolResult) {
 	s.panel.Fields = append([]ToolField(nil), result.snapshot.Fields...)
 	s.panel.Actions = append([]ToolAction(nil), result.snapshot.Actions...)
 	s.panel.AllowGuestInput = result.snapshot.AllowGuestInput
+	s.panel.Session = result.snapshot.Session
+	s.panel.Memory = result.snapshot.Memory
+	if result.err != nil {
+		s.panel.Lines = append(s.panel.Lines, result.err.Error())
+	}
+	newValue := s.panel.FieldValues["new_value"]
 	s.panel.FieldValues = make(map[string]string, len(result.snapshot.Fields))
 	for _, field := range result.snapshot.Fields {
 		s.panel.FieldValues[field.ID] = field.Value
 	}
+	if s.panel.Memory != nil {
+		s.panel.FieldValues["new_value"] = newValue
+	}
 	s.panel.Busy = false
+	if result.err != nil {
+		s.setStatus(s.trf("%s: %s", s.tr(toolTitle(result.kind)), result.err.Error()))
+		return
+	}
 	s.setStatus(s.trf(
 		"%s refreshed",
 		s.tr(toolTitle(result.kind)),
@@ -112,9 +139,10 @@ func (s *Shell) executeToolAction(action string, fields map[string]string) {
 		return
 	}
 	request := ToolRequest{
-		Kind:   s.panel.Tool,
-		Action: action,
-		Fields: cloneStringMap(fields),
+		Kind:    s.panel.Tool,
+		Action:  action,
+		Fields:  cloneStringMap(fields),
+		Session: s.panel.Session,
 	}
 	s.panel.Busy = true
 	s.setStatus(s.trf(
@@ -122,9 +150,10 @@ func (s *Shell) executeToolAction(action string, fields map[string]string) {
 		s.tr(toolTitle(s.panel.Tool)),
 		s.tr(action),
 	))
+	panel, generation, toolGeneration := s.panel, s.frameGeneration, s.toolGeneration
 	go func() {
 		snapshot, err := backend.ExecuteToolAction(context.Background(), request)
-		s.toolResults <- toolResult{kind: request.Kind, snapshot: snapshot, err: err}
+		s.toolResults <- toolResult{kind: request.Kind, snapshot: snapshot, err: err, panel: panel, generation: generation, toolGeneration: toolGeneration}
 	}()
 }
 

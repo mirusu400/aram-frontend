@@ -188,6 +188,15 @@ func (s *Shell) executeBackend(command BackendCommand) {
 		return
 	}
 	s.busyCommands[command] = true
+	if memoryLifecycleCommand(command) {
+		s.toolGeneration++
+		if s.panel != nil && s.panel.Tool == ToolMemory {
+			s.panel.Memory = nil
+			s.panel.Fields, s.panel.Actions = nil, nil
+			s.panel.Busy = true
+			s.panel.Lines = []string{"Refreshing memory session..."}
+		}
+	}
 	if isAudioDiscontinuityCommand(command) {
 		s.beginAudioDiscontinuity()
 	}
@@ -206,6 +215,10 @@ func (s *Shell) executeBackend(command BackendCommand) {
 		}
 		s.commandResults <- commandResult{command: command, err: err}
 	}()
+}
+
+func memoryLifecycleCommand(command BackendCommand) bool {
+	return command == CommandStart || command == CommandReset || command == CommandLoadState || command == CommandStop
 }
 
 // startCurrentTitle begins or resumes the loaded input. A machine sitting in

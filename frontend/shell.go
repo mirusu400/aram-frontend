@@ -197,6 +197,7 @@ type Shell struct {
 	issueReportResults        chan issueReportResult
 	issueCommentResults       chan issueCommentResult
 	toolResults               chan toolResult
+	toolGeneration            uint64
 	updateResults             chan updateResult
 	updateCheckResults        chan updateCheckResult
 	updateNoticeReady         bool
