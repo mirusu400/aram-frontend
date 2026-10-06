@@ -73,7 +73,9 @@ func (s *Shell) consumeToolResult(result toolResult) {
 	if s.panel == nil || s.panel.Tool != result.kind || s.panel != result.panel {
 		return
 	}
-	if result.toolGeneration != s.toolGeneration {
+	// Only memory sessions are refreshed when a lifecycle command completes;
+	// any other tool still needs its response to leave the busy state.
+	if result.kind == ToolMemory && result.toolGeneration != s.toolGeneration {
 		return
 	}
 	if s.frameGeneration != result.generation {

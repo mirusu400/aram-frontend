@@ -116,6 +116,24 @@ func TestMemoryPanelRejectsLateResponses(t *testing.T) {
 	shell.consumeToolResult(waitToolResult(t, shell.toolResults))
 }
 
+// The memory lifecycle generation must not swallow other tools' responses: a
+// Cheats action in flight across Reset would otherwise leave the panel busy.
+func TestLifecycleCommandKeepsOtherToolResponses(t *testing.T) {
+	isolateSettledSettings(t)
+	backend := newMemoryPanelBackend()
+	backend.snapshot.Memory = nil
+	shell := NewShell(backend, nil, "")
+	shell.openToolPanel(ToolCheats)
+	shell.consumeToolResult(waitToolResult(t, shell.toolResults))
+	shell.executeToolAction("refresh", nil)
+	<-backend.requests
+	shell.executeBackend(CommandReset)
+	shell.consumeToolResult(waitToolResult(t, shell.toolResults))
+	if shell.panel == nil || shell.panel.Tool != ToolCheats || shell.panel.Busy || len(shell.panel.Actions) == 0 {
+		t.Fatalf("cheats response dropped across reset: %+v", shell.panel)
+	}
+}
+
 func TestMemoryPanelBuildsOnlyOnePageInResponsiveViewport(t *testing.T) {
 	for _, size := range [][2]int{{390, 844}, {720, 540}, {960, 720}} {
 		t.Run(fmt.Sprintf("%dx%d", size[0], size[1]), func(t *testing.T) {
