@@ -15,8 +15,12 @@ import (
 // state each frame.
 func (u *shellUI) updateSettingsTouchScroll(shell *Shell) {
 	scroll := u.settingsScroll
+	memoryPanel := shell.panel != nil && shell.panel.Tool == ToolMemory && shell.panel.Memory != nil
+	if memoryPanel {
+		scroll = u.memoryScroll
+	}
 	if !platformUsesTouchLayout() || scroll == nil ||
-		shell.panel == nil || shell.panel.Kind != "settings" {
+		shell.panel == nil || (shell.panel.Kind != "settings" && !memoryPanel) {
 		u.settingsTouchActive = false
 		u.settingsTouchDragged = false
 		return
@@ -29,6 +33,14 @@ func (u *shellUI) updateSettingsTouchScroll(shell *Shell) {
 			u.settingsTouchActive = false
 			u.settingsTouchDragged = false
 			return
+		}
+	}
+	if memoryPanel {
+		for _, dropdown := range u.panelDropdowns {
+			if dropdown.ContentVisible() {
+				u.settingsTouchActive, u.settingsTouchDragged = false, false
+				return
+			}
 		}
 	}
 	if u.settingsTouchActive {
@@ -62,7 +74,9 @@ func (u *shellUI) updateSettingsTouchScroll(shell *Shell) {
 		}
 		top := scroll.ScrollTop - float64(delta)/overflow
 		scroll.ScrollTop = min(1, max(0, top))
-		u.settingsOffsets[u.settingsSection] = scroll.ScrollTop
+		if !memoryPanel {
+			u.settingsOffsets[u.settingsSection] = scroll.ScrollTop
+		}
 		return
 	}
 	for _, id := range inpututil.AppendJustPressedTouchIDs(nil) {

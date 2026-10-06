@@ -17,6 +17,9 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 		strings.Join(panel.Lines, "\x00"),
 		fmt.Sprintf("busy=%t", panel.Busy),
 	)
+	if panel.Memory != nil {
+		signatureParts = append(signatureParts, fmt.Sprintf("memory:%d:%+v:%+v", panel.Session, *panel.Memory, panel.Memory.Selected))
+	}
 	for _, field := range panel.Fields {
 		// A self-applying control reports its state through Value, so the
 		// signature has to notice when the backend answers with a new one.
@@ -100,6 +103,22 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 			})),
 		))
 	}
+	fieldsParent := form
+	if panel.Memory != nil {
+		columns := 2
+		if u.viewportWidth < design.px(600) {
+			columns = 1
+		}
+		fieldsParent = widget.NewContainer(
+			widget.ContainerOpts.Layout(widget.NewGridLayout(
+				widget.GridLayoutOpts.Columns(columns),
+				widget.GridLayoutOpts.DefaultStretch(true, false),
+				widget.GridLayoutOpts.Spacing(design.Space.M, design.Space.S),
+			)),
+			widget.ContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true})),
+		)
+		form.AddChild(fieldsParent)
+	}
 	for _, field := range panel.Fields {
 		field := field
 		fieldBlock := widget.NewContainer(
@@ -130,7 +149,7 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 					widget.RowLayoutData{Stretch: true},
 				))
 			}
-			form.AddChild(fieldBlock)
+			fieldsParent.AddChild(fieldBlock)
 			continue
 		}
 		fieldBlock.AddChild(design.text(
@@ -144,7 +163,7 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 			dropdown.GetWidget().Disabled = panel.Busy
 			u.panelDropdowns[field.ID] = dropdown
 			fieldBlock.AddChild(dropdown)
-			form.AddChild(fieldBlock)
+			fieldsParent.AddChild(fieldBlock)
 			continue
 		}
 		input := newIMETextInput(design, imeTextInputConfig{
@@ -164,9 +183,8 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 		input.adoptNativeEdit(previousInputs[field.ID])
 		u.panelTextInputs[field.ID] = input
 		fieldBlock.AddChild(input)
-		form.AddChild(fieldBlock)
+		fieldsParent.AddChild(fieldBlock)
 	}
-	contents.AddChild(form)
 
 	actionRow := widget.NewContainer(
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -184,11 +202,15 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 	)
 	for _, action := range panel.Actions {
 		action := action
+		buttonWidth := design.px(112)
+		if panel.Memory != nil {
+			buttonWidth = 0
+		}
 		button := design.button(
 			shell.tr(action.Label),
 			design.Components.SubtleButton,
 			design.Type.Strong,
-			design.px(112),
+			buttonWidth,
 			design.Components.SubtleButton.MinHeight,
 			widget.TextPositionCenter,
 			func() {
@@ -203,7 +225,32 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 		button.GetWidget().Disabled = !action.Enabled || panel.Busy
 		actionRow.AddChild(button)
 	}
-	contents.AddChild(actionRow)
+	if panel.Memory != nil {
+		actionRow.GetWidget().LayoutData = widget.RowLayoutData{Stretch: true}
+		form.AddChild(actionRow)
+		u.addMemoryResults(shell, panel, form, previousInputs)
+		// A page is bounded to 32 rows; scroll the form on smaller viewports so
+		// every search control, result, and editor remains reachable.
+		form.GetWidget().LayoutData = nil
+		scroll := widget.NewScrollContainer(
+			widget.ScrollContainerOpts.Content(form),
+			widget.ScrollContainerOpts.StretchContentWidth(),
+			widget.ScrollContainerOpts.Image(design.Components.Scroll),
+			widget.ScrollContainerOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+				StretchHorizontal: true, StretchVertical: true,
+				Padding: &widget.Insets{Left: design.Space.L, Top: design.Space.M, Right: design.Space.L, Bottom: design.px(64)},
+			})),
+		)
+		scroll.GetWidget().ScrolledEvent.AddHandler(func(args any) {
+			event := args.(*widget.WidgetScrolledEventArgs)
+			scrollContainerByWheel(scroll, event.Y)
+		})
+		u.memoryScroll = scroll
+		contents.AddChild(scroll)
+	} else {
+		contents.AddChild(form)
+		contents.AddChild(actionRow)
+	}
 
 	var toolWindow *widget.Window
 	closeButton := design.button(

@@ -36,6 +36,14 @@ func newToolFieldDropdown(
 
 	trackIdle := euiimage.NewNineSliceColor(design.Palette.Border)
 	trackHover := euiimage.NewNineSliceColor(design.Palette.BorderStrong)
+	listImage := design.Components.Scroll
+	if panel.Tool == ToolMemory {
+		// Memory's popup overlaps the other search controls and live values.
+		listImage = &widget.ScrollContainerImage{
+			Idle: euiimage.NewNineSliceColor(design.Palette.Surface),
+			Mask: design.Components.Scroll.Mask,
+		}
+	}
 	return widget.NewListComboButton(
 		widget.ListComboButtonOpts.Entries(entries),
 		widget.ListComboButtonOpts.InitialEntry(initial),
@@ -64,7 +72,7 @@ func newToolFieldDropdown(
 			MinSize: &image.Point{Y: design.px(34)},
 		}),
 		widget.ListComboButtonOpts.ListParams(&widget.ListParams{
-			ScrollContainerImage: design.Components.Scroll,
+			ScrollContainerImage: listImage,
 			Slider: &widget.SliderParams{
 				TrackImage: &widget.SliderTrackImage{
 					Idle:     trackIdle,

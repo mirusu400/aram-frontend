@@ -85,6 +85,17 @@ snapshot. The frontend renders those fields and actions and sends a
 `ToolRequest` through `ToolActionBackend`; guest memory is never accessed
 directly by the frontend.
 
+Memory Search uses the structured `MemorySnapshot` page in that contract.
+It displays the numeric type, total count, address, region, and live value,
+with first scan, next scan, new search, page navigation, and a selected-value
+editor. Text entry captures guest input. Closing the panel keeps the backend's
+scan so play can continue before the next scan.
+
+Each memory request carries the snapshot's session number. Panel identity and
+lifecycle generations discard late responses. A write returns the selected
+result's opaque expected-value token; after a conflict the refreshed value is
+shown and the proposed new value is retained for review.
+
 ## Windows input
 
 The default keyboard mapping accepts both arrows and WASD for directions,
