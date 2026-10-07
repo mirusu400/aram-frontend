@@ -93,7 +93,7 @@ func (s *Shell) consumeToolResult(result toolResult) {
 		s.setStatus(s.trf(
 			"%s: %s",
 			s.tr(toolTitle(result.kind)),
-			result.err.Error(),
+			s.trToolText(result.kind, result.err.Error()),
 		))
 		return
 	}
@@ -119,7 +119,7 @@ func (s *Shell) consumeToolResult(result toolResult) {
 	}
 	s.panel.Busy = false
 	if result.err != nil {
-		s.setStatus(s.trf("%s: %s", s.tr(toolTitle(result.kind)), result.err.Error()))
+		s.setStatus(s.trf("%s: %s", s.tr(toolTitle(result.kind)), s.trToolText(result.kind, result.err.Error())))
 		return
 	}
 	s.setStatus(s.trf(

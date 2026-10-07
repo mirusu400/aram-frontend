@@ -30,7 +30,7 @@ func (u *shellUI) addMemoryResults(shell *Shell, panel *Panel, form *widget.Cont
 		form.AddChild(design.text(text, design.Type.Body, design.Palette.Text, widget.RowLayoutData{Stretch: true}))
 	}
 	if model.Status != "" {
-		addText(model.Status)
+		addText(shell.trMemoryText(model.Status))
 	}
 	if !model.Active {
 		addText(shell.tr("Choose a numeric type and region, then run a first scan."))

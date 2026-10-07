@@ -95,7 +95,13 @@ func (s *Shell) panelLines() []string {
 		}
 		return lines
 	default:
-		return append([]string(nil), s.panel.Lines...)
+		lines := append([]string(nil), s.panel.Lines...)
+		if s.panel.Tool == ToolMemory {
+			for index, line := range lines {
+				lines[index] = s.trMemoryText(line)
+			}
+		}
+		return lines
 	}
 }
 
