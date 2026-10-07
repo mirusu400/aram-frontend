@@ -9,6 +9,7 @@ import (
 
 func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 	panel := shell.panel
+	translateText := func(message string) string { return shell.trToolText(panel.Tool, message) }
 	var signatureParts []string
 	signatureParts = append(
 		signatureParts,
@@ -91,9 +92,13 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 		})),
 	)
 	if len(panel.Lines) > 0 {
+		lines := make([]string, len(panel.Lines))
+		for index, line := range panel.Lines {
+			lines[index] = translateText(line)
+		}
 		form.AddChild(widget.NewText(
 			widget.TextOpts.Text(
-				strings.Join(wrapPanelLines(shell.trLines(panel.Lines), 76, 14), "\n"),
+				strings.Join(wrapPanelLines(lines, 76, 14), "\n"),
 				design.Type.Body,
 				design.Palette.TextMuted,
 			),
@@ -159,7 +164,7 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 			widget.RowLayoutData{Stretch: true},
 		))
 		if len(field.Options) > 0 {
-			dropdown := newToolFieldDropdown(design, shell, panel, field, shell.tr)
+			dropdown := newToolFieldDropdown(design, shell, panel, field, translateText)
 			dropdown.GetWidget().Disabled = panel.Busy
 			u.panelDropdowns[field.ID] = dropdown
 			fieldBlock.AddChild(dropdown)
