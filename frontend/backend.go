@@ -143,9 +143,9 @@ type AudioSettings struct {
 	Volume   int
 	Latency  time.Duration
 	DeviceID string
-	// MixMode selects the enhanced audio policy where sound effects mix over a
-	// looping track instead of the title being able to silence it. False keeps
-	// the faithful device behaviour. It is baked into the next machine created.
+	// MixMode retains a legacy compatibility preference. Current backends mix
+	// concurrent clips in both settings; package-specific lifetime corrections
+	// are selected by verified title identity rather than this flag.
 	MixMode bool
 	// Soften applies a gentle output low-pass that tames the harsh top end of
 	// the guest's FM (Yamaha MA-3) synthesis. It is a pure playback filter, not
@@ -170,6 +170,10 @@ type AudioDevice struct {
 
 // AudioChunk is signed PCM16 produced by a backend. Samples are interleaved
 // when Channels is greater than one.
+// AudioChunk carries PCM on the guest timeline. A nonzero Generation with empty
+// PCM16 is a discontinuity marker: discard buffered audio from prior generations.
+// Empty PCM16 with Generation zero means no update. Producers publish a marker
+// once when no new PCM is available; otherwise the new PCM carries the generation.
 type AudioChunk struct {
 	SampleRate   int
 	Channels     int

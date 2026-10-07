@@ -228,6 +228,8 @@ func TestAudioDiscontinuitySuspendsDrainUntilRunning(t *testing.T) {
 	output := &audioOutput{queue: newPCMQueue(64), started: true}
 	output.queue.enqueue([]byte{0xff, 0x7f, 0x00, 0x80})
 	shell := &Shell{audioOutput: output}
+	shell.hostActiveRequest.Store(true)
+	shell.audioFocusRequest.Store(true)
 
 	shell.beginAudioDiscontinuity()
 	if !shell.audioSuspended {

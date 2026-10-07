@@ -99,6 +99,7 @@ type Shell struct {
 	// title then paused the moment it started, and the document picker put
 	// the app in the background before every single open.
 	hostActiveRequest         atomic.Bool
+	audioFocusRequest         atomic.Bool
 	preDialogState            FrontendState
 	panel                     *Panel
 	settingsSection           string
@@ -298,6 +299,7 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		iconSem:                   make(chan struct{}, 4),
 	}
 	shell.hostActiveRequest.Store(true)
+	shell.audioFocusRequest.Store(true)
 	if shell.settings.CPUProfile {
 		shell.settings.CPUProfile = shell.setCPUProfiling(true)
 	}
@@ -404,7 +406,23 @@ func (s *Shell) DispatchExternalCommand(commandID string) {
 // SetHostActive is the Android/iOS lifecycle bridge. It only resumes a
 // machine that was automatically paused by a prior inactive transition.
 func (s *Shell) SetHostActive(active bool) {
-	s.hostActiveRequest.Store(active)
+	if s.hostActiveRequest.Swap(active) == active {
+		return
+	}
+	if !active {
+		s.beginAudioDiscontinuity()
+	}
+}
+
+// SetAudioFocus is independent from foreground lifecycle state. Both must be
+// active before an automatically paused machine can resume.
+func (s *Shell) SetAudioFocus(active bool) {
+	if s.audioFocusRequest.Swap(active) == active {
+		return
+	}
+	if !active {
+		s.beginAudioDiscontinuity()
+	}
 }
 
 // CancelExternalDocumentSelection lets a native picker restore the shell

@@ -38,7 +38,11 @@ type AudioQueueTelemetry struct {
 	FillFrames           int    `json:"fill_frames"`
 	TargetFrames         int    `json:"target_frames"`
 	CapacityFrames       int    `json:"capacity_frames"`
-	Started              bool   `json:"started"`
+	// PlayerBufferedFrames estimates data handed to the player but not played.
+	// It excludes buffering inside the OS and hardware.
+	PlayerBufferedFrames int  `json:"player_buffered_frames"`
+	TotalBufferedFrames  int  `json:"total_buffered_frames"`
+	Started              bool `json:"started"`
 }
 
 // pcmQueue is an infinite PCM stream from the player's point of view. An
@@ -57,6 +61,8 @@ type pcmQueue struct {
 	closed        bool
 	underruns     uint64
 	missingBytes  uint64
+	readFrames    uint64
+	trimCredit    int
 	overruns      uint64
 	droppedFrames uint64
 	// Declick state. lastOut is the last sample handed to the player, residual
@@ -96,6 +102,7 @@ func (q *pcmQueue) Read(destination []byte) (int, error) {
 		q.missingBytes += uint64(missing)
 	}
 	q.declick(destination, count)
+	q.readFrames += uint64(len(destination) / 4)
 	q.offset += count
 	if q.offset == len(q.data) {
 		q.data = q.data[:0]
@@ -212,26 +219,12 @@ func (q *pcmQueue) enqueue(data []byte) {
 		q.droppedFrames += uint64(dropped / 4)
 		q.spliceNext = true
 	}
-	q.trimToTarget()
+	q.trimToTarget(len(data))
 }
 
-// trimToTarget pulls a queue that has drifted above its target back down.
-//
-// The producer generates a frame's worth of audio at a time and the player
-// drains continuously, so the depth wanders upward whenever the guest runs
-// even slightly ahead. Capping it is not enough on its own: the cap is three
-// times the latency the player asked for, so the queue settles near the cap
-// and every sound arrives that late. 리듬스타1 (#148) is where this is
-// audible - its notes are on screen well before the beat is heard - and the
-// report bundle shows the depth sitting at a median of 5 880 frames and
-// peaking at 9 555, against a 90 ms (3 969 frame) target.
-//
-// The correction is deliberately small. Trimming at most a millisecond per
-// enqueue converges over roughly a second, which the ear reads as the sound
-// tightening up rather than as a jump, and the seam goes through the same
-// declick as any other discard. Slack keeps ordinary jitter from trimming at
-// all, so a well-behaved stream is never touched.
-func (q *pcmQueue) trimToTarget() {
+// trimToTarget spends a recovery budget proportional to produced PCM time.
+// Carrying fractional frames makes recovery independent of chunk sizes.
+func (q *pcmQueue) trimToTarget(producedBytes int) {
 	if q.targetBytes <= 0 {
 		return
 	}
@@ -242,17 +235,18 @@ func (q *pcmQueue) trimToTarget() {
 		q.trimming = false
 	}
 	if !q.trimming {
+		q.trimCredit = 0
 		return
 	}
-	trim := alignStereoFrameUp(available - q.targetBytes)
-	if limit := alignStereoFrameUp(hostAudioSampleRate * 4 / 1000); trim > limit {
-		trim = limit
-	}
-	if trim <= 0 || trim >= available {
+	q.trimCredit += producedBytes / 4
+	budget := q.trimCredit / 8
+	q.trimCredit %= 8
+	trimFrames := min((available-q.targetBytes)/4, budget)
+	if trimFrames <= 0 {
 		return
 	}
-	q.offset += trim
-	q.droppedFrames += uint64(trim / 4)
+	q.offset += trimFrames * 4
+	q.droppedFrames += uint64(trimFrames)
 	q.spliceNext = true
 }
 
@@ -359,9 +353,28 @@ func alignStereoFrameUp(size int) int {
 	return size
 }
 
+// hostAudioPlayer keeps device buffering behind a testable ownership boundary.
+// Pause alone preserves read-ahead; a retired player must stop reading first.
+type hostAudioPlayer interface {
+	Play()
+	PauseAndStopReading()
+	IsPlaying() bool
+	SetBufferSize(time.Duration)
+	SetVolume(float64)
+	Position() time.Duration
+	Close() error
+}
+
+type hostAudioPlayerFactory func(io.Reader) (hostAudioPlayer, error)
+
 type audioOutput struct {
 	queue              *pcmQueue
-	player             *audio.Player
+	player             hostAudioPlayer
+	newPlayer          hostAudioPlayerFactory
+	settings           AudioSettings
+	playerError        error
+	retiredQueue       AudioQueueTelemetry
+	encoder            hostPCMEncoder
 	prebufferBytes     int
 	prebufferWait      time.Duration
 	lastEnqueue        time.Time
@@ -434,31 +447,27 @@ func newAudioOutput(settings AudioSettings) (*audioOutput, error) {
 	if context.SampleRate() != hostAudioSampleRate {
 		return nil, errors.New("the existing host audio context does not use 44.1 kHz")
 	}
-	queue := newPCMQueue(audioQueueBytes(settings.Latency))
-	queue.setTargetBytes(audioPrebufferBytes(settings.Latency))
-	player, err := context.NewPlayer(queue)
-	if err != nil {
-		queue.close()
-		return nil, err
-	}
-	output := &audioOutput{queue: queue, player: player}
+	return newAudioOutputWithFactory(settings, func(reader io.Reader) (hostAudioPlayer, error) {
+		return context.NewPlayer(reader)
+	}), nil
+}
+
+func newAudioOutputWithFactory(settings AudioSettings, factory hostAudioPlayerFactory) *audioOutput {
+	output := &audioOutput{newPlayer: factory, queue: newPCMQueue(audioQueueBytes(settings.Latency))}
 	output.configure(settings)
 	output.trace = newAudioTrace(fmt.Sprintf(
 		"host_rate=%dHz latency=%s soften=%t volume=%d muted=%t mix=%t",
-		hostAudioSampleRate,
-		normalizedAudioLatency(settings.Latency),
-		settings.Soften,
-		settings.Volume,
-		settings.Muted,
-		settings.MixMode,
+		hostAudioSampleRate, normalizedAudioLatency(settings.Latency), settings.Soften,
+		settings.Volume, settings.Muted, settings.MixMode,
 	))
-	return output, nil
+	return output
 }
 
 func (o *audioOutput) configure(settings AudioSettings) {
-	if o == nil || o.player == nil {
+	if o == nil {
 		return
 	}
+	o.settings = settings
 	latency := normalizedAudioLatency(settings.Latency)
 	o.queue.setMaxBytes(audioQueueBytes(latency))
 	o.queue.setTargetBytes(audioPrebufferBytes(latency))
@@ -467,7 +476,9 @@ func (o *audioOutput) configure(settings AudioSettings) {
 	// every sound by a hidden 150 ms floor.
 	o.prebufferBytes = audioPrebufferBytes(latency)
 	o.prebufferWait = latency
-	o.player.SetBufferSize(latency)
+	if o.player != nil {
+		o.player.SetBufferSize(latency)
+	}
 	o.softenEnabled = settings.Soften
 	// Volume can exceed 100% for boosted output. oto multiplies samples by the
 	// gain and the driver clips anything past full scale, so amplified audio may
@@ -482,7 +493,9 @@ func (o *audioOutput) configure(settings AudioSettings) {
 	if settings.Muted {
 		volume = 0
 	}
-	o.player.SetVolume(volume)
+	if o.player != nil {
+		o.player.SetVolume(volume)
+	}
 }
 
 func (o *audioOutput) enqueue(
@@ -495,7 +508,7 @@ func (o *audioOutput) enqueue(
 	}
 	o.soften(&chunk)
 	chunk.SampleRate = o.stretchedSampleRate(chunk.SampleRate)
-	encoded, err := encodeHostPCM(chunk)
+	encoded, err := o.encoder.encode(chunk)
 	if err != nil {
 		return err
 	}
@@ -509,7 +522,7 @@ func (o *audioOutput) enqueue(
 	if !o.started && o.queue.availableBytes() >= o.prebufferBytes {
 		o.start()
 	}
-	return nil
+	return o.playerError
 }
 
 // recordChunkArrival records the time between successfully accepted nonempty
@@ -537,20 +550,27 @@ func (o *audioOutput) synchronizeChunk(
 	videoGuestNS int64,
 	videoGeneration uint64,
 ) bool {
-	if chunk == nil || chunk.SampleRate <= 0 || chunk.Channels <= 0 ||
-		len(chunk.PCM16) == 0 || len(chunk.PCM16)%chunk.Channels != 0 {
-		return chunk != nil
+	if chunk == nil {
+		return false
 	}
-	frames := len(chunk.PCM16) / chunk.Channels
-	if chunk.Generation == 0 {
+	if len(chunk.PCM16) != 0 && (chunk.SampleRate <= 0 || chunk.Channels <= 0 || len(chunk.PCM16)%chunk.Channels != 0) {
 		return true
 	}
-	if chunk.Generation != o.generation {
+	if chunk.Generation != 0 && chunk.Generation != o.generation {
 		o.flushInternal(fmt.Sprintf(
 			"generation %d->%d", o.generation, chunk.Generation,
 		))
 		o.generation = chunk.Generation
 		o.nextSample = chunk.StartSample
+	}
+	// A generation marker can retire already-read PCM even when a mute or
+	// stopped clip produces no replacement samples.
+	if len(chunk.PCM16) == 0 {
+		return false
+	}
+	frames := len(chunk.PCM16) / chunk.Channels
+	if chunk.Generation == 0 {
+		return true
 	}
 
 	if videoGeneration == chunk.Generation {
@@ -663,7 +683,20 @@ func (o *audioOutput) startIfReady(now time.Time) {
 }
 
 func (o *audioOutput) start() {
-	if o == nil || o.player == nil || o.started {
+	if o == nil || o.started {
+		return
+	}
+	if o.player == nil && o.newPlayer != nil {
+		player, err := o.newPlayer(o.queue)
+		o.playerError = err
+		if err != nil {
+			o.traceEvent("error", err.Error())
+			return
+		}
+		o.player = player
+		o.configure(o.settings)
+	}
+	if o.player == nil {
 		return
 	}
 	o.started = true
@@ -679,10 +712,27 @@ func (o *audioOutput) flushInternal(reason string) {
 	if o == nil || o.queue == nil {
 		return
 	}
-	if o.player != nil && o.player.IsPlaying() {
-		o.player.Pause()
+	if o.player != nil {
+		o.player.PauseAndStopReading()
+		o.playerError = o.player.Close()
+		o.player = nil
+		if o.playerError != nil {
+			o.traceEvent("error", "retire player: "+o.playerError.Error())
+		}
 	}
-	o.queue.flush()
+	if o.newPlayer != nil {
+		previous := o.queue.telemetry()
+		o.retiredQueue.Underruns += previous.Underruns
+		o.retiredQueue.MissingSamples += previous.MissingSamples
+		o.retiredQueue.Overruns += previous.Overruns
+		o.retiredQueue.DroppedFrames += previous.DroppedFrames
+		o.queue.close()
+		o.queue = newPCMQueue(audioQueueBytes(o.settings.Latency))
+		o.queue.setTargetBytes(audioPrebufferBytes(o.settings.Latency))
+	} else {
+		o.queue.flush()
+	}
+	o.encoder = hostPCMEncoder{}
 	o.lastEnqueue = time.Time{}
 	o.started = false
 	o.lp = [2]float64{}
@@ -697,6 +747,21 @@ func (o *audioOutput) telemetry() AudioQueueTelemetry {
 		return AudioQueueTelemetry{}
 	}
 	telemetry := o.queue.telemetry()
+	telemetry.Underruns += o.retiredQueue.Underruns
+	telemetry.MissingSamples += o.retiredQueue.MissingSamples
+	telemetry.Overruns += o.retiredQueue.Overruns
+	telemetry.DroppedFrames += o.retiredQueue.DroppedFrames
+	if o.player != nil {
+		o.queue.mu.Lock()
+		handed := o.queue.readFrames
+		o.queue.mu.Unlock()
+		position := max(o.player.Position(), 0)
+		played := uint64(position/time.Second)*hostAudioSampleRate + uint64(position%time.Second)*hostAudioSampleRate/uint64(time.Second)
+		if handed > played {
+			telemetry.PlayerBufferedFrames = int(handed - played)
+		}
+	}
+	telemetry.TotalBufferedFrames = telemetry.FillFrames + telemetry.PlayerBufferedFrames
 	telemetry.TargetFrames = o.prebufferBytes / 4
 	telemetry.Started = o.started
 	telemetry.StaleFrames = o.staleFrames
@@ -707,6 +772,9 @@ func (o *audioOutput) telemetry() AudioQueueTelemetry {
 func (o *audioOutput) close() error {
 	if o == nil {
 		return nil
+	}
+	if o.player != nil {
+		o.player.PauseAndStopReading()
 	}
 	o.queue.close()
 	if o.player == nil {
@@ -748,7 +816,21 @@ func audioPrebufferBytes(latency time.Duration) int {
 	))
 }
 
+// hostPCMEncoder carries the rational source cursor across every chunk. A
+// source sample is held until the next source frame, including across timer
+// subdivisions. Fractional output frames are never rounded per chunk.
+type hostPCMEncoder struct {
+	sampleRate int
+	channels   int
+	phase      int
+}
+
 func encodeHostPCM(chunk AudioChunk) ([]byte, error) {
+	var encoder hostPCMEncoder
+	return encoder.encode(chunk)
+}
+
+func (encoder *hostPCMEncoder) encode(chunk AudioChunk) ([]byte, error) {
 	if len(chunk.PCM16) == 0 {
 		return nil, nil
 	}
@@ -761,28 +843,27 @@ func encodeHostPCM(chunk AudioChunk) ([]byte, error) {
 	if len(chunk.PCM16)%chunk.Channels != 0 {
 		return nil, errors.New("backend returned an incomplete PCM frame")
 	}
-	sourceFrames := len(chunk.PCM16) / chunk.Channels
-	outputFrames := int((int64(sourceFrames)*hostAudioSampleRate +
-		int64(chunk.SampleRate)/2) / int64(chunk.SampleRate))
-	if outputFrames == 0 {
-		return nil, nil
+	if encoder.sampleRate == 0 || encoder.channels != chunk.Channels {
+		*encoder = hostPCMEncoder{sampleRate: chunk.SampleRate, channels: chunk.Channels}
+	} else if encoder.sampleRate != chunk.SampleRate {
+		// A changing display-sync ratio changes frame duration, not the stream
+		// generation. Preserve the fractional cursor when that rate changes.
+		encoder.phase = int(int64(encoder.phase) * int64(chunk.SampleRate) / int64(encoder.sampleRate))
+		encoder.sampleRate = chunk.SampleRate
 	}
-	result := make([]byte, outputFrames*4)
-	for outputFrame := 0; outputFrame < outputFrames; outputFrame++ {
-		sourceFrame := int(int64(outputFrame) * int64(chunk.SampleRate) /
-			hostAudioSampleRate)
-		if sourceFrame >= sourceFrames {
-			sourceFrame = sourceFrames - 1
-		}
-		source := sourceFrame * chunk.Channels
-		left := chunk.PCM16[source]
+	frames := len(chunk.PCM16) / chunk.Channels
+	result := make([]byte, 0, (int64(frames)*hostAudioSampleRate/int64(chunk.SampleRate)+1)*4)
+	for frame := 0; frame < frames; frame++ {
+		left := chunk.PCM16[frame*chunk.Channels]
 		right := left
 		if chunk.Channels == 2 {
-			right = chunk.PCM16[source+1]
+			right = chunk.PCM16[frame*2+1]
 		}
-		destination := outputFrame * 4
-		binary.LittleEndian.PutUint16(result[destination:], uint16(left))
-		binary.LittleEndian.PutUint16(result[destination+2:], uint16(right))
+		for encoder.phase < hostAudioSampleRate {
+			result = append(result, byte(left), byte(uint16(left)>>8), byte(right), byte(uint16(right)>>8))
+			encoder.phase += chunk.SampleRate
+		}
+		encoder.phase -= hostAudioSampleRate
 	}
 	return result, nil
 }

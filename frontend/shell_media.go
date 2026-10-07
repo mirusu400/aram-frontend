@@ -86,24 +86,31 @@ func (s *Shell) drainAudioOnce(allowCreate bool) {
 	}
 	s.audioMu.Lock()
 	defer s.audioMu.Unlock()
-	if s.audioSuspended {
+	if s.audioSuspended || !s.hostActiveRequest.Load() || !s.audioFocusRequest.Load() {
 		return
 	}
 	if s.audioOutput == nil && !allowCreate {
 		return
 	}
+	if allowCreate && s.audioOutput != nil {
+		s.audioOutput.setSpeed(s.audioSpeed)
+	}
 	for taken := 0; taken < maxAudioChunksPerDrain; taken++ {
 		chunk := backend.DrainAudio()
-		if len(chunk.PCM16) == 0 {
+		if len(chunk.PCM16) == 0 && chunk.Generation == 0 {
 			break
 		}
 		if s.audioOutput == nil {
+			if len(chunk.PCM16) == 0 {
+				continue
+			}
 			output, err := newAudioOutput(s.currentAudioSettings())
 			if err != nil {
 				s.appendLog(s.tr("Audio output: ") + err.Error())
 				return
 			}
 			s.audioOutput = output
+			output.setSpeed(s.audioSpeed)
 			s.startAudioPumpLocked()
 		}
 		if err := s.audioOutput.enqueue(
@@ -118,11 +125,6 @@ func (s *Shell) drainAudioOnce(allowCreate bool) {
 		}
 	}
 	if s.audioOutput != nil {
-		if allowCreate {
-			// Only the main thread knows the pacer's current ratio; the pump
-			// goroutine keeps using whatever was last pushed here.
-			s.audioOutput.setSpeed(s.audioSpeed)
-		}
 		now := time.Now()
 		s.audioOutput.startIfReady(now)
 		s.audioOutput.maybeSample(now)
@@ -205,7 +207,7 @@ func (s *Shell) finishAudioDiscontinuity(state BackendState) {
 	if s.audioOutput != nil {
 		s.audioOutput.flush()
 	}
-	s.audioSuspended = state != StateRunning
+	s.audioSuspended = state != StateRunning || !s.hostActiveRequest.Load() || !s.audioFocusRequest.Load()
 }
 
 func (s *Shell) flushAudioDiscontinuity() {
@@ -258,7 +260,15 @@ func (s *Shell) syncBackendState() {
 }
 
 func (s *Shell) syncHostLifecycle() {
-	s.hostActive = s.hostActiveRequest.Load()
+	s.hostActive = s.hostActiveRequest.Load() && s.audioFocusRequest.Load()
+	if s.hostActive && !s.hostPaused && !s.loading && len(s.busyCommands) == 0 && s.backend.State() == StateRunning {
+		s.audioMu.Lock()
+		// Native callbacks can close a gate while State is being read. Recheck
+		// under the same lock as the pump before permitting playback again.
+		s.hostActive = s.hostActiveRequest.Load() && s.audioFocusRequest.Load()
+		s.audioSuspended = !s.hostActive
+		s.audioMu.Unlock()
+	}
 	state := s.backend.State()
 	if !s.hostActive &&
 		!s.hostPaused &&

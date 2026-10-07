@@ -1,7 +1,6 @@
 package frontend
 
 import (
-	"fmt"
 	"time"
 )
 
@@ -74,23 +73,6 @@ func (s *Shell) audioChannelsLabel() string {
 func (s *Shell) toggleAudioSoften() {
 	s.settings.AudioSoften = !s.settings.AudioSoften
 	s.applyAudioSettings()
-}
-
-// toggleAudioMixMode switches between the faithful device policy (effects can
-// silence the music, as on the handset) and the mixing policy (effects layer
-// over a continuous background track). The change is baked into the core at
-// creation, so it applies the next time a title is opened.
-func (s *Shell) toggleAudioMixMode() {
-	s.settings.AudioMixMode = !s.settings.AudioMixMode
-	s.applyAudioSettings()
-}
-
-// audioMixModeLabel names the active audio policy for the settings row.
-func (s *Shell) audioMixModeLabel() string {
-	if s.settings.AudioMixMode {
-		return s.tr("Mixed")
-	}
-	return s.tr("Faithful")
 }
 
 // toggleAudioLowPower switches between full-quality (44,100Hz) and reduced
@@ -198,11 +180,23 @@ func (s *Shell) audioQueueTelemetryLabel() string {
 		return s.tr("Idle")
 	}
 	fillMS := telemetry.FillFrames * 1000 / hostAudioSampleRate
-	return fmt.Sprintf(
-		"%d ms | U%d / O%d / D%d",
+	return s.trf(
+		"Queue %d ms + player ~%d ms | U%d / O%d / D%d",
 		fillMS,
+		telemetry.PlayerBufferedFrames*1000/hostAudioSampleRate,
 		telemetry.Underruns,
 		telemetry.Overruns,
 		telemetry.StaleFrames,
 	)
+}
+
+var audioLatencyPresets = []int{20, 60, 120}
+
+func (s *Shell) audioLatencyPreset() int {
+	for index, latency := range audioLatencyPresets {
+		if s.settings.AudioLatencyMS == latency {
+			return index
+		}
+	}
+	return 3
 }

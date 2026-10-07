@@ -764,5 +764,18 @@
   "read cheat memory at %s": "read cheat memory at %s",
   "read expected memory at %s": "read expected memory at %s",
   "write cheat memory at %s": "write cheat memory at %s",
-  "invalid next-scan comparison %s": "invalid next-scan comparison %s"
+  "invalid next-scan comparison %s": "invalid next-scan comparison %s",
+  "Music and effects": "Music and effects",
+  "Music and effects follow the game's playback requests.": "Music and effects follow the game's playback requests.",
+  "Automatic": "Automatic",
+  "Playback filter that gently reduces sharp high frequencies.": "Playback filter that gently reduces sharp high frequencies.",
+  "Reduced quality eases CPU load on slower devices. Applies when the next title opens.": "Reduced quality eases CPU load on slower devices. Applies when the next title opens.",
+  "Latency preset": "Latency preset",
+  "Responsive reduces delay; Balanced absorbs normal jitter; Stable gives slower devices more headroom.": "Responsive reduces delay; Balanced absorbs normal jitter; Stable gives slower devices more headroom.",
+  "Responsive (20 ms)": "Responsive (20 ms)",
+  "Balanced (60 ms)": "Balanced (60 ms)",
+  "Stable (120 ms)": "Stable (120 ms)",
+  "Queue and player buffering each contribute to delay. Fine-tune in ten-millisecond steps.": "Queue and player buffering each contribute to delay. Fine-tune in ten-millisecond steps.",
+  "Queue fill, estimated player read-ahead, and cumulative underrun / overrun events. OS and device buffering are additional.": "Queue fill, estimated player read-ahead, and cumulative underrun / overrun events. OS and device buffering are additional.",
+  "Queue %d ms + player ~%d ms | U%d / O%d / D%d": "Queue %d ms + player ~%d ms | U%d / O%d / D%d"
 }

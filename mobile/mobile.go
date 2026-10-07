@@ -87,9 +87,9 @@ func Resume() {
 }
 
 // AudioFocus mirrors native audio-focus/interruption callbacks. Losing focus
-// uses the same automatic pause contract as lifecycle deactivation.
+// is tracked independently from foreground lifecycle state.
 func AudioFocus(active bool) {
-	game.SetHostActive(active)
+	game.SetAudioFocus(active)
 }
 
 // Dummy forces gomobile/ebitenmobile to bind the package.

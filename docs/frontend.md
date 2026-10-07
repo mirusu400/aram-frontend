@@ -216,6 +216,20 @@ shared Audio settings category and applied immediately through `AudioBackend`.
 Backends that implement `AudioDeviceBackend` provide selectable device IDs;
 an empty ID always means the host system default.
 
+Latency presets select Responsive (20 ms), Balanced (60 ms), or Stable (120 ms);
+the custom slider remains available. Requested latency applies to the frontend
+queue target and player buffering, so it is not a measurement of total device
+latency. Buffer health and diagnostics report queue fill plus estimated player
+read-ahead separately; OS and hardware buffering are additional.
+
+A timeline reset, pause, or focus loss stops the player's reads, retires the
+player and its queue, and starts a fresh player only when new PCM is ready.
+This discards sound already read ahead without letting a paused player consume
+the next warmup buffer. Streaming conversion carries fractional sample phase
+across timer-sized chunks, and backlog recovery is proportional to PCM time.
+Music and effects are shown as Automatic: concurrent clips mix, and playback
+follows the game's requests. Legacy mixing flags remain readable in saved settings.
+
 All desktop entry paths converge on `OpenRequest`. Ebitengine drop handles are
 copied to an application-private cache before opening, retain the original
 display name and extension, and are removed when the input closes.

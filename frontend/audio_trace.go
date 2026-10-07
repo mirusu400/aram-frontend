@@ -24,6 +24,7 @@ type audioTraceEntry struct {
 	dropped   uint64
 	stale     uint64
 	fill      int
+	player    int
 }
 
 // audioTrace is a bounded, timestamped history of audio pipeline events. Sound
@@ -57,6 +58,7 @@ func (t *audioTrace) record(
 		dropped:   telemetry.DroppedFrames,
 		stale:     telemetry.StaleFrames,
 		fill:      telemetry.FillFrames,
+		player:    telemetry.PlayerBufferedFrames,
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -88,7 +90,7 @@ func (t *audioTrace) render() []byte {
 	for _, entry := range t.entries {
 		fmt.Fprintf(
 			&output,
-			"t+%d.%03ds %-6s under=%d over=%d drop=%d stale=%d fill=%d %s\n",
+			"t+%d.%03ds %-6s under=%d over=%d drop=%d stale=%d fill=%d player_estimate=%d %s\n",
 			entry.millis/1000,
 			entry.millis%1000,
 			entry.kind,
@@ -97,6 +99,7 @@ func (t *audioTrace) render() []byte {
 			entry.dropped,
 			entry.stale,
 			entry.fill,
+			entry.player,
 			strings.TrimSpace(entry.detail),
 		)
 	}

@@ -240,10 +240,9 @@ func (u *shellUI) settingsRowModelsForLayout(
 				action:      shell.toggleMuted,
 			},
 			{
-				label:       "Effect / music mixing",
-				description: "Mixed layers effects over continuous music; Faithful matches the handset.",
-				value:       shell.audioMixModeLabel(),
-				action:      shell.toggleAudioMixMode,
+				label:       "Music and effects",
+				description: "Music and effects follow the game's playback requests.",
+				value:       shell.tr("Automatic"),
 			},
 			{
 				label:       "Audio channels",
@@ -253,13 +252,13 @@ func (u *shellUI) settingsRowModelsForLayout(
 			},
 			{
 				label:       "Soften audio",
-				description: "Gentle low-pass that eases the harsh FM synth top end. Playback only.",
+				description: "Playback filter that gently reduces sharp high frequencies.",
 				value:       onOff(shell.settings.AudioSoften),
 				action:      shell.toggleAudioSoften,
 			},
 			{
 				label:       "Audio quality",
-				description: "Reduced renders FM music at a lower rate, easing CPU load on weak hardware.",
+				description: "Reduced quality eases CPU load on slower devices. Applies when the next title opens.",
 				value:       shell.audioLowPowerLabel(),
 				action:      shell.toggleAudioLowPower,
 			},
@@ -275,8 +274,28 @@ func (u *shellUI) settingsRowModelsForLayout(
 				},
 			},
 			{
+				label:       "Latency preset",
+				description: "Responsive reduces delay; Balanced absorbs normal jitter; Stable gives slower devices more headroom.",
+				dropdown: &settingsDropdownModel{
+					count: 4,
+					value: shell.audioLatencyPreset,
+					label: func(value int) string {
+						choices := []string{"Responsive (20 ms)", "Balanced (60 ms)", "Stable (120 ms)", "Custom"}
+						if value < 0 || value >= len(choices) {
+							return ""
+						}
+						return shell.tr(choices[value])
+					},
+					apply: func(value int) {
+						if value >= 0 && value < len(audioLatencyPresets) {
+							shell.setAudioLatency(audioLatencyPresets[value])
+						}
+					},
+				},
+			},
+			{
 				label:       "Requested latency",
-				description: "Audio buffer target in ten-millisecond steps.",
+				description: "Queue and player buffering each contribute to delay. Fine-tune in ten-millisecond steps.",
 				slider: &settingsSliderModel{
 					min:    2,
 					max:    25,
@@ -293,7 +312,7 @@ func (u *shellUI) settingsRowModelsForLayout(
 			},
 			{
 				label:       "Buffer health",
-				description: "Current host fill and cumulative underrun / overrun events.",
+				description: "Queue fill, estimated player read-ahead, and cumulative underrun / overrun events. OS and device buffering are additional.",
 				value:       shell.audioQueueTelemetryLabel(),
 			},
 		}

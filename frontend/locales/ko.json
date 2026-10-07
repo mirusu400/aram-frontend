@@ -764,5 +764,18 @@
   "read cheat memory at %s": "%s 주소의 메모리 읽기 실패",
   "read expected memory at %s": "%s 주소의 원래 값 읽기 실패",
   "write cheat memory at %s": "%s 주소의 메모리 쓰기 실패",
-  "invalid next-scan comparison %s": "다음 검색에 사용할 수 없는 비교 방식: %s"
+  "invalid next-scan comparison %s": "다음 검색에 사용할 수 없는 비교 방식: %s",
+  "Music and effects": "배경음악과 효과음",
+  "Music and effects follow the game's playback requests.": "배경음악과 효과음은 게임의 재생 요청에 따라 처리됩니다.",
+  "Automatic": "자동",
+  "Playback filter that gently reduces sharp high frequencies.": "날카로운 고음을 부드럽게 줄이는 재생 필터입니다.",
+  "Reduced quality eases CPU load on slower devices. Applies when the next title opens.": "낮은 품질은 느린 기기의 CPU 부담을 줄입니다. 다음 게임을 열 때 적용됩니다.",
+  "Latency preset": "지연 시간 프리셋",
+  "Responsive reduces delay; Balanced absorbs normal jitter; Stable gives slower devices more headroom.": "응답 우선은 지연을 줄이고, 균형은 일반적인 재생 간격 변동을 흡수하며, 안정 우선은 느린 기기에 버퍼 여유를 줍니다.",
+  "Responsive (20 ms)": "응답 우선 (20 ms)",
+  "Balanced (60 ms)": "균형 (60 ms)",
+  "Stable (120 ms)": "안정 우선 (120 ms)",
+  "Queue and player buffering each contribute to delay. Fine-tune in ten-millisecond steps.": "대기열과 플레이어 버퍼가 각각 지연 시간에 영향을 줍니다. 10밀리초 단위로 조정하세요.",
+  "Queue fill, estimated player read-ahead, and cumulative underrun / overrun events. OS and device buffering are additional.": "대기열 사용량, 플레이어의 예상 선행 읽기 분량, 누적 버퍼 부족과 넘침 횟수를 표시합니다. 운영체제와 기기의 버퍼 지연은 별도입니다.",
+  "Queue %d ms + player ~%d ms | U%d / O%d / D%d": "대기열 %d ms + 플레이어 약 %d ms | 부족 %d / 넘침 %d / 제외 %d"
 }

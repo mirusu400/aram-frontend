@@ -49,7 +49,9 @@ desktop.
 The generated binding exposes `mobile.SetHost`. The native Activity implements
 `RequestDocument`, then completes the asynchronous request with
 `OpenDocument`, `OpenFirmware`, or `DocumentSelectionCanceled`. `AudioFocus`
-and `Pause`/`Resume` feed the same automatic lifecycle-pause contract.
+and `Pause`/`Resume` update independent focus and foreground gates. Either loss
+suspends audio immediately; automatic resume requires both gates to be active.
+Manual user pauses remain paused.
 
 Text entry crosses the same bridge. Ebitengine raises no soft keyboard for its
 own surface and `exp/textinput` has no mobile backend, so a tap on a form
