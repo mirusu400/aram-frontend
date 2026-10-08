@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/color"
 	"strings"
+	"time"
 
 	"github.com/ebitenui/ebitenui"
 	"github.com/ebitenui/ebitenui/widget"
@@ -70,6 +71,14 @@ type shellUI struct {
 	homeShortcutButton   *widget.Button
 	homeSelectedPath     string
 	homeSignature        string
+	homeLastClickPath    string
+	homeLastClickAt      time.Time
+	problemContainer     *widget.Container
+	problemSignature     string
+	problemExpanded      bool
+	problemIdentity      FrontendProblem
+	problemScroll        *widget.ScrollContainer
+	surfaceTouch         surfaceTouchScroll
 	welcomeStableButton  *widget.Button
 	welcomeNightlyButton *widget.Button
 	welcomeLaterButton   *widget.Button
@@ -132,6 +141,9 @@ func newShellUI(shell *Shell, design *ARAMDesignSystem) *shellUI {
 	view.homeContainer.GetWidget().SetVisibility(widget.Visibility_Hide)
 
 	root.AddChild(view.homeContainer)
+	view.problemContainer = widget.NewContainer(widget.ContainerOpts.Layout(widget.NewAnchorLayout()))
+	view.problemContainer.GetWidget().SetVisibility(widget.Visibility_Hide)
+	root.AddChild(view.problemContainer)
 	root.AddChild(chrome...)
 	root.AddChild(statusBar, view.scrim)
 	view.ui = &ebitenui.UI{
@@ -242,6 +254,7 @@ func (u *shellUI) sync(shell *Shell) {
 		}
 	}
 	u.syncHomeSurface(shell)
+	u.syncProblemSurface(shell)
 	u.syncPanel(shell)
 }
 

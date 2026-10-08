@@ -11,7 +11,7 @@ import (
 // the single way back to the full interface, so it must never be covered.
 
 func (s *Shell) focusModeActive() bool {
-	return s.focusMode && platformUsesTouchLayout()
+	return s.focusMode && s.problem == nil && platformUsesTouchLayout()
 }
 
 func (s *Shell) toggleFocusMode() {

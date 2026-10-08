@@ -1,22 +1,40 @@
 package frontend
 
-import euiimage "github.com/ebitenui/ebitenui/image"
+import (
+	"time"
+
+	euiimage "github.com/ebitenui/ebitenui/image"
+)
 
 // Home launcher selection and navigation. Selection is driven both by mouse
 // clicks (onHomeRowClicked) and by directional/confirm input the Shell forwards
 // here (moveHomeSelection, switchHomeTab, activateHomeSelection), so the picker
 // works like a handset's — keyboard, gamepad, or on-screen keypad.
 
-// onHomeRowClicked selects a row, or opens it when it is already selected.
+const homeDoubleClickInterval = 500 * time.Millisecond
+
+// A desktop click selects; a second click within the interval opens. A touch
+// tap opens immediately, independently of the row's previous selection.
 func (u *shellUI) onHomeRowClicked(shell *Shell, path string) {
+	u.handleHomeRowClick(shell, path, platformUsesTouchLayout(), time.Now())
+}
+
+func (u *shellUI) handleHomeRowClick(shell *Shell, path string, touch bool, now time.Time) {
 	if path == "" {
 		return
 	}
-	if u.homeSelectedPath == path {
+	elapsed := now.Sub(u.homeLastClickAt)
+	activate := touch || (u.homeSelectedPath == path && u.homeLastClickPath == path &&
+		!u.homeLastClickAt.IsZero() && elapsed >= 0 && elapsed <= homeDoubleClickInterval)
+	u.highlightHomeRow(path)
+	if activate {
+		u.homeLastClickPath = ""
+		u.homeLastClickAt = time.Time{}
 		shell.homeOpenPath(path)
 		return
 	}
-	u.highlightHomeRow(path)
+	u.homeLastClickPath = path
+	u.homeLastClickAt = now
 }
 
 // highlightHomeRow moves the selection to path, swapping the row backgrounds and
@@ -38,6 +56,7 @@ func (u *shellUI) highlightHomeRow(path string) {
 	}
 	if u.homeFavButton != nil {
 		u.homeFavButton.GetWidget().Disabled = !enabled
+		u.homeFavButton.SetText(u.owner.homeFavoriteActionLabel(path))
 	}
 	if u.homeShortcutButton != nil {
 		u.homeShortcutButton.GetWidget().Disabled = !enabled

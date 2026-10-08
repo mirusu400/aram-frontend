@@ -319,3 +319,19 @@ remains local and the frontend opens its folder plus a prefilled GitHub draft
 for manual attachment and submission. Idempotency keys are reused when that
 automatic upload is retried, preventing an uncertain network response from
 creating duplicate issues.
+
+## Launcher and recovery
+
+The Home launcher offers Recent, Library, and Favorites. Empty lists provide
+direct file-open and folder-add actions; an empty search offers Clear search.
+Folder libraries remain disabled with an explanation in the browser.
+
+Desktop clicks select a game and a double click launches it. Touch taps launch
+immediately; dragging scrolls without launching. Keyboard and controller
+navigation retain selection and confirm. Favorite actions describe whether they
+add or remove the selected game, and favorites carry a drawn star.
+
+Failures show the reason, recovery guidance, file-open and report actions before
+collapsible technical details. The report action opens a reviewable form with
+the input name and full reason filled in. A failure restores the visible touch
+interface, and its recovery surface scrolls on small screens.

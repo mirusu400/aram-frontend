@@ -74,6 +74,7 @@ func (u *shellUI) syncHomeSurface(shell *Shell) {
 		u.homeScroll = nil
 		u.homeRowPaths = nil
 		u.homeRowContainers = nil
+		u.homeLastClickPath = ""
 		return
 	}
 	u.homeContainer.GetWidget().SetVisibility(widget.Visibility_Show)
@@ -117,6 +118,7 @@ func (u *shellUI) rebuildHomeContent(
 	rect image.Rectangle,
 ) {
 	u.homeBody.RemoveChildren()
+	u.homeLastClickPath = ""
 	u.homeRowContainers = make(map[string]*widget.Container)
 	u.homeRowPaths = u.homeRowPaths[:0]
 
@@ -149,21 +151,17 @@ func (u *shellUI) rebuildHomeContent(
 	u.homeBody.AddChild(homeDividerAtScale(homeTabBarHeight, u.design.Scale))
 	if installed {
 		u.homeBody.AddChild(u.homeFolderBar(shell, folders))
+		if len(folders) > 0 {
+			contentTop += u.design.px(32)
+			u.homeBody.AddChild(homeText(shell.tr("Games in these folders appear here."),
+				u.design.Type.Caption, homeColorMuted,
+				widget.AnchorLayoutData{
+					Padding: &widget.Insets{Left: u.design.px(22), Top: u.design.px(homeTabBarHeight + homeSoftkeyHeight)},
+				}, max(1, rect.Dx()-u.design.px(44))))
+		}
 	}
 
 	u.homeBody.AddChild(u.homeRowScroll(shell, rows, contentTop, selectedPath))
-
-	if len(rows) == 0 {
-		u.homeBody.AddChild(homeText(
-			homeEmptyMessage(shell, tab, folders, shell.libraryScanning),
-			u.design.Type.Body, homeColorMuted,
-			widget.AnchorLayoutData{
-				HorizontalPosition: widget.AnchorLayoutPositionCenter,
-				VerticalPosition:   widget.AnchorLayoutPositionCenter,
-			},
-			max(u.design.px(240), rect.Dx()-u.design.px(64)),
-		))
-	}
 
 	u.homeBody.AddChild(u.homeSoftkeyBar(shell, selectedPath))
 }
@@ -183,7 +181,7 @@ func (u *shellUI) homeTabBar(shell *Shell, active string) *widget.Container {
 	)
 	labels := map[string]string{
 		homeTabRecent:    shell.tr("Recent"),
-		homeTabInstalled: shell.tr("Installed"),
+		homeTabInstalled: shell.tr("Library"),
 		homeTabFavorites: shell.tr("Favorites"),
 	}
 	for _, tab := range homeTabs() {
@@ -208,8 +206,8 @@ func (u *shellUI) homeTabCell(shell *Shell, tab, label string, active bool) *wid
 			widget.RowLayoutOpts.Spacing(u.design.px(6)),
 		)),
 		widget.ContainerOpts.WidgetOpts(
-			widget.WidgetOpts.MouseButtonReleasedHandler(func(args *widget.WidgetMouseButtonReleasedEventArgs) {
-				if args.Inside {
+			widget.WidgetOpts.MouseButtonClickedHandler(func(args *widget.WidgetMouseButtonClickedEventArgs) {
+				if args.Button == ebiten.MouseButtonLeft {
 					shell.setHomeTab(tabName)
 				}
 			}),
@@ -241,9 +239,11 @@ func (u *shellUI) homeFolderBar(shell *Shell, folders []string) *widget.Containe
 			VerticalPosition:   widget.AnchorLayoutPositionStart,
 		})),
 	)
-	bar.AddChild(homeFlatButton(u, "+ "+shell.tr("Add folder"), homeColorTabActive, func() {
+	addFolder := homeFlatButton(u, "+ "+shell.tr("Add folder"), homeColorTabActive, func() {
 		shell.chooseLibraryFolder()
-	}))
+	})
+	addFolder.GetWidget().Disabled = !platformLibraryFolderPickerAvailable()
+	bar.AddChild(addFolder)
 	for shown, folder := range folders {
 		if shown >= homeMaxFolderChips {
 			bar.AddChild(homeText(shell.trf("+%d", len(folders)-homeMaxFolderChips),
@@ -269,6 +269,18 @@ func (u *shellUI) homeRowScroll(shell *Shell, rows []homeRow, top int, selectedP
 	for _, row := range rows {
 		content.AddChild(u.homeRowWidget(shell, row, row.path == selectedPath))
 		u.homeRowPaths = append(u.homeRowPaths, row.path)
+	}
+	if len(rows) == 0 {
+		area := shell.guestViewportRect(u.viewportWidth, u.viewportHeight)
+		empty := widget.NewContainer(
+			widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
+			widget.ContainerOpts.WidgetOpts(
+				widget.WidgetOpts.MinSize(0, max(1, area.Dy()-u.design.px(homeSearchBarHeight+homeBottomBarHeight())-top)),
+				widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
+			),
+		)
+		empty.AddChild(u.homeEmptyContent(shell, shell.homeTab, shell.homeLibraryFolders(), area.Dx()))
+		content.AddChild(empty)
 	}
 	var scroll *widget.ScrollContainer
 	scroll = widget.NewScrollContainer(
@@ -306,8 +318,8 @@ func (u *shellUI) homeRowWidget(shell *Shell, row homeRow, selected bool) *widge
 		widget.ContainerOpts.WidgetOpts(
 			widget.WidgetOpts.MinSize(0, u.design.px(homeRowHeight)),
 			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true}),
-			widget.WidgetOpts.MouseButtonReleasedHandler(func(args *widget.WidgetMouseButtonReleasedEventArgs) {
-				if args.Inside {
+			widget.WidgetOpts.MouseButtonClickedHandler(func(args *widget.WidgetMouseButtonClickedEventArgs) {
+				if args.Button == ebiten.MouseButtonLeft {
 					u.onHomeRowClicked(shell, path)
 				}
 			}),
@@ -336,11 +348,9 @@ func (u *shellUI) homeRowWidget(shell *Shell, row homeRow, selected bool) *widge
 	container.AddChild(left)
 
 	if row.favorite {
-		// A small gold tile marks a favorite; the pixel fonts have no star
-		// glyph, so a drawn swatch reads better than tofu.
-		container.AddChild(widget.NewContainer(
-			widget.ContainerOpts.BackgroundImage(euiimage.NewNineSliceColor(homeColorStar)),
-			widget.ContainerOpts.WidgetOpts(
+		container.AddChild(widget.NewGraphic(
+			widget.GraphicOpts.Image(homeFavoriteIcon(u.design)),
+			widget.GraphicOpts.WidgetOpts(
 				widget.WidgetOpts.MinSize(u.design.px(12), u.design.px(12)),
 				widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 					HorizontalPosition: widget.AnchorLayoutPositionEnd,
@@ -386,7 +396,7 @@ func (u *shellUI) homeSoftkeyBar(shell *Shell, selectedPath string) *widget.Cont
 			}),
 		),
 	)
-	fav := homeFlatButton(u, shell.tr("Favorite"), homeColorStar, func() {
+	fav := homeFlatButton(u, shell.homeFavoriteActionLabel(selectedPath), homeColorStar, func() {
 		shell.toggleFavoritePath(u.homeSelectedPath)
 	})
 	fav.GetWidget().Disabled = selectedPath == ""
@@ -586,13 +596,13 @@ func homeEmptyMessage(shell *Shell, tab string, folders []string, scanning bool)
 			return shell.tr("Scanning library…")
 		}
 		if len(folders) == 0 {
-			return shell.tr("No library folder yet. Use “Add folder” to choose where your games live.")
+			return shell.tr("Add your game folder to build your library.")
 		}
-		return shell.tr("No installed games found under the library folders.")
+		return shell.tr("No games found in your library folders. Open a game file or add another folder.")
 	case homeTabFavorites:
 		return shell.tr("No favorites yet. Star a title to keep it here.")
 	default:
-		return shell.tr("No recent titles yet. Open a title from File or the Installed tab.")
+		return shell.tr("Open a game file to start playing, or add a folder to your library.")
 	}
 }
 

@@ -1146,6 +1146,9 @@ func (s *Shell) drawEmptyViewport(screen *ebiten.Image, viewport image.Rectangle
 	if s.showHomeSurface() {
 		return
 	}
+	if s.problem != nil && s.interfaceUI != nil {
+		return // The interactive problem surface owns the reason and recovery actions.
+	}
 	palette := defaultARAMPalette()
 	if s.design != nil {
 		palette = s.design.Palette

@@ -453,6 +453,7 @@ func (s *Shell) Update() error {
 	s.syncDesignSystem()
 	if s.interfaceUI != nil {
 		s.interfaceUI.updateSettingsTouchScroll(s)
+		s.interfaceUI.updateSurfaceTouchScroll(s)
 	}
 	s.syncUIPointerSuppression()
 	if s.focusModeActive() || s.touchLayoutEditing ||

@@ -11,6 +11,7 @@ import "github.com/hajimehoshi/ebiten/v2"
 // stripped in favor of the full-bleed guest viewport.
 func (s *Shell) touchChromeHiddenActive() bool {
 	return s.touchChromeHidden &&
+		s.problem == nil &&
 		platformUsesTouchLayout() &&
 		s.panel == nil &&
 		!s.touchLayoutEditing &&
@@ -22,6 +23,7 @@ func (s *Shell) touchChromeHiddenActive() bool {
 // the whole screen, and open panels or menus already cover the toggle's spot.
 func (s *Shell) touchChromeToggleAvailable() bool {
 	return platformUsesTouchLayout() &&
+		s.problem == nil &&
 		s.panel == nil &&
 		!s.touchLayoutEditing &&
 		!s.focusModeActive() &&

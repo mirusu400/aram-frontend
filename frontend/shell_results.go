@@ -23,6 +23,9 @@ func (s *Shell) consumeResults() {
 			s.state = s.preDialogState
 			s.setStatus(s.tr("Selection canceled"))
 		case stage := <-s.openStageResults:
+			if !s.loading {
+				continue // Buffered progress must not overwrite a completed open or its failure.
+			}
 			switch stage {
 			case OpenStageInspecting:
 				s.state = FrontendInspecting

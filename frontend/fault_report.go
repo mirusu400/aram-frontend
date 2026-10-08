@@ -63,11 +63,14 @@ func (s *Shell) consumeFaultReportRequest(reason string) {
 // openIssueTrackerForFault opens the issue report panel with the fault reason
 // pre-filled into the description, so the user only has to review and submit.
 func (s *Shell) openIssueTrackerForFault(reason string) {
+	s.openIssueTrackerWithSituation(s.trf(faultReportSituation, reason))
+}
+
+func (s *Shell) openIssueTrackerWithSituation(situation string) {
 	s.openIssueTracker()
 	if s.panel == nil {
 		return
 	}
-	situation := s.trf(faultReportSituation, reason)
 	if s.panel.FieldValues == nil {
 		s.panel.FieldValues = make(map[string]string)
 	}
