@@ -12,6 +12,42 @@ import (
 // count keeps the record honest.
 const audioTraceCapacity = 512
 
+type frameWorkTraceWindow struct {
+	startedAt time.Time
+	frames    int
+	total     time.Duration
+	maximum   time.Duration
+}
+
+// sampleFrameWork retains every batch in a one-second aggregate, including slow
+// batches between log entries. Normal frame traffic adds at most one entry per
+// second; transitions and diagnostic exports also flush an incomplete window.
+func (o *audioOutput) sampleFrameWork(result frameRunResult, now time.Time) {
+	if result.workFrames <= 0 {
+		return
+	}
+	window := &o.frameWorkWindow
+	if window.startedAt.IsZero() {
+		window.startedAt = now
+	}
+	window.frames += result.workFrames
+	window.total += result.workTotal
+	window.maximum = max(window.maximum, result.workMax)
+	if now.Sub(window.startedAt) >= time.Second {
+		o.flushFrameWork(now)
+	}
+}
+
+func (o *audioOutput) flushFrameWork(now time.Time) {
+	window := o.frameWorkWindow
+	if window.frames == 0 {
+		return
+	}
+	o.frameWorkWindow = frameWorkTraceWindow{}
+	o.traceEvent("frame", fmt.Sprintf("window=%s work_frames=%d total=%s max=%s",
+		max(time.Duration(0), now.Sub(window.startedAt)), window.frames, window.total, window.maximum))
+}
+
 // audioTraceEntry is one moment in the audio pipeline. Every entry snapshots the
 // cumulative queue counters so a reader sees underruns and drops climbing
 // between control events even when no control event of its own fired.

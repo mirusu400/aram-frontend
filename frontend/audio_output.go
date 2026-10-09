@@ -43,6 +43,10 @@ type AudioQueueTelemetry struct {
 	PlayerBufferedFrames int  `json:"player_buffered_frames"`
 	TotalBufferedFrames  int  `json:"total_buffered_frames"`
 	Started              bool `json:"started"`
+	ReportedDeviceRate   int  `json:"reported_device_rate,omitempty"`
+	ReportedBurstFrames  int  `json:"reported_burst_frames,omitempty"`
+	PlayerBufferMS       int  `json:"player_buffer_ms"`
+	PumpIntervalUS       int  `json:"pump_interval_us"`
 }
 
 // pcmQueue is an infinite PCM stream from the player's point of view. An
@@ -388,7 +392,10 @@ type audioOutput struct {
 	lp                 [2]float64 // per-channel one-pole low-pass state
 	trace              *audioTrace
 	lastSample         time.Time
+	frameWorkWindow    frameWorkTraceWindow
 	speed              audioSpeed
+	hostProperties     HostAudioProperties
+	bufferPlan         audioBufferPlan
 }
 
 // traceEvent records one pipeline event, snapshotting the current queue
@@ -405,6 +412,9 @@ func (o *audioOutput) traceEvent(kind, detail string) {
 func (o *audioOutput) maybeSample(now time.Time) {
 	if o == nil || o.trace == nil {
 		return
+	}
+	if !o.frameWorkWindow.startedAt.IsZero() && now.Sub(o.frameWorkWindow.startedAt) >= time.Second {
+		o.flushFrameWork(now)
 	}
 	if !o.lastSample.IsZero() && now.Sub(o.lastSample) < time.Second {
 		return
@@ -456,9 +466,11 @@ func newAudioOutputWithFactory(settings AudioSettings, factory hostAudioPlayerFa
 	output := &audioOutput{newPlayer: factory, queue: newPCMQueue(audioQueueBytes(settings.Latency))}
 	output.configure(settings)
 	output.trace = newAudioTrace(fmt.Sprintf(
-		"host_rate=%dHz latency=%s soften=%t volume=%d muted=%t mix=%t",
+		"host_rate=%dHz latency=%s soften=%t volume=%d muted=%t mix=%t reported_device_rate=%d reported_burst_frames=%d %s",
 		hostAudioSampleRate, normalizedAudioLatency(settings.Latency), settings.Soften,
 		settings.Volume, settings.Muted, settings.MixMode,
+		output.hostProperties.SampleRate, output.hostProperties.FramesPerBuffer,
+		fmtAudioBufferPlan(output.bufferPlan),
 	))
 	return output
 }
@@ -469,15 +481,16 @@ func (o *audioOutput) configure(settings AudioSettings) {
 	}
 	o.settings = settings
 	latency := normalizedAudioLatency(settings.Latency)
+	o.hostProperties = currentHostAudioProperties()
+	o.bufferPlan = planAudioBuffers(latency, o.hostProperties)
 	o.queue.setMaxBytes(audioQueueBytes(latency))
-	o.queue.setTargetBytes(audioPrebufferBytes(latency))
-	// Requested latency is the actual steady-state start target. Capacity stays
-	// larger so a producer spike can be absorbed without structurally delaying
-	// every sound by a hidden 150 ms floor.
-	o.prebufferBytes = audioPrebufferBytes(latency)
-	o.prebufferWait = latency
+	o.queue.setTargetBytes(pcmBytesForDuration(o.bufferPlan.queueTarget))
+	// Capacity absorbs producer spikes independently from the start target.
+	// Android divides its budget between this target and player read-ahead.
+	o.prebufferBytes = pcmBytesForDuration(o.bufferPlan.queueTarget)
+	o.prebufferWait = o.bufferPlan.queueTarget
 	if o.player != nil {
-		o.player.SetBufferSize(latency)
+		o.player.SetBufferSize(o.bufferPlan.player)
 	}
 	o.softenEnabled = settings.Soften
 	// Volume can exceed 100% for boosted output. oto multiplies samples by the
@@ -577,6 +590,11 @@ func (o *audioOutput) synchronizeChunk(
 		targetDuration := time.Duration(
 			int64(o.prebufferBytes/4) * int64(time.Second) / hostAudioSampleRate,
 		)
+		if o.hostProperties.burst() != 0 {
+			// Samples already handed to the player are part of the Android
+			// budget too; the smaller app queue alone is not the stale cutoff.
+			targetDuration = o.bufferPlan.queueTarget + o.bufferPlan.player
+		}
 		targetGuestNS := videoGuestNS - int64(targetDuration)
 		chunkEndNS := chunk.StartGuestNS + int64(
 			time.Duration(int64(frames)*int64(time.Second)/int64(chunk.SampleRate)),
@@ -712,6 +730,7 @@ func (o *audioOutput) flushInternal(reason string) {
 	if o == nil || o.queue == nil {
 		return
 	}
+	o.flushFrameWork(time.Now())
 	if o.player != nil {
 		o.player.PauseAndStopReading()
 		o.playerError = o.player.Close()
@@ -728,7 +747,7 @@ func (o *audioOutput) flushInternal(reason string) {
 		o.retiredQueue.DroppedFrames += previous.DroppedFrames
 		o.queue.close()
 		o.queue = newPCMQueue(audioQueueBytes(o.settings.Latency))
-		o.queue.setTargetBytes(audioPrebufferBytes(o.settings.Latency))
+		o.queue.setTargetBytes(pcmBytesForDuration(o.bufferPlan.queueTarget))
 	} else {
 		o.queue.flush()
 	}
@@ -766,6 +785,10 @@ func (o *audioOutput) telemetry() AudioQueueTelemetry {
 	telemetry.Started = o.started
 	telemetry.StaleFrames = o.staleFrames
 	telemetry.MaxChunkArrivalGapMS = uint64(o.maxChunkArrivalGap / time.Millisecond)
+	telemetry.ReportedDeviceRate = o.hostProperties.SampleRate
+	telemetry.ReportedBurstFrames = o.hostProperties.FramesPerBuffer
+	telemetry.PlayerBufferMS = int(o.bufferPlan.player / time.Millisecond)
+	telemetry.PumpIntervalUS = int(o.bufferPlan.pump / time.Microsecond)
 	return telemetry
 }
 
@@ -773,6 +796,7 @@ func (o *audioOutput) close() error {
 	if o == nil {
 		return nil
 	}
+	o.flushFrameWork(time.Now())
 	if o.player != nil {
 		o.player.PauseAndStopReading()
 	}

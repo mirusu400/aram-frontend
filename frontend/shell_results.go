@@ -3,6 +3,7 @@ package frontend
 import (
 	"errors"
 	"fmt"
+	"time"
 )
 
 func (s *Shell) consumeResults() {
@@ -70,6 +71,14 @@ func (s *Shell) consumeResults() {
 				continue
 			}
 			s.frameRunPending = false
+			s.frameWorkCount += uint64(result.workFrames)
+			s.frameWorkTotal += result.workTotal
+			s.frameWorkMax = max(s.frameWorkMax, result.workMax)
+			s.audioMu.Lock()
+			if s.audioOutput != nil {
+				s.audioOutput.sampleFrameWork(result, time.Now())
+			}
+			s.audioMu.Unlock()
 			s.recordPacingSample(
 				result.startedAt,
 				result.completedAt,

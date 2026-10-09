@@ -3,6 +3,7 @@ package frontend
 import (
 	"image"
 	"image/draw"
+	"runtime"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -27,7 +28,7 @@ func (s *Shell) releaseCurrentInput(deleteTemporary bool) error {
 		return err
 	}
 	s.audioMu.Lock()
-	s.audioSuspended = true
+	s.setAudioSuspendedLocked(true)
 	if s.audioOutput != nil {
 		s.audioOutput.flush()
 	}
@@ -70,6 +71,13 @@ func (s *Shell) updateAudio() {
 		return
 	}
 	s.drainAudioOnce(true)
+	// Drain the last published PCM before idling a guest that ended by itself.
+	// State may synchronize with guest work, so only the UI calls it here.
+	if s.backend.State() != StateRunning {
+		s.audioMu.Lock()
+		s.setAudioSuspendedLocked(true)
+		s.audioMu.Unlock()
+	}
 }
 
 // drainAudioOnce moves produced guest PCM into the output queue once. It is the
@@ -94,6 +102,10 @@ func (s *Shell) drainAudioOnce(allowCreate bool) {
 	}
 	if allowCreate && s.audioOutput != nil {
 		s.audioOutput.setSpeed(s.audioSpeed)
+	}
+	if s.audioOutput != nil && s.audioOutput.hostProperties != currentHostAudioProperties() {
+		s.audioOutput.configure(s.audioOutput.settings)
+		s.audioOutput.traceEvent("device", fmtAudioBufferPlan(s.audioOutput.bufferPlan))
 	}
 	for taken := 0; taken < maxAudioChunksPerDrain; taken++ {
 		chunk := backend.DrainAudio()
@@ -145,26 +157,82 @@ const maxAudioChunksPerDrain = 16
 // startAudioPumpLocked launches the audio pump goroutine the first time an
 // output exists. The pump feeds produced PCM into the queue every few
 // milliseconds, decoupled from the 60Hz Update loop, so a stalled or jittery
-// video tick cannot starve the sound. It idles harmlessly (DrainAudio returns
-// nothing) whenever no title is running. Caller holds audioMu.
+// video tick cannot starve the sound. When playback is suspended, the ticker is
+// stopped and the pump waits for a playback/lifecycle wake. Caller holds audioMu.
 func (s *Shell) startAudioPumpLocked() {
 	if s.audioPumpStarted {
 		return
 	}
 	s.audioPumpStarted = true
 	go func() {
-		ticker := time.NewTicker(4 * time.Millisecond)
+		if host := currentNativePerformanceHost(); host != nil {
+			runtime.LockOSThread()
+			defer runtime.UnlockOSThread()
+			host.PrepareAudioThread()
+		}
+		interval := s.audioPumpInterval()
+		ticker := time.NewTicker(hostAudioPumpInterval())
 		defer ticker.Stop()
-		for range ticker.C {
+		var ticks <-chan time.Time
+		if interval > 0 {
+			ticker.Reset(interval)
+			ticks = ticker.C
+		} else {
+			ticker.Stop()
+		}
+		for {
+			select {
+			case <-ticks:
+			case <-s.audioPumpWake:
+			}
 			s.drainAudioOnce(false)
+			if next := s.audioPumpInterval(); next != interval {
+				interval = next
+				if interval > 0 {
+					ticker.Reset(interval)
+					ticks = ticker.C
+				} else {
+					ticker.Stop()
+					ticks = nil
+				}
+			}
 		}
 	}()
+}
+
+func (s *Shell) audioPumpInterval() time.Duration {
+	s.audioMu.Lock()
+	defer s.audioMu.Unlock()
+	if s.audioSuspended || s.audioOutput == nil || !s.hostActiveRequest.Load() || !s.audioFocusRequest.Load() {
+		return 0
+	}
+	return hostAudioPumpInterval()
+}
+
+// Caller holds audioMu. Publish state before waking the pump so it can start or
+// stop its timer without polling a backend or reading UI state concurrently.
+func (s *Shell) setAudioSuspendedLocked(suspended bool) {
+	if s.audioSuspended == suspended {
+		return
+	}
+	s.audioSuspended = suspended
+	if suspended && s.audioOutput != nil {
+		s.audioOutput.flushFrameWork(time.Now())
+	}
+	s.wakeAudioPump()
+}
+
+func (s *Shell) wakeAudioPump() {
+	select {
+	case s.audioPumpWake <- struct{}{}:
+	default:
+	}
 }
 
 func (s *Shell) closeAudio() error {
 	s.audioMu.Lock()
 	defer s.audioMu.Unlock()
-	s.audioSuspended = true
+	s.setAudioSuspendedLocked(true)
 	if s.audioOutput == nil {
 		return nil
 	}
@@ -193,7 +261,7 @@ func isAudioDiscontinuityCommand(command BackendCommand) bool {
 func (s *Shell) beginAudioDiscontinuity() {
 	s.audioMu.Lock()
 	defer s.audioMu.Unlock()
-	s.audioSuspended = true
+	s.setAudioSuspendedLocked(true)
 	if s.audioOutput != nil {
 		s.audioOutput.flush()
 	}
@@ -207,7 +275,7 @@ func (s *Shell) finishAudioDiscontinuity(state BackendState) {
 	if s.audioOutput != nil {
 		s.audioOutput.flush()
 	}
-	s.audioSuspended = state != StateRunning || !s.hostActiveRequest.Load() || !s.audioFocusRequest.Load()
+	s.setAudioSuspendedLocked(state != StateRunning || !s.hostActiveRequest.Load() || !s.audioFocusRequest.Load())
 }
 
 func (s *Shell) flushAudioDiscontinuity() {
@@ -235,6 +303,7 @@ func (s *Shell) audioTraceRender() []byte {
 	if s.audioOutput == nil {
 		return nil
 	}
+	s.audioOutput.flushFrameWork(time.Now())
 	return s.audioOutput.trace.render()
 }
 
@@ -266,7 +335,7 @@ func (s *Shell) syncHostLifecycle() {
 		// Native callbacks can close a gate while State is being read. Recheck
 		// under the same lock as the pump before permitting playback again.
 		s.hostActive = s.hostActiveRequest.Load() && s.audioFocusRequest.Load()
-		s.audioSuspended = !s.hostActive
+		s.setAudioSuspendedLocked(!s.hostActive)
 		s.audioMu.Unlock()
 	}
 	state := s.backend.State()

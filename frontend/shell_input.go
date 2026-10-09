@@ -158,6 +158,7 @@ func (s *Shell) queueInputTransitions(backend InputBackend, next map[string]bool
 			} else {
 				delete(s.controlState, control)
 			}
+			s.requestInputFrame()
 		}
 	}
 }

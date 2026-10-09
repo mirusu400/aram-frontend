@@ -152,6 +152,10 @@ type debugPacingReport struct {
 	UIPriority        bool    `json:"ui_priority"`
 	DisplaySync       bool    `json:"display_sync"`
 	DisplaySyncActive bool    `json:"display_sync_active"`
+	FrameWorkCount    uint64  `json:"frame_work_count"`
+	MeanFrameWorkMS   float64 `json:"mean_frame_work_ms"`
+	MaxFrameWorkMS    float64 `json:"max_frame_work_ms"`
+	InputWakeups      uint64  `json:"input_wakeups"`
 	HostTickRate      float64 `json:"host_tick_rate"`
 	VsyncDisabled     bool    `json:"vsync_disabled"`
 }

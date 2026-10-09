@@ -39,11 +39,13 @@ type frameRunResult struct {
 	startedAt       time.Time
 	completedAt     time.Time
 	err             error
+	workFrames      int
+	workTotal       time.Duration
+	workMax         time.Duration
 }
 
-// frameRunRequest hands a batch of guest quanta to the persistent low-priority
-// frame worker. Running the guest on its own de-prioritised OS thread keeps a
-// heavy title from starving the interface of CPU.
+// frameRunRequest hands guest quanta to a persistent worker on its own OS thread.
+// The platform controls thread priority; UI priority mode also adds brief rests.
 type frameRunRequest struct {
 	backend    FrameBackend
 	owed       int
@@ -51,6 +53,7 @@ type frameRunRequest struct {
 	generation uint64
 	startedAt  time.Time
 	uiPriority bool
+	workTarget time.Duration
 }
 
 type Shell struct {
@@ -128,6 +131,7 @@ type Shell struct {
 	audioOutput               *audioOutput
 	audioMu                   sync.Mutex
 	audioPumpStarted          bool
+	audioPumpWake             chan struct{}
 	audioSuspended            bool
 	cpuProfile                cpuProfileState
 	controlState              map[string]bool
@@ -160,6 +164,11 @@ type Shell struct {
 	touchLayoutDragPoint      map[ebiten.TouchID]image.Point
 	busyCommands              map[BackendCommand]bool
 	frameRunPending           bool
+	inputFramePending         bool
+	inputWakeups              uint64
+	frameWorkCount            uint64
+	frameWorkTotal            time.Duration
+	frameWorkMax              time.Duration
 	frameGeneration           uint64
 	faultPrompter             reportPrompter
 	faultPrompted             bool
@@ -185,6 +194,7 @@ type Shell struct {
 	commandResults            chan commandResult
 	frameRunResults           chan frameRunResult
 	frameRunRequests          chan frameRunRequest
+	frameWorkerWake           chan struct{}
 	faultReportRequests       chan string
 	openStageResults          chan OpenStage
 	externalOpen              chan OpenRequest
@@ -275,6 +285,8 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		commandResults:            make(chan commandResult, 8),
 		frameRunResults:           make(chan frameRunResult, 2),
 		frameRunRequests:          make(chan frameRunRequest, 1),
+		frameWorkerWake:           make(chan struct{}, 1),
+		audioPumpWake:             make(chan struct{}, 1),
 		faultReportRequests:       make(chan string, 1),
 		openStageResults:          make(chan OpenStage, 4),
 		externalOpen:              make(chan OpenRequest, 2),
@@ -412,6 +424,7 @@ func (s *Shell) SetHostActive(active bool) {
 	if !active {
 		s.beginAudioDiscontinuity()
 	}
+	s.wakeAudioPump()
 }
 
 // SetAudioFocus is independent from foreground lifecycle state. Both must be
@@ -423,6 +436,7 @@ func (s *Shell) SetAudioFocus(active bool) {
 	if !active {
 		s.beginAudioDiscontinuity()
 	}
+	s.wakeAudioPump()
 }
 
 // CancelExternalDocumentSelection lets a native picker restore the shell

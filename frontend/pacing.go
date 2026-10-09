@@ -82,6 +82,7 @@ func (s *Shell) resetFramePacing() {
 	s.lastFramePacingAt = time.Time{}
 	s.pacingGuestAdvanced = 0
 	s.pacingSampleStartedAt = time.Time{}
+	s.inputFramePending = false
 }
 
 // clearMeasuredSpeed forgets the achieved-speed readout. It runs when the
@@ -89,6 +90,10 @@ func (s *Shell) resetFramePacing() {
 // fully unloaded - rather than on every transient pause.
 func (s *Shell) clearMeasuredSpeed() {
 	s.measuredSpeed = 0
+	s.frameWorkCount = 0
+	s.frameWorkTotal = 0
+	s.frameWorkMax = 0
+	s.inputWakeups = 0
 }
 
 // accumulateFramePacing folds elapsed real time into the guest's time budget.
@@ -241,7 +246,7 @@ func (s *Shell) scheduleRunningFrame() {
 		}
 		return
 	}
-	owed := s.takeFrameQuanta(quantum)
+	owed := s.takeScheduledFrameQuanta(quantum)
 	if owed == 0 {
 		if debugPacing {
 			owedZero++
@@ -260,19 +265,18 @@ func (s *Shell) scheduleRunningFrame() {
 		generation: s.frameGeneration,
 		startedAt:  now,
 		uiPriority: s.settings.UIPriority,
+		workTarget: hostFrameWorkTarget(quantum, s.effectivePacingSpeed()),
 	}
 }
 
 // uiPriorityFrameRest is the pause the worker takes after each guest frame when
-// UI priority is on. Lowering the worker thread's priority already lets the
-// interface preempt the guest; this hands back a slice of the physical core as
-// well, so even a single- or dual-core host stays responsive while a heavy
-// title runs a little slower.
+// UI priority is on. It gives the interface additional CPU time alongside the
+// platform's thread priority policy, including on hosts with few cores.
 const uiPriorityFrameRest = 3 * time.Millisecond
 
 // startFrameWorker launches the guest frame worker once, on first use. The
-// worker owns a single de-prioritised OS thread for the shell's lifetime, so a
-// heavy title yields CPU to the interface instead of stalling it.
+// worker owns one OS thread for the shell's lifetime, which lets the platform
+// apply thread priority and performance hints to the actual guest worker.
 func (s *Shell) startFrameWorker() {
 	s.frameWorkerOnce.Do(func() {
 		go s.runFrameWorker()
@@ -280,27 +284,43 @@ func (s *Shell) startFrameWorker() {
 }
 
 // runFrameWorker executes batched guest quanta off the interface goroutine. It
-// pins itself to one OS thread and lowers that thread's priority so the guest
-// never starves the ebiten update/draw thread of CPU. It processes one batch
-// at a time; scheduleRunningFrame only enqueues while no batch is in flight.
+// pins itself to one OS thread and applies the platform's scheduling policy.
+// It processes one batch at a time; scheduleRunningFrame only enqueues while no
+// batch is in flight.
 func (s *Shell) runFrameWorker() {
 	runtime.LockOSThread()
 	lowerCurrentThreadPriority()
 	for request := range s.frameRunRequests {
 		var (
-			completed int
-			err       error
+			completed  int
+			err        error
+			workFrames int
+			workTotal  time.Duration
+			workMax    time.Duration
 		)
 		if debugPacing {
 			fmt.Fprintf(os.Stderr, "worker: batch owed=%d\n", request.owed)
 		}
 		for range request.owed {
-			if err = request.backend.RunFrame(context.Background()); err != nil {
+			host := currentNativePerformanceHost()
+			if host != nil {
+				host.FrameWorkStarted(int64(request.workTarget), request.uiPriority)
+			}
+			started := time.Now()
+			err = request.backend.RunFrame(context.Background())
+			elapsed := time.Since(started)
+			if host != nil {
+				host.FrameWorkFinished(int64(max(time.Nanosecond, elapsed)))
+			}
+			workFrames++
+			workTotal += elapsed
+			workMax = max(workMax, elapsed)
+			if err != nil {
 				break
 			}
 			completed++
 			if request.uiPriority {
-				time.Sleep(uiPriorityFrameRest)
+				s.waitFrameRest()
 			}
 		}
 		if debugPacing {
@@ -313,8 +333,54 @@ func (s *Shell) runFrameWorker() {
 			startedAt:       request.startedAt,
 			completedAt:     s.now(),
 			err:             err,
+			workFrames:      workFrames,
+			workTotal:       workTotal,
+			workMax:         workMax,
 		}
 	}
+}
+
+func (s *Shell) requestInputFrame() {
+	s.inputFramePending = true
+	select {
+	case s.frameWorkerWake <- struct{}{}:
+	default:
+	}
+}
+
+func (s *Shell) takeScheduledFrameQuanta(quantum time.Duration) int {
+	if quantum <= 0 {
+		return 0
+	}
+	owed := s.takeFrameQuanta(quantum)
+	if owed == 0 && s.inputFramePending && s.frameAccumulator >= 0 {
+		// Run accepted input without waiting for a whole new quantum. Borrow
+		// at most one quantum and repay it from later pacing budgets so rapid
+		// input cannot advance guest time faster than the requested speed.
+		owed = 1
+		s.frameAccumulator -= quantum
+		s.inputWakeups++
+	}
+	if owed > 0 {
+		s.inputFramePending = false
+	}
+	return owed
+}
+
+func (s *Shell) waitFrameRest() {
+	timer := time.NewTimer(uiPriorityFrameRest)
+	defer timer.Stop()
+	select {
+	case <-s.frameWorkerWake:
+	case <-timer.C:
+	}
+}
+
+func hostFrameWorkTarget(quantum time.Duration, speed float64) time.Duration {
+	if speed <= 0 {
+		speed = 1
+	}
+	return max(time.Millisecond, min(250*time.Millisecond, time.Duration(float64(quantum)/speed)))
 }
 
 // speedSettingValue labels the speed control with the achieved ratio beside the
@@ -358,5 +424,16 @@ func (s *Shell) debugPacingReport() debugPacingReport {
 		DisplaySyncActive: s.displaySync.active,
 		HostTickRate:      s.displaySync.tickRate,
 		VsyncDisabled:     s.settings.VsyncDisabled,
+		FrameWorkCount:    s.frameWorkCount,
+		MeanFrameWorkMS:   meanFrameWorkMS(s.frameWorkTotal, s.frameWorkCount),
+		MaxFrameWorkMS:    float64(s.frameWorkMax) / float64(time.Millisecond),
+		InputWakeups:      s.inputWakeups,
 	}
+}
+
+func meanFrameWorkMS(total time.Duration, count uint64) float64 {
+	if count == 0 {
+		return 0
+	}
+	return float64(total) / float64(count) / float64(time.Millisecond)
 }
