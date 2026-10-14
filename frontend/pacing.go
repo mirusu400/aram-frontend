@@ -226,17 +226,20 @@ func (s *Shell) scheduleRunningFrame() {
 		s.input == nil ||
 		len(s.busyCommands) != 0 ||
 		s.backend.State() != StateRunning {
+		s.setAnalyticsRunning(false)
 		s.resetFramePacing()
 		return
 	}
 	backend, ok := s.backend.(FrameBackend)
 	if !ok {
+		s.setAnalyticsRunning(false)
 		s.resetFramePacing()
 		return
 	}
 	quantum := s.frameQuantum()
 	now := s.now()
 	s.accumulateFramePacing(now, quantum)
+	s.setAnalyticsRunning(true)
 	if s.frameRunPending {
 		if debugPacing {
 			pendingStuck++

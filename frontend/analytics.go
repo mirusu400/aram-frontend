@@ -1,9 +1,11 @@
 package frontend
 
 import (
+	"path"
 	"runtime"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/google/uuid"
 	"github.com/posthog/posthog-go"
@@ -11,39 +13,135 @@ import (
 
 const (
 	analyticsHost = "https://eu.i.posthog.com"
-	// analyticsShutdownTimeout bounds how long app exit waits for queued
-	// events to flush, so an offline or slow connection never delays closing
-	// the app.
-	analyticsShutdownTimeout = 1500 * time.Millisecond
-	analyticsSchemaVersion   = 1
+	// Close flushes queued events, but must never hold up app exit indefinitely.
+	analyticsShutdownTimeout     = 1500 * time.Millisecond
+	analyticsSchemaVersion       = 2
+	analyticsPerformanceInterval = 60 * time.Second
+	analyticsAudioSampleInterval = time.Second
+	// PostHog accepts custom UUIDv7 sessions lasting at most 24 hours.
+	analyticsMaxSessionDuration = 23 * time.Hour
 )
 
-// analyticsService is the app's usage-analytics seam, deliberately narrow: a
-// handful of lifecycle events, not a generic property bag. A disabled or
-// unconfigured client is a no-op so callers never branch on whether
-// analytics is on.
+// analyticsService keeps the transport separate from lifecycle and aggregation.
+// Only the fields in these typed events may leave the app.
 type analyticsService interface {
-	CaptureAppStarted()
-	CaptureTitleMilestone(sha256, profileID, milestone string)
-	CaptureSessionEnded(duration time.Duration, reachedMilestone string, crashed bool)
+	CaptureAppStarted(sessionID string)
+	CaptureSessionStarted(sessionID, reason string)
+	CaptureTitleMilestone(sessionID string, title analyticsTitle, state FrontendState)
+	CaptureSessionEnded(summary analyticsSessionSummary)
+	CapturePerformanceSummary(summary analyticsPerformanceSummary)
 	Shutdown()
 }
 
 type noopAnalyticsService struct{}
 
-func (noopAnalyticsService) CaptureAppStarted()                                        {}
-func (noopAnalyticsService) CaptureTitleMilestone(sha256, profileID, milestone string) {}
-func (noopAnalyticsService) CaptureSessionEnded(time.Duration, string, bool)           {}
-func (noopAnalyticsService) Shutdown()                                                 {}
+func (noopAnalyticsService) CaptureAppStarted(string)                                    {}
+func (noopAnalyticsService) CaptureSessionStarted(string, string)                        {}
+func (noopAnalyticsService) CaptureTitleMilestone(string, analyticsTitle, FrontendState) {}
+func (noopAnalyticsService) CaptureSessionEnded(analyticsSessionSummary)                 {}
+func (noopAnalyticsService) CapturePerformanceSummary(analyticsPerformanceSummary)       {}
+func (noopAnalyticsService) Shutdown()                                                   {}
+
+type analyticsTitle struct {
+	RunID       string
+	FileName    string
+	SHA256      string
+	ImageSHA256 string
+	ProfileID   string
+	Format      string
+	Mode        string
+}
+
+func (title analyticsTitle) properties(sessionID string) posthog.Properties {
+	properties := posthog.NewProperties().Set("$session_id", sessionID)
+	if title.RunID != "" {
+		properties.Set("title_run_id", title.RunID).
+			Set("file_name", title.FileName).
+			Set("sha256", title.SHA256).
+			Set("image_sha256", title.ImageSHA256).
+			Set("profile_id", title.ProfileID).
+			Set("input_format", title.Format).
+			Set("mode", title.Mode)
+	}
+	return properties
+}
+
+type analyticsSessionSummary struct {
+	SessionID string
+	Title     analyticsTitle
+	Duration  time.Duration
+	State     FrontendState
+	HadError  bool
+	Reason    string
+}
+
+// This is the selected CPU choice, not a claim about the resolved CPU backend.
+type analyticsPerformanceSettings struct {
+	CPUChoice         string
+	RequestedSpeed    float64
+	EffectiveSpeed    float64
+	DisplaySync       bool
+	DisplaySyncActive bool
+	VsyncDisabled     bool
+	UIPriority        bool
+}
+
+func (settings analyticsPerformanceSettings) sameConfiguration(other analyticsPerformanceSettings) bool {
+	// A measured refresh rate drifts each second. Update the time-weighted
+	// target without making that drift create a new event window.
+	settings.EffectiveSpeed = other.EffectiveSpeed
+	return settings == other
+}
+
+type analyticsPerformanceSummary struct {
+	SessionID    string
+	Title        analyticsTitle
+	Settings     analyticsPerformanceSettings
+	Duration     time.Duration
+	GuestTime    time.Duration
+	TargetTime   time.Duration
+	FrameCount   uint64
+	FrameWork    time.Duration
+	MaxFrameWork time.Duration
+	Underruns    uint64
+	Overruns     uint64
+	Dropped      uint64
+	Reason       string
+}
+
+func (summary analyticsPerformanceSummary) properties() posthog.Properties {
+	properties := summary.Title.properties(summary.SessionID).
+		Set("duration_seconds", summary.Duration.Seconds()).
+		Set("guest_seconds", summary.GuestTime.Seconds()).
+		Set("frame_work_count", summary.FrameCount).
+		Set("mean_frame_work_ms", meanFrameWorkMS(summary.FrameWork, summary.FrameCount)).
+		Set("max_frame_work_ms", float64(summary.MaxFrameWork)/float64(time.Millisecond)).
+		Set("audio_underruns", summary.Underruns).
+		Set("audio_overruns", summary.Overruns).
+		Set("audio_dropped_frames", summary.Dropped).
+		Set("cpu_choice", summary.Settings.CPUChoice).
+		Set("requested_speed", summary.Settings.RequestedSpeed).
+		Set("effective_speed", summary.Settings.EffectiveSpeed).
+		Set("display_sync", summary.Settings.DisplaySync).
+		Set("display_sync_active", summary.Settings.DisplaySyncActive).
+		Set("vsync_disabled", summary.Settings.VsyncDisabled).
+		Set("ui_priority", summary.Settings.UIPriority).
+		Set("summary_reason", summary.Reason)
+	if summary.Duration > 0 {
+		properties.Set("measured_speed", float64(summary.GuestTime)/float64(summary.Duration))
+		properties.Set("effective_speed", float64(summary.TargetTime)/float64(summary.Duration))
+	}
+	if summary.TargetTime > 0 {
+		properties.Set("achieved_percent", float64(summary.GuestTime)/float64(summary.TargetTime)*100)
+	}
+	return properties
+}
 
 type postHogAnalyticsService struct {
 	client     posthog.Client
 	distinctID string
 }
 
-// newAnalyticsService returns a no-op service when analytics is disabled in
-// settings or the API key hasn't been configured yet, so a disabled user's
-// process never opens a PostHog connection at all.
 func newAnalyticsService(enabled bool, distinctID string) analyticsService {
 	if !enabled || AnalyticsAPIKey == "" || distinctID == "" {
 		return noopAnalyticsService{}
@@ -51,9 +149,7 @@ func newAnalyticsService(enabled bool, distinctID string) analyticsService {
 	client, err := posthog.NewWithConfig(AnalyticsAPIKey, posthog.Config{
 		Endpoint:        analyticsHost,
 		ShutdownTimeout: analyticsShutdownTimeout,
-		// This is a client app, not a server - omit $is_server so events
-		// attribute to the running OS/arch normally.
-		IsServer: posthog.Ptr(false),
+		IsServer:        posthog.Ptr(false),
 		DefaultEventProperties: posthog.NewProperties().
 			Set("platform", runtime.GOOS+"/"+runtime.GOARCH).
 			Set("app_version", currentApplicationVersion()).
@@ -73,77 +169,104 @@ func (a *postHogAnalyticsService) capture(event string, properties posthog.Prope
 	})
 }
 
-func (a *postHogAnalyticsService) CaptureAppStarted() {
-	a.capture("app_started", nil)
+func (a *postHogAnalyticsService) CaptureAppStarted(sessionID string) {
+	a.capture("app_started", posthog.NewProperties().Set("$session_id", sessionID))
 }
 
-func (a *postHogAnalyticsService) CaptureTitleMilestone(sha256, profileID, milestone string) {
-	a.capture("title_milestone", posthog.NewProperties().
-		Set("sha256", sha256).
-		Set("profile_id", profileID).
-		Set("milestone", milestone))
+func (a *postHogAnalyticsService) CaptureSessionStarted(sessionID, reason string) {
+	a.capture("session_started", posthog.NewProperties().
+		Set("$session_id", sessionID).Set("start_reason", reason))
 }
 
-func (a *postHogAnalyticsService) CaptureSessionEnded(duration time.Duration, reachedMilestone string, crashed bool) {
-	a.capture("session_ended", posthog.NewProperties().
-		Set("duration_seconds", int(duration.Seconds())).
-		Set("reached_milestone", reachedMilestone).
-		Set("crashed", crashed))
+func (a *postHogAnalyticsService) CaptureTitleMilestone(sessionID string, title analyticsTitle, state FrontendState) {
+	a.capture("title_milestone", title.properties(sessionID).Set("milestone", string(state)))
 }
 
-// Shutdown flushes and closes the client, bounded by analyticsShutdownTimeout
-// (Config.ShutdownTimeout above) so a dead connection never delays app exit.
-func (a *postHogAnalyticsService) Shutdown() {
-	_ = a.client.Close()
+func (a *postHogAnalyticsService) CaptureSessionEnded(summary analyticsSessionSummary) {
+	reached := string(summary.State)
+	if reached == "" {
+		reached = "none"
+	}
+	a.capture("session_ended", summary.Title.properties(summary.SessionID).
+		Set("duration_seconds", int(summary.Duration.Seconds())).
+		Set("reached_milestone", reached).
+		// Keep the old property for existing insights; it denotes guest/load errors.
+		Set("crashed", summary.HadError).
+		Set("had_error", summary.HadError).
+		Set("end_reason", summary.Reason))
 }
 
-// newAnalyticsDistinctID mints a random anonymous identifier, persisted in
-// Settings so it stays stable across runs. It is never derived from any
-// hardware or account identifier.
-func newAnalyticsDistinctID() string {
-	return uuid.NewString()
+func (a *postHogAnalyticsService) CapturePerformanceSummary(summary analyticsPerformanceSummary) {
+	a.capture("performance_summary", summary.properties())
 }
 
-// toggleAnalyticsEnabled flips the persisted analytics preference and
-// (re)initializes the client - a disabled user never has one constructed.
+func (a *postHogAnalyticsService) Shutdown() { _ = a.client.Close() }
+
+// Installation identity is random and stable across launches, with no hardware
+// or account identifier. PostHog session aggregation separately requires UUIDv7.
+func newAnalyticsDistinctID() string { return uuid.NewString() }
+
+func analyticsFileName(name string) string {
+	name = path.Base(strings.ReplaceAll(strings.TrimSpace(name), "\\", "/"))
+	name = strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return -1
+		}
+		return r
+	}, name)
+	if name == "." || name == ".." || name == "/" {
+		return ""
+	}
+	const maxNameRunes = 255
+	runes := []rune(name)
+	if len(runes) > maxNameRunes {
+		return string(runes[:maxNameRunes])
+	}
+	return name
+}
+
+func analyticsSHA256(value string) string {
+	if validIssueSHA256(value) {
+		return strings.ToLower(value)
+	}
+	return ""
+}
+
 func (s *Shell) toggleAnalyticsEnabled() {
 	s.settings.AnalyticsEnabled = !s.settings.AnalyticsEnabled
 	_ = s.settings.save()
-	s.analytics.Shutdown()
-	s.analytics = newAnalyticsService(s.settings.AnalyticsEnabled, s.settings.AnalyticsID)
+	s.analytics.setEnabled(s.settings.AnalyticsEnabled && AnalyticsAPIKey != "", s.now(), s.audioQueueTelemetry())
 	s.setStatus(s.trf("Usage analytics: %s", s.tr(onOff(s.settings.AnalyticsEnabled))))
 }
 
-// reportAnalyticsMilestone captures a title-load milestone, deduped so a
-// state that hasn't changed (syncBackendState runs every frame) doesn't
-// resend the same event. sha256/profileID come from the caller rather than
-// s.input directly, because on a failed open s.input may still hold the
-// previous title (Shell only updates it once a DisplayName comes back).
-func (s *Shell) reportAnalyticsMilestone(state FrontendState, sha256, profileID string) {
-	if state == s.analyticsLastMilestone {
-		return
+func (s *Shell) analyticsPerformanceSettings() analyticsPerformanceSettings {
+	return analyticsPerformanceSettings{
+		CPUChoice:      s.currentCPUSettings().Name,
+		RequestedSpeed: s.framePacingSpeed(), EffectiveSpeed: s.effectivePacingSpeed(),
+		DisplaySync: s.settings.DisplaySync, DisplaySyncActive: s.displaySync.active,
+		VsyncDisabled: s.settings.VsyncDisabled, UIPriority: s.settings.UIPriority,
 	}
-	s.analyticsLastMilestone = state
-	if !validIssueSHA256(sha256) {
-		return
-	}
-	s.analytics.CaptureTitleMilestone(strings.ToLower(sha256), profileID, string(state))
 }
 
-// reportAnalyticsSessionEnded fires once as the process shuts down. Desktop
-// and web reach it through Run/RunWithOptions; there is no equivalent
-// teardown hook on Android/iOS today (the mobile host owns the process
-// lifecycle through Pause/Resume, not a Run-loop return), so mobile sessions
-// don't yet emit this event.
-func (s *Shell) reportAnalyticsSessionEnded() {
-	reached := "none"
-	if s.analyticsLastMilestone != "" {
-		reached = string(s.analyticsLastMilestone)
+func (s *Shell) reportAnalyticsMilestone(state FrontendState, info InputInfo) {
+	if s.analytics.needsMilestone(state, info) {
+		s.analytics.milestone(state, info, s.now(), s.audioQueueTelemetry())
 	}
-	s.analytics.CaptureSessionEnded(
-		time.Since(s.analyticsSessionStartedAt),
-		reached,
-		s.problem != nil,
-	)
-	s.analytics.Shutdown()
+}
+
+func (s *Shell) reportAnalyticsPerformance() {
+	if s.analytics.needsAudioSample(s.now()) {
+		s.analytics.sampleAudio(s.now(), s.audioQueueTelemetry())
+	}
+}
+
+func (s *Shell) setAnalyticsRunning(running bool) {
+	settings := s.analyticsPerformanceSettings()
+	if s.analytics.needsRunningChange(running, settings) {
+		s.analytics.setRunning(running, settings, s.now(), s.audioQueueTelemetry())
+	}
+}
+
+func (s *Shell) reportAnalyticsSessionEnded() {
+	s.analytics.shutdown(s.now(), s.audioQueueTelemetry())
 }

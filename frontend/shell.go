@@ -185,9 +185,7 @@ type Shell struct {
 	welcomeInstalling         bool
 	updater                   updateDownloader
 	issueRelay                issueRelayService
-	analytics                 analyticsService
-	analyticsSessionStartedAt time.Time
-	analyticsLastMilestone    FrontendState
+	analytics                 *analyticsReporter
 	updateProgress            map[updateComponent]updateProgress
 	pickerResults             chan pickerResult
 	backendResults            chan backendResult
@@ -277,8 +275,7 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		busyCommands:              make(map[BackendCommand]bool),
 		updater:                   newGitHubUpdater(),
 		issueRelay:                newIssueRelayClient(),
-		analytics:                 newAnalyticsService(settings.AnalyticsEnabled, settings.AnalyticsID),
-		analyticsSessionStartedAt: time.Now(),
+		analytics:                 newAnalyticsReporter(settings.AnalyticsEnabled, settings.AnalyticsID),
 		updateProgress:            make(map[updateComponent]updateProgress),
 		pickerResults:             make(chan pickerResult, 2),
 		backendResults:            make(chan backendResult, 2),
@@ -363,7 +360,6 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		// populated by the time the user switches to it.
 		shell.rescanLibrary()
 	}
-	shell.analytics.CaptureAppStarted()
 	return shell
 }
 
@@ -424,6 +420,7 @@ func (s *Shell) SetHostActive(active bool) {
 	if !active {
 		s.beginAudioDiscontinuity()
 	}
+	s.analytics.setHostActive(active, time.Now(), s.audioQueueTelemetry())
 	s.wakeAudioPump()
 }
 
@@ -487,6 +484,7 @@ func (s *Shell) Update() error {
 		s.handleHomeNavigation()
 	}
 	s.scheduleRunningFrame()
+	s.reportAnalyticsPerformance()
 	return nil
 }
 

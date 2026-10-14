@@ -84,10 +84,11 @@ func (s *Shell) consumeResults() {
 				result.completedAt,
 				result.guestAdvanced,
 			)
+			s.analytics.recordFrame(result, s.now())
 			if result.err != nil {
 				s.state = frontendStateForError(result.err)
 				if s.input != nil {
-					s.reportAnalyticsMilestone(s.state, s.input.SHA256, s.input.ProfileID)
+					s.reportAnalyticsMilestone(s.state, *s.input)
 				}
 				s.problem = &FrontendProblem{
 					State:       s.state,
@@ -182,7 +183,7 @@ func (s *Shell) consumeBackendResult(result backendResult) {
 	}
 	if result.err != nil {
 		s.state = frontendStateForError(result.err)
-		s.reportAnalyticsMilestone(s.state, result.info.SHA256, result.info.ProfileID)
+		s.reportAnalyticsMilestone(s.state, result.info)
 		s.problem = &FrontendProblem{
 			State:       s.state,
 			Input:       displayName(result.request),
@@ -207,7 +208,7 @@ func (s *Shell) consumeBackendResult(result backendResult) {
 	if s.state == FrontendEmpty {
 		s.state = FrontendReady
 	}
-	s.reportAnalyticsMilestone(s.state, result.info.SHA256, result.info.ProfileID)
+	s.reportAnalyticsMilestone(s.state, result.info)
 	s.setStatus(s.trf(
 		"Loaded %s | %s | profile %s",
 		result.info.DisplayName,

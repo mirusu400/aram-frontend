@@ -1,4 +1,6 @@
 {
+  "Usage analytics": "Usage analytics",
+  "Share platform, input file names, title-load milestones, foreground session length, and performance summaries to help prioritize fixes. Folder paths and file contents are not collected. Turn off to stop sending usage data.": "Share platform, input file names, title-load milestones, foreground session length, and performance summaries to help prioritize fixes. Folder paths and file contents are not collected. Turn off to stop sending usage data.",
   "Search titles": "Search titles",
   "In the browser, open individual game files instead of folders.": "In the browser, open individual game files instead of folders.",
   "Library": "Library",

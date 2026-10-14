@@ -27,6 +27,7 @@ func (s *Shell) releaseCurrentInput(deleteTemporary bool) error {
 	if err := s.backend.Close(); err != nil {
 		return err
 	}
+	s.analytics.clearTitle(s.now(), s.audioQueueTelemetry())
 	s.audioMu.Lock()
 	s.setAudioSuspendedLocked(true)
 	if s.audioOutput != nil {
@@ -324,7 +325,7 @@ func (s *Shell) syncBackendState() {
 	s.lastRunState = state
 	s.state = state
 	if s.input != nil {
-		s.reportAnalyticsMilestone(state, s.input.SHA256, s.input.ProfileID)
+		s.reportAnalyticsMilestone(state, *s.input)
 	}
 }
 

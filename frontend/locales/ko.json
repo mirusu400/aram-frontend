@@ -1,4 +1,6 @@
 {
+  "Usage analytics": "사용 통계",
+  "Share platform, input file names, title-load milestones, foreground session length, and performance summaries to help prioritize fixes. Folder paths and file contents are not collected. Turn off to stop sending usage data.": "개선할 문제의 우선순위를 정하기 위해 실행 환경, 입력 파일명, 실행 단계, 앱을 사용한 시간, 성능 요약을 전송합니다. 폴더 경로와 파일 내용은 수집하지 않습니다. 끄면 사용 통계 전송이 중단됩니다.",
   "Search titles": "게임 검색",
   "In the browser, open individual game files instead of folders.": "브라우저에서는 폴더 대신 게임 파일을 하나씩 열어 주세요.",
   "Library": "내 게임",

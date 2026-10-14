@@ -153,6 +153,7 @@ func (s *Shell) openRequest(request OpenRequest) {
 	s.loading = true
 	s.problem = nil
 	s.state = FrontendInspecting
+	s.analytics.beginTitle(request, s.now(), s.audioQueueTelemetry())
 	s.setStatus(s.trf("Inspecting %s...", displayName(request)))
 	if request.Firmware && request.Path != "" {
 		s.settings.LastFirmwarePath = request.Path

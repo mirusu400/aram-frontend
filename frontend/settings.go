@@ -218,9 +218,9 @@ type Settings struct {
 	// Home. Both are cleaned and de-duplicated by normalize.
 	GameLibraryFolders []string `json:"game_library_folders,omitempty"`
 	FavoriteFiles      []string `json:"favorite_files,omitempty"`
-	// AnalyticsEnabled controls whether anonymous usage events (platform,
-	// title-load milestones, session length) are sent. Opt-out: true by
-	// default, one Experiments toggle to disable.
+	// AnalyticsEnabled controls whether usage events (platform, file names,
+	// title-load milestones, session length, performance summaries) are sent.
+	// Opt-out: true by default, one Experiments toggle to disable.
 	AnalyticsEnabled bool `json:"analytics_enabled"`
 	// AnalyticsID is a random anonymous identifier generated once and kept
 	// stable across runs. It never derives from any hardware/account ID.

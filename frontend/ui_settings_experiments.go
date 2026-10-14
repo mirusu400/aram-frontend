@@ -31,7 +31,7 @@ func experimentSettingsRowModels(shell *Shell) []settingsRowModel {
 		},
 		{
 			label:       "Usage analytics",
-			description: "Share anonymous usage data (platform, title-load milestones, session length) to help prioritize fixes. No title names, file paths, or personal data are collected.",
+			description: "Share platform, input file names, title-load milestones, foreground session length, and performance summaries to help prioritize fixes. Folder paths and file contents are not collected. Turn off to stop sending usage data.",
 			value:       onOff(shell.settings.AnalyticsEnabled),
 			action:      shell.toggleAnalyticsEnabled,
 		},
