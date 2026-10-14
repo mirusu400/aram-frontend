@@ -331,7 +331,7 @@ func defaultSettings() Settings {
 		Speed:                 1,
 		Volume:                100,
 		AudioLatencyMS:        60,
-		AudioSoften:           true,
+		AudioSoften:           false,
 		AudioChannels:         1,
 		GamepadEnabled:        true,
 		GamepadLayout:         "standard",
