@@ -54,8 +54,17 @@ func TestMainAudioDrainerAppliesCurrentDisplaySpeedBeforeEncoding(t *testing.T) 
 	shell := activeAudioShell(backend, output)
 	shell.audioSpeed = 0.96
 	shell.drainAudioOnce(true)
-	if got := output.telemetry().FillFrames; got != 735 {
-		t.Fatalf("first display-synchronized drain = %d frames, want 735", got)
+	if got := output.telemetry().FillFrames; got != 734 {
+		t.Fatalf("first display-synchronized drain = %d frames, want 734 complete periods", got)
+	}
+	// The fractional period carries between drains. Three such chunks emit
+	// 2203 frames, rather than rounding each drain down to 734 independently.
+	for range 2 {
+		backend.chunks = []AudioChunk{{SampleRate: 44100, Channels: 1, PCM16: make([]int16, 705)}}
+		shell.drainAudioOnce(true)
+	}
+	if got := output.telemetry().FillFrames; got != 2203 {
+		t.Fatalf("three display-synchronized drains = %d frames, want 2203", got)
 	}
 }
 

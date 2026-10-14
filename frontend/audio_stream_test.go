@@ -141,7 +141,9 @@ func TestStreamingResamplingIsIndependentOfFragmentSize(t *testing.T) {
 					t.Fatalf("rate=%d channels=%d fragment=%d: %d != %d frames or changed samples", rate, channels, fragment, len(got)/4, len(want)/4)
 				}
 			}
-			expected := (1001*hostAudioSampleRate + rate - 1) / rate
+			// Only complete host sample periods can be emitted from
+			// the received source frames; the remainder carries on.
+			expected := 1001 * hostAudioSampleRate / rate
 			if len(want)/4 != expected {
 				t.Fatalf("rate=%d output frames=%d want=%d", rate, len(want)/4, expected)
 			}

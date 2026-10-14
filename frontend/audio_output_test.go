@@ -19,7 +19,7 @@ func TestEncodeHostPCMConvertsMonoAndSampleRate(t *testing.T) {
 	if len(encoded) != 4*4 {
 		t.Fatalf("encoded bytes = %d, want 16", len(encoded))
 	}
-	want := []int16{100, 100, 100, 100, -200, -200, -200, -200}
+	want := []int16{100, 100, 100, 100, -50, -50, -200, -200}
 	for index, expected := range want {
 		got := int16(binary.LittleEndian.Uint16(encoded[index*2:]))
 		if got != expected {

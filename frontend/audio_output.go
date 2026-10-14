@@ -840,13 +840,16 @@ func audioPrebufferBytes(latency time.Duration) int {
 	))
 }
 
-// hostPCMEncoder carries the rational source cursor across every chunk. A
-// source sample is held until the next source frame, including across timer
-// subdivisions. Fractional output frames are never rounded per chunk.
+// hostPCMEncoder carries a rational clock and the previous source frame across
+// chunks. Interpolation avoids staircase noise when display sync slightly
+// stretches a stream. Only complete host periods are emitted, without rounding
+// each chunk or needing a future chunk to finish interpolation.
 type hostPCMEncoder struct {
 	sampleRate int
 	channels   int
 	phase      int
+	previous   [2]int32
+	seeded     bool
 }
 
 func encodeHostPCM(chunk AudioChunk) ([]byte, error) {
@@ -878,16 +881,28 @@ func (encoder *hostPCMEncoder) encode(chunk AudioChunk) ([]byte, error) {
 	frames := len(chunk.PCM16) / chunk.Channels
 	result := make([]byte, 0, (int64(frames)*hostAudioSampleRate/int64(chunk.SampleRate)+1)*4)
 	for frame := 0; frame < frames; frame++ {
-		left := chunk.PCM16[frame*chunk.Channels]
+		left := int32(chunk.PCM16[frame*chunk.Channels])
 		right := left
 		if chunk.Channels == 2 {
-			right = chunk.PCM16[frame*2+1]
+			right = int32(chunk.PCM16[frame*2+1])
 		}
-		for encoder.phase < hostAudioSampleRate {
-			result = append(result, byte(left), byte(uint16(left)>>8), byte(right), byte(uint16(right)>>8))
-			encoder.phase += chunk.SampleRate
+		if !encoder.seeded {
+			encoder.previous = [2]int32{left, right}
+			encoder.seeded = true
 		}
-		encoder.phase -= hostAudioSampleRate
+		encoder.phase += hostAudioSampleRate
+		for encoder.phase >= chunk.SampleRate {
+			encoder.phase -= chunk.SampleRate
+			// phase is the time from this host sample to the current
+			// source frame, in host-rate ticks. Both weights are in
+			// [0, hostAudioSampleRate], so interpolation cannot clip.
+			oldWeight := int64(encoder.phase)
+			newWeight := int64(hostAudioSampleRate - encoder.phase)
+			outLeft := int16((int64(encoder.previous[0])*oldWeight + int64(left)*newWeight) / hostAudioSampleRate)
+			outRight := int16((int64(encoder.previous[1])*oldWeight + int64(right)*newWeight) / hostAudioSampleRate)
+			result = append(result, byte(outLeft), byte(uint16(outLeft)>>8), byte(outRight), byte(uint16(outRight)>>8))
+		}
+		encoder.previous = [2]int32{left, right}
 	}
 	return result, nil
 }
