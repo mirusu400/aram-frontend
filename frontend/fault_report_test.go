@@ -91,6 +91,7 @@ func TestPromptFaultReportPromptsOncePerGeneration(t *testing.T) {
 }
 
 func TestFrameFaultResultPromptsAndOpensReport(t *testing.T) {
+	const faultReason = "execute KTF guest: java native target is null"
 	shell := NewShell(NullBackend{}, nil, "")
 	shell.faultPrompter = stubCrashPrompter{confirm: true, available: true}
 	shell.input = &InputInfo{DisplayName: "2006독일축구.zip"}
@@ -99,7 +100,7 @@ func TestFrameFaultResultPromptsAndOpensReport(t *testing.T) {
 
 	shell.frameRunResults <- frameRunResult{
 		generation: 4,
-		err:        errors.New("execute KTF guest: java native target is null"),
+		err:        errors.New(faultReason),
 	}
 	shell.consumeResults()
 
@@ -108,16 +109,24 @@ func TestFrameFaultResultPromptsAndOpensReport(t *testing.T) {
 			shell.state, shell.problem)
 	}
 
-	reason, ok := awaitFaultRequest(t, shell)
-	if !ok {
-		t.Fatal("frame fault raised no report request")
+	// A fast confirmation may already have been consumed by the same drain.
+	// Otherwise, complete the queued hand-off through the ordinary next drain.
+	if shell.panel == nil {
+		reason, ok := awaitFaultRequest(t, shell)
+		if !ok {
+			t.Fatal("frame fault raised no report request")
+		}
+		if reason != faultReason {
+			t.Fatalf("routed reason = %q, want %q", reason, faultReason)
+		}
+		shell.faultReportRequests <- reason
+		shell.consumeResults()
 	}
-	// Re-queue the routed reason so the next drain opens the panel, mirroring
-	// the async goroutine hand-off in the running shell.
-	shell.faultReportRequests <- reason
-	shell.consumeResults()
 	if shell.panel == nil || shell.panel.Kind != "issue-report" {
 		t.Fatalf("panel = %+v, want issue-report", shell.panel)
+	}
+	if situation := shell.panel.FieldValues["situation"]; !strings.Contains(situation, faultReason) {
+		t.Fatalf("situation = %q, want fault reason %q", situation, faultReason)
 	}
 }
 
