@@ -308,6 +308,10 @@ func (s *Shell) collectGamepadState(state map[string]bool, profile ControllerPro
 }
 
 func (s *Shell) handleTouch() {
+	if s.uiTouchPointers == nil {
+		s.uiTouchPointers = make(map[ebiten.TouchID]bool)
+	}
+	clear(s.uiTouchPointers)
 	if !platformUsesTouchLayout() {
 		return
 	}
@@ -332,6 +336,7 @@ func (s *Shell) handleTouch() {
 		if s.focusMode {
 			width, height := s.viewportSize()
 			if pointInRect(x, y, focusExitBoundsForScale(width, height, s.renderScale)) {
+				s.uiTouchPointers[id] = true
 				s.buttonHaptic()
 				s.toggleFocusMode()
 				continue
@@ -348,6 +353,7 @@ func (s *Shell) handleTouch() {
 			width, _ := s.viewportSize()
 			bounds := touchChromeToggleBoundsAtScale(width, s.touchChromeHiddenActive(), s.renderScale)
 			if pointInRect(x, y, bounds) {
+				s.uiTouchPointers[id] = true
 				s.buttonHaptic()
 				s.toggleTouchChrome()
 				continue
