@@ -147,6 +147,10 @@ type Shell struct {
 	hapticActive              bool
 	hapticRemaining           time.Duration
 	touchControls             map[ebiten.TouchID]string
+	uiTouchPointers           map[ebiten.TouchID]bool
+	guestPointerMap           guestPointerMapping
+	guestPointer              guestPointerCapture
+	guestPointerUIBlocked     bool
 	padTouchActive            bool
 	padTouchID                ebiten.TouchID
 	padTouchMoved             bool
@@ -460,6 +464,7 @@ func (s *Shell) Update() error {
 	if !s.handleBindingCapture() {
 		s.handleShortcuts()
 	}
+	s.guestPointerUIBlocked = s.panel != nil || s.activeMenu >= 0 || s.dialogOpen || s.bindingCapture != nil
 	s.handleTouch()
 	s.syncDesignSystem()
 	if s.interfaceUI != nil {
@@ -477,6 +482,7 @@ func (s *Shell) Update() error {
 	} else {
 		s.handleMouse()
 	}
+	s.handleGuestPointer()
 	s.handleMappedInput()
 	if s.showHomeSurface() && s.panel == nil && s.activeMenu < 0 && !s.dialogOpen {
 		// The Home launcher is the focus, so directional/confirm input drives

@@ -138,6 +138,13 @@ type InputEvent struct {
 	At time.Duration
 }
 
+// PointerInputEvent uses the guest's unrotated framebuffer coordinates.
+type PointerInputEvent struct {
+	X, Y    int
+	Pressed bool
+	At      time.Duration
+}
+
 type AudioSettings struct {
 	Muted    bool
 	Volume   int
@@ -331,6 +338,11 @@ type FrameBackend interface {
 // InputBackend receives normalized controls rather than host-specific keys.
 type InputBackend interface {
 	QueueInput(InputEvent) error
+}
+
+type PointerBackend interface {
+	SupportsPointer() bool
+	QueuePointer(PointerInputEvent) error
 }
 
 type AudioBackend interface {

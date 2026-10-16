@@ -117,6 +117,7 @@ func (s *Shell) drawGuestViewport(screen *ebiten.Image, viewport image.Rectangle
 	)
 
 	if s.frameImage == nil || s.frame.Image == nil {
+		s.guestPointerMap = guestPointerMapping{}
 		s.drawEmptyViewport(screen, viewport)
 		return
 	}
@@ -129,6 +130,8 @@ func (s *Shell) drawGuestViewport(screen *ebiten.Image, viewport image.Rectangle
 		rotatedWidth, rotatedHeight = sourceHeight, sourceWidth
 	}
 	destination := s.frameDestination(viewport, rotatedWidth, rotatedHeight)
+	s.guestPointerMap = guestPointerMapping{source: sourceBounds, destination: destination,
+		rotation: display.Rotation, generation: s.frameGeneration}
 	s.drawGuestFrame(screen, destination, sourceBounds)
 }
 
