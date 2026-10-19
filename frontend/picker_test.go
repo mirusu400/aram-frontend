@@ -14,14 +14,19 @@ func TestInputPickerPatternsIncludeZIPPackages(t *testing.T) {
 	}
 }
 
-func TestInputPickerPreservesExistingFormatsAndIncludesJavaME(t *testing.T) {
+func TestInputPickerPreservesExistingFormatsAndIncludesApplications(t *testing.T) {
 	patterns := supportedInputPatterns()
 	for _, pattern := range []string{
 		"*.dat", "*.jar", "*.JAR", "*.zip", "*.ZIP", "*.sgs", "*.SGS",
-		"*.wbin", "*.wbt", "*.bin", "*.rom", "*.img", "*.mbn",
+		"*.pxo", "*.PXO", "*.wbin", "*.wbt", "*.bin", "*.rom", "*.img", "*.mbn",
 	} {
 		if !slices.Contains(patterns, pattern) {
 			t.Errorf("supported inputs omit %s", pattern)
+		}
+	}
+	for _, pattern := range []string{"*.pxo", "*.PXO"} {
+		if !slices.Contains(pxoPackagePatterns(), pattern) {
+			t.Errorf("LG PXO inputs omit %s", pattern)
 		}
 	}
 	for _, pattern := range []string{"*.jar", "*.JAR", "*.zip", "*.ZIP"} {
@@ -40,9 +45,9 @@ func TestInputPickerPreservesExistingFormatsAndIncludesJavaME(t *testing.T) {
 	}
 }
 
-func TestJ2MEPickerLabelsAreLocalized(t *testing.T) {
+func TestApplicationPickerLabelsAreLocalized(t *testing.T) {
 	for _, language := range []Language{LanguageEnglish, LanguageKorean} {
-		for _, key := range []string{"Open application package or firmware", "J2ME packages (JAR or JAD/JAR ZIP)", "GVM inputs (recognition only)"} {
+		for _, key := range []string{"Open application package or firmware", "J2ME packages (JAR or JAD/JAR ZIP)", "GVM inputs (recognition only)", "LG PXO games"} {
 			if got := translate(language, key); got == "" || (language == LanguageKorean && got == key) {
 				t.Errorf("missing %s translation for %q", language, key)
 			}
