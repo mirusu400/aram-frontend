@@ -28,12 +28,18 @@ func supportedInputPatterns() []string {
 	patterns := wipiPackagePatterns()
 	// ZIP and JAR are shared containers, not evidence of a platform. The core
 	// inspects the selected bytes and chooses the application implementation.
-	for _, pattern := range append(j2mePackagePatterns(), gvmInputPatterns()...) {
+	applicationPatterns := append(j2mePackagePatterns(), gvmInputPatterns()...)
+	applicationPatterns = append(applicationPatterns, pxoPackagePatterns()...)
+	for _, pattern := range applicationPatterns {
 		if !slices.Contains(patterns, pattern) {
 			patterns = append(patterns, pattern)
 		}
 	}
 	return append(patterns, firmwareImagePatterns()...)
+}
+
+func pxoPackagePatterns() []string {
+	return []string{"*.pxo", "*.PXO"}
 }
 
 func wipiPackagePatterns() []string {

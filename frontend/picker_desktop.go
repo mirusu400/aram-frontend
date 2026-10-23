@@ -28,6 +28,7 @@ func (p *platformPicker) OpenFile() (string, error) {
 			{Name: translate(p.language, "WIPI packages"), Patterns: wipiPackagePatterns()},
 			{Name: translate(p.language, "J2ME packages (JAR or JAD/JAR ZIP)"), Patterns: j2mePackagePatterns()},
 			{Name: translate(p.language, "GVM inputs (recognition only)"), Patterns: gvmInputPatterns()},
+			{Name: translate(p.language, "LG PXO games"), Patterns: pxoPackagePatterns()},
 			{Name: translate(p.language, "Firmware images"), Patterns: firmwareImagePatterns()},
 			{Name: translate(p.language, "All files"), Patterns: []string{"*"}},
 		},
