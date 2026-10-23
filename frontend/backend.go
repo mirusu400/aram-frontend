@@ -13,6 +13,8 @@ var ErrBackendUnavailable = errors.New(
 		"aram-emu with `go run ./cmd/aram`",
 )
 
+var ErrHostEventUnsupported = errors.New("loaded title does not accept host events")
+
 type BackendState string
 
 const (
@@ -136,6 +138,38 @@ type InputEvent struct {
 	// At is guest-relative. Zero applies live host input at the backend's
 	// current guest time.
 	At time.Duration
+}
+
+type HostEventKind string
+
+const (
+	HostEventNetworkReceive HostEventKind = "network-receive"
+	HostEventSerialReceive  HostEventKind = "serial-receive"
+	HostEventSMSReceive     HostEventKind = "sms-receive"
+)
+
+// HostEvent carries data from a native handset provider into a running title.
+// Network receive uses Data; serial and SMS notifications use Words.
+type HostEvent struct {
+	Kind  HostEventKind
+	Data  []byte
+	Words [4]uint32
+}
+
+func (e HostEvent) Validate() error {
+	switch e.Kind {
+	case HostEventNetworkReceive:
+		if e.Words != ([4]uint32{}) {
+			return errors.New("network receive event contains serial/SMS words")
+		}
+	case HostEventSerialReceive, HostEventSMSReceive:
+		if len(e.Data) != 0 {
+			return errors.New(string(e.Kind) + " event contains network data")
+		}
+	default:
+		return errors.New("unknown host event kind " + string(e.Kind))
+	}
+	return nil
 }
 
 // PointerInputEvent uses the guest's unrotated framebuffer coordinates.
@@ -338,6 +372,12 @@ type FrameBackend interface {
 // InputBackend receives normalized controls rather than host-specific keys.
 type InputBackend interface {
 	QueueInput(InputEvent) error
+}
+
+// HostEventReceiver is an optional synchronous native-host ingress interface.
+// Implementations must serialize delivery with guest execution.
+type HostEventReceiver interface {
+	ReceiveHostEvent(HostEvent) error
 }
 
 type PointerBackend interface {
