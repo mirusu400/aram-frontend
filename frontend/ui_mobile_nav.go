@@ -8,11 +8,50 @@ import (
 
 const mobileDrawerMaxWidth = 360
 
-var mobileQuickCommands = []string{
-	"emu.configure",
-	"emu.pause",
-	"emu.save_state",
-	"emu.stop",
+func mobileQuickCommandIDs(shell *Shell) []string {
+	if shell == nil || shell.input == nil {
+		return []string{"file.open", "file.recent", "emu.configure"}
+	}
+	switch shell.state {
+	case FrontendReady, FrontendStopped:
+		return []string{"emu.start", "emu.load_state", "emu.reset", "emu.configure"}
+	case FrontendRunning:
+		return []string{"emu.pause", "emu.save_state", "emu.load_state", "emu.fast_forward"}
+	case FrontendPaused:
+		return []string{"emu.pause", "emu.load_state", "emu.reset"}
+	default:
+		return []string{"file.open", "emu.configure"}
+	}
+}
+
+// mobileQuickCommands presents only actions that work in the current state.
+// Unsupported commands remain reachable in their full menu category, where
+// the persistent command model can explain that they are unavailable.
+func mobileQuickCommands(shell *Shell) []Command {
+	commands := make([]Command, 0, 4)
+	for _, id := range mobileQuickCommandIDs(shell) {
+		command, found := shell.findCommand(id)
+		if !found || !command.IsEnabled(shell) {
+			continue
+		}
+		// Desktop shortcuts add noise in the touch-first quick section. They stay
+		// visible in the full categories for users with an attached keyboard.
+		command.Shortcut = ""
+		switch id {
+		case "file.open":
+			command.Label = "Open game file"
+		case "emu.configure":
+			command.Label = "Settings"
+		case "emu.pause":
+			if shell.state == FrontendRunning {
+				command.Label = "Pause"
+			} else if shell.state == FrontendPaused {
+				command.Label = "Resume"
+			}
+		}
+		commands = append(commands, command)
+	}
+	return commands
 }
 
 func mobileMenuRootIndex(menus []Menu) int {
@@ -96,14 +135,7 @@ func (u *shellUI) openMobileMenuRoot() {
 
 	body := u.mobileDrawerBody()
 	body.AddChild(u.mobileDrawerSection(u.owner.tr("Quick actions")))
-	for _, id := range mobileQuickCommands {
-		command, found := u.owner.findCommand(id)
-		if !found {
-			continue
-		}
-		if id == "emu.configure" {
-			command.Label = "Settings"
-		}
+	for _, command := range mobileQuickCommands(u.owner) {
 		body.AddChild(u.mobileCommandButton(command))
 	}
 	body.AddChild(u.mobileDrawerSection(u.owner.tr("All commands")))

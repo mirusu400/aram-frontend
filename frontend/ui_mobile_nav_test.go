@@ -1,6 +1,117 @@
 package frontend
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
+
+type mobileQuickActionBackend struct {
+	NullBackend
+	state     BackendState
+	supported map[BackendCommand]bool
+}
+
+func (b *mobileQuickActionBackend) State() BackendState {
+	return b.state
+}
+
+func (b *mobileQuickActionBackend) Supports(command BackendCommand) bool {
+	return b.supported[command]
+}
+
+func (b *mobileQuickActionBackend) Capability(command BackendCommand) Capability {
+	return Capability{Supported: b.Supports(command)}
+}
+
+func newMobileQuickActionShell(state FrontendState, input bool) *Shell {
+	backend := &mobileQuickActionBackend{
+		state: StateReady,
+		supported: map[BackendCommand]bool{
+			CommandStart:       true,
+			CommandPauseResume: true,
+			CommandReset:       true,
+			CommandFastForward: true,
+			CommandLoadState:   true,
+			CommandSaveState:   true,
+		},
+	}
+	shell := &Shell{
+		backend:  backend,
+		state:    state,
+		settings: defaultSettings(),
+		menus:    defaultMenus(),
+	}
+	if input {
+		shell.input = &InputInfo{DisplayName: "game.zip"}
+	}
+	return shell
+}
+
+func quickCommandIDs(commands []Command) []string {
+	ids := make([]string, 0, len(commands))
+	for _, command := range commands {
+		ids = append(ids, command.ID)
+	}
+	return ids
+}
+
+func TestMobileQuickActionsFollowFrontendState(t *testing.T) {
+	tests := []struct {
+		name  string
+		state FrontendState
+		input bool
+		want  []string
+	}{
+		{"empty", FrontendEmpty, false, []string{"file.open", "emu.configure"}},
+		{"ready", FrontendReady, true, []string{"emu.start", "emu.load_state", "emu.reset", "emu.configure"}},
+		{"running", FrontendRunning, true, []string{"emu.pause", "emu.save_state", "emu.load_state", "emu.fast_forward"}},
+		{"paused", FrontendPaused, true, []string{"emu.pause", "emu.load_state", "emu.reset"}},
+		{"stopped", FrontendStopped, true, []string{"emu.start", "emu.load_state", "emu.reset", "emu.configure"}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			shell := newMobileQuickActionShell(test.state, test.input)
+			got := quickCommandIDs(mobileQuickCommands(shell))
+			if !reflect.DeepEqual(got, test.want) {
+				t.Fatalf("quick actions = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestMobileQuickActionsIncludeRecentOnlyWhenAvailable(t *testing.T) {
+	shell := newMobileQuickActionShell(FrontendEmpty, false)
+	shell.settings.RecentFiles = []RecentEntry{{Path: "recent.zip"}}
+
+	got := quickCommandIDs(mobileQuickCommands(shell))
+	want := []string{"file.open", "file.recent", "emu.configure"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("quick actions = %v, want %v", got, want)
+	}
+}
+
+func TestMobileQuickActionsOmitUnsupportedBackendCommands(t *testing.T) {
+	shell := newMobileQuickActionShell(FrontendRunning, true)
+	backend := shell.backend.(*mobileQuickActionBackend)
+	backend.supported = map[BackendCommand]bool{CommandPauseResume: true}
+
+	commands := mobileQuickCommands(shell)
+	if got, want := quickCommandIDs(commands), []string{"emu.pause"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("quick actions = %v, want %v", got, want)
+	}
+	if commands[0].Label != "Pause" || commands[0].Shortcut != "" {
+		t.Fatalf("running pause presentation = label %q, shortcut %q", commands[0].Label, commands[0].Shortcut)
+	}
+
+	shell.state = FrontendPaused
+	commands = mobileQuickCommands(shell)
+	if got, want := quickCommandIDs(commands), []string{"emu.pause", "emu.reset"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("paused quick actions = %v, want %v", got, want)
+	}
+	if commands[0].Label != "Resume" || commands[0].Shortcut != "" {
+		t.Fatalf("paused resume presentation = label %q, shortcut %q", commands[0].Label, commands[0].Shortcut)
+	}
+}
 
 func TestTopChromeHeightUsesOneCompactRowOnTouch(t *testing.T) {
 	if got := topChromeHeightForLayout(true); got != mobileAppBarHeight {
