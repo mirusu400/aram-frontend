@@ -2,6 +2,8 @@ package frontend
 
 import (
 	"encoding/json"
+	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -75,40 +77,46 @@ func TestToggleShowControlsWithPadFlips(t *testing.T) {
 	}
 }
 
-// Touch controls cover the guest by default instead of shrinking it. Loading
-// a settings file written before the option existed must inherit that default,
-// while an explicit off must still survive serialization and loading.
-func TestTouchControlsOverlayDefaultsOnAndPersistsOff(t *testing.T) {
-	if !defaultSettings().TouchControlsOverlay {
-		t.Fatal("touch controls overlay should default on")
+// Android docks touch controls by default so they do not cover the guest;
+// other platforms retain the overlay default. Loading a settings file written
+// before the option existed must inherit the platform default, while an
+// explicit choice must still survive serialization and loading.
+func TestTouchControlsOverlayDefaultMatchesPlatformAndPersists(t *testing.T) {
+	wantDefault := runtime.GOOS != "android"
+	if got := defaultSettings().TouchControlsOverlay; got != wantDefault {
+		t.Fatalf("touch controls overlay default on %s = %t, want %t", runtime.GOOS, got, wantDefault)
 	}
 	legacy := defaultSettings()
 	if err := json.Unmarshal([]byte(`{"theme_mode":"dark"}`), &legacy); err != nil {
 		t.Fatal(err)
 	}
-	if !legacy.TouchControlsOverlay {
-		t.Fatal("legacy settings did not inherit the on default")
+	if legacy.TouchControlsOverlay != wantDefault {
+		t.Fatalf("legacy settings overlay on %s = %t, want %t", runtime.GOOS, legacy.TouchControlsOverlay, wantDefault)
 	}
 
-	blob, err := json.Marshal(Settings{TouchControlsOverlay: false})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(blob), `"touch_controls_overlay":false`) {
-		t.Fatalf("touch_controls_overlay was omitted from %s", blob)
-	}
-	loaded := defaultSettings()
-	if err := json.Unmarshal(blob, &loaded); err != nil {
-		t.Fatal(err)
-	}
-	if loaded.TouchControlsOverlay {
-		t.Fatal("an explicit off did not survive a load over the on default")
+	for _, explicit := range []bool{false, true} {
+		blob, err := json.Marshal(Settings{TouchControlsOverlay: explicit})
+		if err != nil {
+			t.Fatal(err)
+		}
+		wantField := `"touch_controls_overlay":` + strconv.FormatBool(explicit)
+		if !strings.Contains(string(blob), wantField) {
+			t.Fatalf("touch_controls_overlay was omitted from %s", blob)
+		}
+		loaded := defaultSettings()
+		if err := json.Unmarshal(blob, &loaded); err != nil {
+			t.Fatal(err)
+		}
+		if loaded.TouchControlsOverlay != explicit {
+			t.Fatalf("an explicit overlay value %t loaded as %t", explicit, loaded.TouchControlsOverlay)
+		}
 	}
 }
 
 func TestTouchControlsOverlayToggleAndDeckReservation(t *testing.T) {
 	isolateSettings(t)
 	shell := &Shell{settings: defaultSettings()}
+	shell.settings.TouchControlsOverlay = true
 	shell.input = &InputInfo{DisplayName: "loaded.dat"}
 	shell.settings.ShowVirtualKeypad = true
 	const width, height = 1080, 2280

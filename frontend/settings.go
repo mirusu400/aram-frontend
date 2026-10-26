@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"math"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -340,7 +341,7 @@ func defaultSettings() Settings {
 		TitleControllers:      make(map[string]ControllerProfile),
 		UpdateChannel:         string(updateChannelStable),
 		VibrationEnabled:      true,
-		TouchControlsOverlay:  true,
+		TouchControlsOverlay:  runtime.GOOS != "android",
 		TouchDpadCircular:     true,
 		CPUProfile:            defaultCPUProfilingEnabled(),
 		DisplaySync:           true,

@@ -148,8 +148,9 @@ The shell uses the current Ebitengine layout dimensions rather than a fixed
 internal canvas. Modal bounds are centered and clamped to the viewport, long
 configuration categories scroll, and secondary metadata is hidden at compact
 desktop widths. The optional desktop virtual keypad scales within its right
-rail. On mobile, the touch deck overlays the guest viewport by default; its
-Controls option can switch back to a reserved dock below the guest.
+rail. On Android, the touch deck uses a reserved dock below the guest by default;
+on iOS, it overlays the guest viewport by default. The Controls option switches
+between the two layouts.
 
 Mobile keeps two sizes deliberately. Ebitengine reports the native view in
 density-independent pixels, which drives compact breakpoints and preserves the

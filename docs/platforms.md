@@ -79,11 +79,11 @@ decisions and returns the density-scaled pixel size from `Layout`; all shared UI
 metrics and touch bounds are scaled to that same coordinate space. This avoids
 upscaling a low-resolution text atlas on high-density phone displays.
 
-`Touch controls overlay` defaults on and lets the guest keep the full display
-area while the touch deck is painted above it. Turning the option off restores
-the docked layout that reserves space below the guest. This presentation choice
-is independent of `Virtual keypad` and of the controller-connected visibility
-rule.
+`Touch controls overlay` defaults off on Android, keeping the touch deck docked
+below the guest so it does not cover the display. It remains on by default on
+iOS. Turning the option on lets the guest keep the full display area while the
+touch deck is painted above it. This presentation choice is independent of
+`Virtual keypad` and of the controller-connected visibility rule.
 
 The layout editor owns the size and placement of the controls. Steppers set
 how much height the deck footprint takes (`touch_deck_ratio`, 20-65% of the
