@@ -49,9 +49,9 @@ type AudioQueueTelemetry struct {
 	PumpIntervalUS       int  `json:"pump_interval_us"`
 }
 
-// pcmQueue is an infinite PCM stream from the player's point of view. An
-// underrun produces silence, while an overrun drops the oldest complete stereo
-// frames so audio stays synchronized with current guest time.
+// pcmQueue is the player's source stream. Read hands over only the frames the
+// queue holds, while an overrun drops the oldest complete stereo frames so
+// audio stays synchronized with current guest time.
 type pcmQueue struct {
 	mu       sync.Mutex
 	data     []byte
@@ -61,10 +61,13 @@ type pcmQueue struct {
 	// bounds how bad the lag can get; without a target the queue drifts up to
 	// the cap and stays there, so the player hears everything that far behind.
 	// See trimToTarget.
-	targetBytes   int
-	closed        bool
+	targetBytes int
+	closed      bool
+	// underruns counts the times the player found the queue dry, once per
+	// episode. missingBytes is what it asked for at the start of each one.
 	underruns     uint64
 	missingBytes  uint64
+	dry           bool
 	readFrames    uint64
 	trimCredit    int
 	overruns      uint64
@@ -99,14 +102,25 @@ func (q *pcmQueue) Read(destination []byte) (int, error) {
 	// Only whole stereo frames are handed over, so a seam always falls on a
 	// frame boundary and the declick below can reason in frames.
 	count -= count % 4
-	copy(destination, q.data[q.offset:q.offset+count])
-	clear(destination[count:])
-	if missing := len(destination) - count; missing > 0 {
-		q.underruns++
-		q.missingBytes += uint64(missing)
+	// A short read is the honest answer. The player asks for its whole buffer
+	// every time that buffer is below full, not for what it is about to play,
+	// so padding the request with silence wrote a gap into the middle of
+	// continuous sound on almost every refill. The stream then ran ahead of
+	// the guest, the real audio piled up behind it and trimToTarget threw it
+	// away: a constant cycle of inserted silence and skipped sound. The player
+	// keeps playing what it already holds and comes back for more.
+	if count == 0 {
+		if !q.dry && len(destination) >= 4 {
+			q.dry = true
+			q.underruns++
+			q.missingBytes += uint64(len(destination) - len(destination)%4)
+		}
+		return 0, nil
 	}
-	q.declick(destination, count)
-	q.readFrames += uint64(len(destination) / 4)
+	q.dry = false
+	copy(destination, q.data[q.offset:q.offset+count])
+	q.declick(destination[:count], count)
+	q.readFrames += uint64(count / 4)
 	q.offset += count
 	if q.offset == len(q.data) {
 		q.data = q.data[:0]
@@ -115,19 +129,18 @@ func (q *pcmQueue) Read(destination []byte) (int, error) {
 		q.data = append(q.data[:0], q.data[q.offset:]...)
 		q.offset = 0
 	}
-	return len(destination), nil
+	return count, nil
 }
 
-// declick smooths every seam the player is about to hear: the frame where the
-// producer ran out, the frame where it came back, and any frame where the queue
-// itself discarded buffered sound.
+// declick smooths every seam the player is about to hear: any frame where the
+// queue itself discarded buffered sound (a trim, an overrun or a flush).
 //
 // A seam is a step in the waveform, and a step is exactly the click that reads
 // as crackle - the ear is far more sensitive to the discontinuity than to the
 // missing milliseconds around it. Carrying the step forward as an offset that
-// decays over a fraction of a millisecond turns it into a slope, so a short
-// starvation sounds like a dip rather than a tick. realBytes is how much of
-// destination is genuine audio; anything past it is fill.
+// decays over a fraction of a millisecond turns it into a slope. realBytes is
+// how much of destination is genuine audio; anything past it is fill. Read
+// hands over only genuine audio, so its callers pass the whole destination.
 func (q *pcmQueue) declick(destination []byte, realBytes int) {
 	frames := len(destination) / 4
 	realFrames := realBytes / 4

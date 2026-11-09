@@ -28,7 +28,7 @@ func TestEncodeHostPCMConvertsMonoAndSampleRate(t *testing.T) {
 	}
 }
 
-func TestPCMQueuePadsUnderrunWithSilence(t *testing.T) {
+func TestPCMQueueReadsOnlyQueuedFrames(t *testing.T) {
 	queue := newPCMQueue(32)
 	queue.enqueue([]byte{1, 2, 3, 4})
 	destination := make([]byte, 12)
@@ -36,48 +36,102 @@ func TestPCMQueuePadsUnderrunWithSilence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Read: %v", err)
 	}
-	if count != len(destination) {
-		t.Fatalf("Read count = %d, want %d", count, len(destination))
+	if count != 4 {
+		t.Fatalf("Read count = %d, want the 4 queued bytes", count)
 	}
-	want := []byte{1, 2, 3, 4}
-	for index := range want {
-		if destination[index] != want[index] {
-			t.Fatalf("byte %d = %d, want %d", index, destination[index], want[index])
+	for index, want := range []byte{1, 2, 3, 4} {
+		if destination[index] != want {
+			t.Fatalf("byte %d = %d, want %d", index, destination[index], want)
 		}
 	}
-	// The pad eases out of the last real sample instead of stepping to zero,
-	// because the step is the click a starved queue is actually heard as.
-	played := int16(binary.LittleEndian.Uint16(destination[0:]))
-	first := int16(binary.LittleEndian.Uint16(destination[4:]))
-	second := int16(binary.LittleEndian.Uint16(destination[8:]))
-	if first == 0 {
-		t.Fatalf("underrun pad stepped straight to silence")
-	}
-	if absInt16(first) > absInt16(played) || absInt16(second) >= absInt16(first) {
-		t.Fatalf(
-			"underrun pad = %d then %d, want a decay out of %d",
-			first, second, played,
-		)
-	}
-	telemetry := queue.telemetry()
-	if telemetry.Underruns != 1 || telemetry.MissingSamples != 4 {
-		t.Fatalf("underrun telemetry = %+v, want 1 event and 4 samples", telemetry)
+	if telemetry := queue.telemetry(); telemetry.Underruns != 0 {
+		t.Fatalf("a short read counted as an underrun: %+v", telemetry)
 	}
 }
 
-// TestPCMQueueUnderrunFillReachesSilence pins the other half of the property:
-// the eased pad is a short slope, not a permanent tone.
-func TestPCMQueueUnderrunFillReachesSilence(t *testing.T) {
-	queue := newPCMQueue(4_096)
-	queue.enqueue([]byte{0xFF, 0x7F, 0xFF, 0x7F})
-	destination := make([]byte, 4_096)
-	if _, err := queue.Read(destination); err != nil {
-		t.Fatalf("Read: %v", err)
-	}
-	for index := 1_024; index < len(destination); index++ {
-		if destination[index] != 0 {
-			t.Fatalf("byte %d = %d, want silence", index, destination[index])
+// TestPCMQueueCountsEachDryEpisodeOnce pins the underrun telemetry: the player
+// polls a dry queue repeatedly, and that is one starvation, not many.
+func TestPCMQueueCountsEachDryEpisodeOnce(t *testing.T) {
+	queue := newPCMQueue(32)
+	for range 3 {
+		if count, err := queue.Read(make([]byte, 12)); count != 0 || err != nil {
+			t.Fatalf("dry Read = %d, %v; want 0, nil", count, err)
 		}
+	}
+	if telemetry := queue.telemetry(); telemetry.Underruns != 1 || telemetry.MissingSamples != 6 {
+		t.Fatalf("dry telemetry = %+v, want 1 episode asking for 6 samples", telemetry)
+	}
+	queue.enqueue([]byte{1, 2, 3, 4})
+	if count, _ := queue.Read(make([]byte, 12)); count != 4 {
+		t.Fatalf("Read after refill = %d, want 4", count)
+	}
+	_, _ = queue.Read(make([]byte, 12))
+	if telemetry := queue.telemetry(); telemetry.Underruns != 2 {
+		t.Fatalf("second dry episode not counted: %+v", telemetry)
+	}
+}
+
+// TestPCMQueueFeedsAWholeBufferReaderWithoutGaps models how the host player
+// pulls: whenever its buffer is below full it asks for a whole buffer, not for
+// what it is about to play. A producer that keeps pace must reach the player
+// unchanged - no fabricated silence in the middle of the sound and nothing
+// trimmed to make up for it afterwards.
+func TestPCMQueueFeedsAWholeBufferReaderWithoutGaps(t *testing.T) {
+	const (
+		playerFrames   = 2_646 // a 60 ms player buffer
+		framesPerVideo = 735   // 1/60 s at 44.1 kHz
+	)
+	target := pcmBytesForDuration(60 * time.Millisecond)
+	queue := newPCMQueue(audioQueueBytes(60 * time.Millisecond))
+	queue.setTargetBytes(target)
+	produced, expected := 0, 0
+	nextVideoMS := 0.0
+	held, playedFraction := 0, 0.0
+	started := false
+	request := make([]byte, playerFrames*4)
+	for ms := 0; ms < 10_000; ms++ {
+		for nextVideoMS <= float64(ms) {
+			chunk := make([]byte, framesPerVideo*4)
+			for frame := range framesPerVideo {
+				value := uint16(produced%20_000 + 1)
+				binary.LittleEndian.PutUint16(chunk[frame*4:], value)
+				binary.LittleEndian.PutUint16(chunk[frame*4+2:], value)
+				produced++
+			}
+			queue.enqueue(chunk)
+			nextVideoMS += 1000.0 / 60
+		}
+		if !started && queue.availableBytes() < target {
+			continue
+		}
+		started = true
+		for held < playerFrames {
+			count, err := queue.Read(request)
+			if err != nil {
+				t.Fatalf("Read: %v", err)
+			}
+			if count == 0 {
+				break
+			}
+			for frame := 0; frame < count/4; frame++ {
+				got := binary.LittleEndian.Uint16(request[frame*4:])
+				if want := uint16(expected%20_000 + 1); got != want {
+					t.Fatalf("frame %d reached the player as %d, want %d: the stream was padded or cut", expected, got, want)
+				}
+				expected++
+			}
+			held += count / 4
+		}
+		playedFraction += 44.1
+		played := int(playedFraction)
+		playedFraction -= float64(played)
+		held = max(held-played, 0)
+	}
+	if telemetry := queue.telemetry(); telemetry.DroppedFrames != 0 {
+		t.Fatalf("a producer keeping pace lost %d frames to trimming", telemetry.DroppedFrames)
+	}
+	if expected < produced-playerFrames {
+		t.Fatalf("player received %d of %d frames", expected, produced)
 	}
 }
 
