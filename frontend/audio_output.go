@@ -54,6 +54,7 @@ type AudioQueueTelemetry struct {
 // audio stays synchronized with current guest time.
 type pcmQueue struct {
 	mu       sync.Mutex
+	readCond *sync.Cond
 	data     []byte
 	offset   int
 	maxBytes int
@@ -63,11 +64,16 @@ type pcmQueue struct {
 	// See trimToTarget.
 	targetBytes int
 	closed      bool
-	// underruns counts the times the player found the queue dry, once per
-	// episode. missingBytes is what it asked for at the start of each one.
+	// readAheadGrace is how long the player's own buffer can cover an empty
+	// source queue. A wait shorter than this is ordinary read-ahead, not an
+	// audible underrun.
+	readAheadGrace time.Duration
+	now            func() time.Time
+	waitingReaders int
+	// underruns counts producer gaps that outlast the player's read-ahead.
+	// missingBytes is the host-rate stereo PCM absent beyond that grace.
 	underruns     uint64
 	missingBytes  uint64
-	dry           bool
 	readFrames    uint64
 	trimCredit    int
 	overruns      uint64
@@ -87,7 +93,12 @@ type pcmQueue struct {
 }
 
 func newPCMQueue(maxBytes int) *pcmQueue {
-	return &pcmQueue{maxBytes: alignStereoFrame(maxBytes)}
+	queue := &pcmQueue{
+		maxBytes: alignStereoFrame(maxBytes),
+		now:      time.Now,
+	}
+	queue.readCond = sync.NewCond(&queue.mu)
+	return queue
 }
 
 func (q *pcmQueue) Read(destination []byte) (int, error) {
@@ -97,6 +108,30 @@ func (q *pcmQueue) Read(destination []byte) (int, error) {
 	if q.closed && q.offset >= len(q.data) {
 		return 0, io.EOF
 	}
+	if len(destination) < 4 {
+		return 0, nil
+	}
+	waitStarted := time.Time{}
+	for !q.closed && q.offset >= len(q.data) {
+		if waitStarted.IsZero() {
+			waitStarted = q.now()
+		}
+		q.waitingReaders++
+		q.readCond.Wait()
+		q.waitingReaders--
+	}
+	if q.closed && q.offset >= len(q.data) {
+		return 0, io.EOF
+	}
+	if !waitStarted.IsZero() && q.readAheadGrace > 0 {
+		if missing := q.now().Sub(waitStarted) - q.readAheadGrace; missing > 0 {
+			q.underruns++
+			q.missingBytes += uint64(framesForDurationCeil(
+				missing,
+				hostAudioSampleRate,
+			) * 4)
+		}
+	}
 	available := len(q.data) - q.offset
 	count := min(len(destination), available)
 	// Only whole stereo frames are handed over, so a seam always falls on a
@@ -105,19 +140,8 @@ func (q *pcmQueue) Read(destination []byte) (int, error) {
 	// A short read is the honest answer. The player asks for its whole buffer
 	// every time that buffer is below full, not for what it is about to play,
 	// so padding the request with silence wrote a gap into the middle of
-	// continuous sound on almost every refill. The stream then ran ahead of
-	// the guest, the real audio piled up behind it and trimToTarget threw it
-	// away: a constant cycle of inserted silence and skipped sound. The player
-	// keeps playing what it already holds and comes back for more.
-	if count == 0 {
-		if !q.dry && len(destination) >= 4 {
-			q.dry = true
-			q.underruns++
-			q.missingBytes += uint64(len(destination) - len(destination)%4)
-		}
-		return 0, nil
-	}
-	q.dry = false
+	// continuous sound on almost every refill. When the queue is empty, Read
+	// waits for the producer instead of making Oto poll it every millisecond.
 	copy(destination, q.data[q.offset:q.offset+count])
 	q.declick(destination[:count], count)
 	q.readFrames += uint64(count / 4)
@@ -237,6 +261,7 @@ func (q *pcmQueue) enqueue(data []byte) {
 		q.spliceNext = true
 	}
 	q.trimToTarget(len(data))
+	q.readCond.Signal()
 }
 
 // trimToTarget spends a recovery budget proportional to produced PCM time.
@@ -306,6 +331,12 @@ func (q *pcmQueue) setTargetBytes(targetBytes int) {
 	q.targetBytes = alignStereoFrame(targetBytes)
 }
 
+func (q *pcmQueue) setReadAheadGrace(grace time.Duration) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.readAheadGrace = max(grace, 0)
+}
+
 func (q *pcmQueue) setMaxBytes(maxBytes int) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -353,6 +384,7 @@ func (q *pcmQueue) close() {
 	q.closed = true
 	q.data = nil
 	q.offset = 0
+	q.readCond.Broadcast()
 	q.mu.Unlock()
 }
 
@@ -498,6 +530,7 @@ func (o *audioOutput) configure(settings AudioSettings) {
 	o.bufferPlan = planAudioBuffers(latency, o.hostProperties)
 	o.queue.setMaxBytes(audioQueueBytes(latency))
 	o.queue.setTargetBytes(pcmBytesForDuration(o.bufferPlan.queueTarget))
+	o.queue.setReadAheadGrace(o.bufferPlan.player)
 	// Capacity absorbs producer spikes independently from the start target.
 	// Android divides its budget between this target and player read-ahead.
 	o.prebufferBytes = pcmBytesForDuration(o.bufferPlan.queueTarget)
@@ -744,6 +777,13 @@ func (o *audioOutput) flushInternal(reason string) {
 		return
 	}
 	o.flushFrameWork(time.Now())
+	replaceQueue := o.newPlayer != nil
+	if replaceQueue {
+		// Wake a source Read before asking the player to stop reading. Oto waits
+		// for an in-flight Read in PauseAndStopReading, so the opposite order
+		// deadlocks when the queue is waiting for its producer.
+		o.queue.close()
+	}
 	if o.player != nil {
 		o.player.PauseAndStopReading()
 		o.playerError = o.player.Close()
@@ -752,15 +792,15 @@ func (o *audioOutput) flushInternal(reason string) {
 			o.traceEvent("error", "retire player: "+o.playerError.Error())
 		}
 	}
-	if o.newPlayer != nil {
+	if replaceQueue {
 		previous := o.queue.telemetry()
 		o.retiredQueue.Underruns += previous.Underruns
 		o.retiredQueue.MissingSamples += previous.MissingSamples
 		o.retiredQueue.Overruns += previous.Overruns
 		o.retiredQueue.DroppedFrames += previous.DroppedFrames
-		o.queue.close()
 		o.queue = newPCMQueue(audioQueueBytes(o.settings.Latency))
 		o.queue.setTargetBytes(pcmBytesForDuration(o.bufferPlan.queueTarget))
+		o.queue.setReadAheadGrace(o.bufferPlan.player)
 	} else {
 		o.queue.flush()
 	}
@@ -810,10 +850,10 @@ func (o *audioOutput) close() error {
 		return nil
 	}
 	o.flushFrameWork(time.Now())
+	o.queue.close()
 	if o.player != nil {
 		o.player.PauseAndStopReading()
 	}
-	o.queue.close()
 	if o.player == nil {
 		return nil
 	}

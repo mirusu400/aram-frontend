@@ -22,6 +22,29 @@ type bufferedTestPlayer struct {
 	closeErr error
 }
 
+type blockingReadTestPlayer struct {
+	source io.Reader
+	done   chan struct{}
+}
+
+func (p *blockingReadTestPlayer) Play() {
+	go func() {
+		defer close(p.done)
+		buffer := make([]byte, 4*441)
+		for {
+			if _, err := p.source.Read(buffer); err != nil {
+				return
+			}
+		}
+	}()
+}
+func (p *blockingReadTestPlayer) PauseAndStopReading()        { <-p.done }
+func (p *blockingReadTestPlayer) IsPlaying() bool             { return true }
+func (p *blockingReadTestPlayer) SetBufferSize(time.Duration) {}
+func (p *blockingReadTestPlayer) SetVolume(float64)           {}
+func (p *blockingReadTestPlayer) Position() time.Duration     { return 0 }
+func (p *blockingReadTestPlayer) Close() error                { return nil }
+
 func (p *bufferedTestPlayer) Play()                         { p.playing = true }
 func (p *bufferedTestPlayer) PauseAndStopReading()          { p.playing = false; p.stopped = true }
 func (p *bufferedTestPlayer) IsPlaying() bool               { return p.playing }
@@ -91,6 +114,39 @@ func TestAudioGenerationReplacesPlayerAndItsReadAhead(t *testing.T) {
 	}
 	if err := output.close(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestAudioFlushWakesAnInFlightSourceRead(t *testing.T) {
+	var player *blockingReadTestPlayer
+	output := newAudioOutputWithFactory(
+		AudioSettings{Latency: 20 * time.Millisecond},
+		func(source io.Reader) (hostAudioPlayer, error) {
+			player = &blockingReadTestPlayer{source: source, done: make(chan struct{})}
+			return player, nil
+		},
+	)
+	if err := output.enqueue(AudioChunk{
+		SampleRate: hostAudioSampleRate,
+		Channels:   1,
+		PCM16:      make([]int16, 882),
+	}, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	if player == nil {
+		t.Fatal("fixture did not create a player")
+	}
+	waitForPCMQueueReader(t, output.queue)
+
+	flushed := make(chan struct{})
+	go func() {
+		output.flush()
+		close(flushed)
+	}()
+	select {
+	case <-flushed:
+	case <-time.After(time.Second):
+		t.Fatal("flush deadlocked behind the player's blocked source Read")
 	}
 }
 

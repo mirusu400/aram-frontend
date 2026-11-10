@@ -49,25 +49,75 @@ func TestPCMQueueReadsOnlyQueuedFrames(t *testing.T) {
 	}
 }
 
-// TestPCMQueueCountsEachDryEpisodeOnce pins the underrun telemetry: the player
-// polls a dry queue repeatedly, and that is one starvation, not many.
-func TestPCMQueueCountsEachDryEpisodeOnce(t *testing.T) {
+// TestPCMQueueWaitsThroughPlayerReadAhead pins both sides of a dry source read:
+// it blocks instead of making Oto poll every millisecond, and only a producer
+// gap longer than the player's buffered audio is reported as an underrun.
+func TestPCMQueueWaitsThroughPlayerReadAhead(t *testing.T) {
 	queue := newPCMQueue(32)
-	for range 3 {
-		if count, err := queue.Read(make([]byte, 12)); count != 0 || err != nil {
-			t.Fatalf("dry Read = %d, %v; want 0, nil", count, err)
+	queue.setReadAheadGrace(60 * time.Millisecond)
+	now := time.Date(2026, time.November, 10, 12, 0, 0, 0, time.UTC)
+	queue.now = func() time.Time { return now }
+
+	readAfter := func(wait time.Duration) {
+		t.Helper()
+		result := make(chan struct {
+			count int
+			err   error
+		}, 1)
+		go func() {
+			count, err := queue.Read(make([]byte, 12))
+			result <- struct {
+				count int
+				err   error
+			}{count: count, err: err}
+		}()
+		waitForPCMQueueReader(t, queue)
+		queue.mu.Lock()
+		now = now.Add(wait)
+		queue.mu.Unlock()
+		queue.enqueue([]byte{1, 2, 3, 4})
+		got := <-result
+		if got.count != 4 || got.err != nil {
+			t.Fatalf("Read after producer wake = %d, %v; want 4, nil", got.count, got.err)
 		}
 	}
-	if telemetry := queue.telemetry(); telemetry.Underruns != 1 || telemetry.MissingSamples != 6 {
-		t.Fatalf("dry telemetry = %+v, want 1 episode asking for 6 samples", telemetry)
+
+	readAfter(20 * time.Millisecond)
+	if telemetry := queue.telemetry(); telemetry.Underruns != 0 {
+		t.Fatalf("player-buffered wait counted as an underrun: %+v", telemetry)
 	}
-	queue.enqueue([]byte{1, 2, 3, 4})
-	if count, _ := queue.Read(make([]byte, 12)); count != 4 {
-		t.Fatalf("Read after refill = %d, want 4", count)
+	readAfter(80 * time.Millisecond)
+	telemetry := queue.telemetry()
+	if telemetry.Underruns != 1 || telemetry.MissingSamples != 1_764 {
+		t.Fatalf("starvation telemetry = %+v, want 1 event and 1764 samples", telemetry)
 	}
-	_, _ = queue.Read(make([]byte, 12))
-	if telemetry := queue.telemetry(); telemetry.Underruns != 2 {
-		t.Fatalf("second dry episode not counted: %+v", telemetry)
+
+	result := make(chan error, 1)
+	go func() {
+		_, err := queue.Read(make([]byte, 12))
+		result <- err
+	}()
+	waitForPCMQueueReader(t, queue)
+	queue.close()
+	if err := <-result; err != io.EOF {
+		t.Fatalf("close woke blocked Read with %v, want EOF", err)
+	}
+}
+
+func waitForPCMQueueReader(t *testing.T, queue *pcmQueue) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for {
+		queue.mu.Lock()
+		waiting := queue.waitingReaders
+		queue.mu.Unlock()
+		if waiting != 0 {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("queue Read did not block")
+		}
+		time.Sleep(time.Millisecond)
 	}
 }
 
@@ -105,7 +155,7 @@ func TestPCMQueueFeedsAWholeBufferReaderWithoutGaps(t *testing.T) {
 			continue
 		}
 		started = true
-		for held < playerFrames {
+		for held < playerFrames && queue.availableBytes() != 0 {
 			count, err := queue.Read(request)
 			if err != nil {
 				t.Fatalf("Read: %v", err)
