@@ -87,9 +87,11 @@ type analyticsPerformanceSettings struct {
 }
 
 func (settings analyticsPerformanceSettings) sameConfiguration(other analyticsPerformanceSettings) bool {
-	// A measured refresh rate drifts each second. Update the time-weighted
-	// target without making that drift create a new event window.
+	// EffectiveSpeed and DisplaySyncActive are measured scheduler state, not
+	// user configuration. Update the time-weighted target as they change without
+	// making refresh detection split one run into one-second event windows.
 	settings.EffectiveSpeed = other.EffectiveSpeed
+	settings.DisplaySyncActive = other.DisplaySyncActive
 	return settings == other
 }
 

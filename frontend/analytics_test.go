@@ -293,9 +293,13 @@ func TestAnalyticsRefreshRateDriftKeepsMinuteSummary(t *testing.T) {
 	a, clients := newTestAnalytics(true, now)
 	a.beginTitle(OpenRequest{DisplayName: "Synthetic.dat"}, now, AudioQueueTelemetry{})
 	a.milestone(FrontendRunning, InputInfo{}, now, AudioQueueTelemetry{})
-	settings := analyticsPerformanceSettings{RequestedSpeed: 1, EffectiveSpeed: 0.96, DisplaySync: true, DisplaySyncActive: true}
+	settings := analyticsPerformanceSettings{RequestedSpeed: 1, DisplaySync: true}
 	for second := range 60 {
-		settings.EffectiveSpeed = 0.96 + float64(second)*0.00001
+		settings.DisplaySyncActive = second%2 == 0
+		settings.EffectiveSpeed = 1
+		if settings.DisplaySyncActive {
+			settings.EffectiveSpeed = 0.96 + float64(second)*0.00001
+		}
 		a.setRunning(true, settings, now.Add(time.Duration(second)*time.Second), AudioQueueTelemetry{})
 		a.recordFrame(frameRunResult{workFrames: 1, guestAdvanced: time.Second}, now.Add(time.Duration(second+1)*time.Second))
 		a.sampleAudio(now.Add(time.Duration(second+1)*time.Second), AudioQueueTelemetry{})
@@ -306,7 +310,9 @@ func TestAnalyticsRefreshRateDriftKeepsMinuteSummary(t *testing.T) {
 		t.Fatalf("refresh-rate drift flooded events: %d", len(events))
 	}
 	assertAnalyticsProperties(t, events[0], posthog.Properties{"summary_reason": "interval", "frame_work_count": uint64(60), "duration_seconds": float64(60)})
-	if speed := events[0].Properties["effective_speed"].(float64); speed < 0.96 || speed > 0.961 {
+	// Half the samples use the detected 0.96-ish refresh target and half use
+	// the requested 1.0 speed while detection settles.
+	if speed := events[0].Properties["effective_speed"].(float64); speed < 0.9801 || speed > 0.9802 {
 		t.Fatalf("invalid averaged display-sync target: %f", speed)
 	}
 }
