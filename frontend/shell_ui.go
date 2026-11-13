@@ -275,9 +275,9 @@ func (u *shellUI) syncPanel(shell *Shell) {
 		u.syncRecentPanel(shell)
 		return
 	}
-	if (shell.panel.Kind == "tool" ||
-		shell.panel.Kind == "issue-report") &&
-		(len(shell.panel.Fields) > 0 || len(shell.panel.Actions) > 0) {
+	if shell.panel.Kind == externalRequestPanelKind ||
+		((shell.panel.Kind == "tool" || shell.panel.Kind == "issue-report") &&
+			(len(shell.panel.Fields) > 0 || len(shell.panel.Actions) > 0)) {
 		u.syncInteractiveToolPanel(shell)
 		return
 	}

@@ -45,6 +45,7 @@ func (s *Shell) releaseCurrentInput(deleteTemporary bool) error {
 	s.hostPaused = false
 	s.frameGeneration++
 	s.toolGeneration++
+	s.resetExternalRequestPrompt()
 	if s.panel != nil && s.panel.Tool == ToolMemory {
 		s.panel = nil
 	}

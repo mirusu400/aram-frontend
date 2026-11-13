@@ -204,6 +204,10 @@ func (s *Shell) openCompatibilityPanel() {
 
 func (s *Shell) handlePanelShortcuts(control bool) {
 	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
+		if s.panel.Kind == externalRequestPanelKind {
+			s.executeExternalRequestAction("ignore")
+			return
+		}
 		s.panel = nil
 		return
 	}

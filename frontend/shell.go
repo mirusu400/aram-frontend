@@ -56,6 +56,12 @@ type frameRunRequest struct {
 	workTarget time.Duration
 }
 
+type pendingExternalRequest struct {
+	request    ExternalRequest
+	generation uint64
+	failure    string
+}
+
 type Shell struct {
 	backend              Backend
 	picker               Picker
@@ -177,6 +183,8 @@ type Shell struct {
 	faultPrompter             reportPrompter
 	faultPrompted             bool
 	faultPromptGeneration     uint64
+	pendingExternalRequest    *pendingExternalRequest
+	openGuestURL              func(string) error
 	frameWorkerOnce           sync.Once
 	frameAccumulator          time.Duration
 	lastFramePacingAt         time.Time
@@ -289,6 +297,7 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 		frameWorkerWake:           make(chan struct{}, 1),
 		audioPumpWake:             make(chan struct{}, 1),
 		faultReportRequests:       make(chan string, 1),
+		openGuestURL:              openPlatformURL,
 		openStageResults:          make(chan OpenStage, 4),
 		externalOpen:              make(chan OpenRequest, 2),
 		externalOpenStatus:        make(chan string, 4),
@@ -455,6 +464,7 @@ func (s *Shell) Update() error {
 	}
 	s.consumeResults()
 	s.syncBackendState()
+	s.syncExternalRequests()
 	s.syncTouchChrome()
 	s.syncHostLifecycle()
 	s.updateVideo()
@@ -642,7 +652,11 @@ func (s *Shell) handleMouse() {
 func (s *Shell) handlePointerPress(x, y int) {
 	if s.panel != nil {
 		if x >= 760 && x <= 850 && y >= 612 && y <= 648 {
-			s.panel = nil
+			if s.panel.Kind == externalRequestPanelKind {
+				s.executeExternalRequestAction("ignore")
+			} else {
+				s.panel = nil
+			}
 		}
 		return
 	}

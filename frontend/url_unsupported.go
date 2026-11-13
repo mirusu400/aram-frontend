@@ -1,4 +1,4 @@
-//go:build !windows && !linux && !darwin && !android && !ios
+//go:build !windows && !linux && !darwin && !android && !ios && !js
 
 package frontend
 

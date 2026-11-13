@@ -380,6 +380,32 @@ type HostEventReceiver interface {
 	ReceiveHostEvent(HostEvent) error
 }
 
+type ExternalRequestKind string
+
+const (
+	ExternalRequestPhone   ExternalRequestKind = "phone"
+	ExternalRequestSMS     ExternalRequestKind = "sms"
+	ExternalRequestBrowser ExternalRequestKind = "browser"
+)
+
+// ExternalRequest is a guest-requested handset action. Sequence is an opaque,
+// increasing acknowledgement token owned by the backend.
+type ExternalRequest struct {
+	Sequence uint64
+	GuestNS  int64
+	Kind     ExternalRequestKind
+	Target   string
+	Data     []byte
+}
+
+// ExternalRequestBackend exposes a persistent host-action outbox. The frontend
+// acknowledges a request only after the user accepted it, deliberately ignored
+// it, or it was rejected as malformed.
+type ExternalRequestBackend interface {
+	ExternalRequests() []ExternalRequest
+	ClearExternalRequests(through uint64)
+}
+
 type PointerBackend interface {
 	SupportsPointer() bool
 	QueuePointer(PointerInputEvent) error

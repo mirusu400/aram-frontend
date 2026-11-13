@@ -221,6 +221,8 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 			func() {
 				if panel.Kind == "issue-report" {
 					shell.executeIssueReportAction(action.ID, panel.FieldValues)
+				} else if panel.Kind == externalRequestPanelKind {
+					shell.executeExternalRequestAction(action.ID)
 				} else {
 					shell.executeToolAction(action.ID, panel.FieldValues)
 				}
@@ -258,15 +260,23 @@ func (u *shellUI) syncInteractiveToolPanel(shell *Shell) {
 	}
 
 	var toolWindow *widget.Window
+	closeLabel := "Close"
+	if panel.Kind == externalRequestPanelKind {
+		closeLabel = "Ignore"
+	}
 	closeButton := design.button(
-		shell.tr("Close"),
+		shell.tr(closeLabel),
 		design.Components.PrimaryButton,
 		design.Type.Strong,
 		design.px(96),
 		design.Components.PrimaryButton.MinHeight,
 		widget.TextPositionCenter,
 		func() {
-			shell.panel = nil
+			if panel.Kind == externalRequestPanelKind {
+				shell.executeExternalRequestAction("ignore")
+			} else {
+				shell.panel = nil
+			}
 			if toolWindow != nil {
 				toolWindow.Close()
 			}
