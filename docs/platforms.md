@@ -72,6 +72,11 @@ keys included, is a placement slot: `Touch button layout` drags them into
 custom positions stored normalized in `touch_layout`, so a saved arrangement
 survives rotation and resizes.
 
+A focused guest text field temporarily reveals that same phone keypad even
+when the persistent option is off. This makes legacy multi-tap and Korean
+Cheonjiin name entry discoverable, then restores the normal game layout when
+the field loses focus.
+
 The Android/iOS render target is HiDPI-aware. Their native view dimensions
 arrive from Ebitengine in DIP, while `Monitor().DeviceScaleFactor()` identifies
 the backing-surface density. The frontend retains the DIP size for responsive

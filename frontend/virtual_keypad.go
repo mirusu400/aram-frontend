@@ -8,15 +8,22 @@ import (
 )
 
 func (s *Shell) virtualKeypadVisible() bool {
-	return s.settings.ShowVirtualKeypad && !platformUsesTouchLayout()
+	return (s.settings.ShowVirtualKeypad || s.textInputActive()) &&
+		!platformUsesTouchLayout()
 }
 
 // touchKeypadVisible is the same setting on a touch layout, where the keypad
 // joins the on-screen control deck instead of taking a rail beside the guest
 // display. Without it a handset has no way to reach the numeric keys at all.
 func (s *Shell) touchKeypadVisible() bool {
-	return s.settings.ShowVirtualKeypad && platformUsesTouchLayout() &&
+	return (s.settings.ShowVirtualKeypad || s.textInputActive()) &&
+		platformUsesTouchLayout() &&
 		!s.onScreenControlsHidden()
+}
+
+func (s *Shell) textInputActive() bool {
+	backend, ok := s.backend.(TextInputBackend)
+	return ok && backend.TextInputActive()
 }
 
 func virtualKeypadWidthFor(width int) int {
