@@ -2,6 +2,12 @@ package frontend
 
 import "testing"
 
+func TestVirtualKeypadDefaultsOn(t *testing.T) {
+	if !defaultSettings().ShowVirtualKeypad {
+		t.Fatal("the virtual keypad should be on by default")
+	}
+}
+
 type textInputHintBackend struct {
 	NullBackend
 	active bool

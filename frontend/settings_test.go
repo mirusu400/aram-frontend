@@ -137,7 +137,7 @@ func TestSettingsNormalizeRepairsDisplayOptions(t *testing.T) {
 		settings.ThemeMode != "light" ||
 		settings.ScreenLayout != "center" ||
 		settings.Filter != "nearest" ||
-		settings.DisplayEffect != displayEffectFeaturePhoneTFT ||
+		settings.DisplayEffect != displayEffectOff ||
 		settings.DisplayEffectStrength != displayEffectStrengthMax ||
 		settings.StateSlot != 0 ||
 		settings.Speed != 1 {
@@ -160,8 +160,8 @@ func TestDisplayEffectPresetsHaveAStableCycleOrder(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", temporary)
 
 	shell := &Shell{settings: defaultSettings()}
-	if shell.settings.DisplayEffect != displayEffectFeaturePhoneTFT {
-		t.Fatalf("default display effect = %q, want TFT", shell.settings.DisplayEffect)
+	if shell.settings.DisplayEffect != displayEffectOff {
+		t.Fatalf("default display effect = %q, want Original", shell.settings.DisplayEffect)
 	}
 	shell.settings.DisplayEffect = displayEffectCRTTV
 	want := displayEffectChoices()
@@ -224,11 +224,11 @@ func TestTextureFilterCyclesIndependentlyFromDisplayEffect(t *testing.T) {
 		if profile.Filter != filter {
 			t.Fatalf("cycled texture filter = %q, want %q", profile.Filter, filter)
 		}
-		if profile.DisplayEffect != displayEffectFeaturePhoneTFT {
+		if profile.DisplayEffect != displayEffectOff {
 			t.Fatalf("texture filter changed display effect to %q", profile.DisplayEffect)
 		}
 	}
-	if got := shell.displayPresentationValueLabel(); got != "Feature Phone TFT + Nearest" {
+	if got := shell.displayPresentationValueLabel(); got != "Nearest" {
 		t.Fatalf("combined display label = %q", got)
 	}
 }
@@ -315,7 +315,7 @@ func TestDisplayProfilesNormalizeTheirOwnValues(t *testing.T) {
 	if profile.Rotation != 0 ||
 		profile.ScreenLayout != "center" ||
 		profile.Filter != "nearest" ||
-		profile.DisplayEffect != displayEffectFeaturePhoneTFT ||
+		profile.DisplayEffect != displayEffectOff ||
 		profile.DisplayEffectStrength != displayEffectStrengthMin {
 		t.Fatalf("normalized title display profile = %#v", profile)
 	}
@@ -531,6 +531,7 @@ func TestGraphicsSettingsExposePerTitleStrengthSlider(t *testing.T) {
 		settings: defaultSettings(),
 		input:    &InputInfo{DisplayName: "example.dat", SHA256: "abc123"},
 	}
+	shell.settings.DisplayEffect = displayEffectFeaturePhoneTFT
 	u := &shellUI{settingsSection: "Graphics"}
 	var foundScope, foundStrength bool
 	for _, row := range u.settingsRowModels(shell) {
@@ -629,7 +630,7 @@ func TestGraphicsTextureFilterIsIndependentDropdown(t *testing.T) {
 		}
 		row.dropdown.apply(textureFilterIndex(textureFilterLinear))
 		if got := shell.displayProfile(); got.Filter != textureFilterLinear ||
-			got.DisplayEffect != displayEffectFeaturePhoneTFT {
+			got.DisplayEffect != displayEffectOff {
 			t.Fatalf("combined display profile = %#v", got)
 		}
 		return

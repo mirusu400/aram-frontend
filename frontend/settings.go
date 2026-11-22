@@ -323,7 +323,7 @@ func defaultSettings() Settings {
 		PreserveAspect:        true,
 		ScreenLayout:          "center",
 		Filter:                textureFilterNearest,
-		DisplayEffect:         displayEffectFeaturePhoneTFT,
+		DisplayEffect:         displayEffectOff,
 		DisplayEffectStrength: displayEffectStrengthDefault,
 		TitleDisplays:         make(map[string]DisplayProfile),
 		StateSlot:             0,
@@ -339,10 +339,11 @@ func defaultSettings() Settings {
 		GamepadAnalog:         true,
 		GamepadDeadzone:       30,
 		TitleControllers:      make(map[string]ControllerProfile),
+		ShowVirtualKeypad:     true,
 		UpdateChannel:         string(updateChannelStable),
 		VibrationEnabled:      true,
 		TouchControlsOverlay:  runtime.GOOS != "android",
-		TouchDpadCircular:     true,
+		TouchDpadCircular:     false,
 		CPUProfile:            defaultCPUProfilingEnabled(),
 		DisplaySync:           true,
 		AnalyticsEnabled:      true,
@@ -494,7 +495,7 @@ func (profile *DisplayProfile) normalize() {
 	if profile.DisplayEffect == displayEffectFeaturePhoneLegacy {
 		profile.DisplayEffect = displayEffectFeaturePhoneTFT
 	} else if !isDisplayEffectChoice(profile.DisplayEffect) {
-		profile.DisplayEffect = displayEffectFeaturePhoneTFT
+		profile.DisplayEffect = displayEffectOff
 	}
 	profile.DisplayEffectStrength = clampInt(
 		profile.DisplayEffectStrength,

@@ -153,11 +153,10 @@ func TestCircularPadStateFeedsControls(t *testing.T) {
 	}
 }
 
-// The round pad is the shipped default on a touch layout: a thumb steers it
-// far more easily than it hits four separate d-pad keys.
-func TestCircularPadDefaultsOn(t *testing.T) {
-	if !defaultSettings().TouchDpadCircular {
-		t.Fatal("the circular d-pad should be on by default")
+// The digital cross is the shipped default; players can opt into the round pad.
+func TestCircularPadDefaultsOff(t *testing.T) {
+	if defaultSettings().TouchDpadCircular {
+		t.Fatal("the circular d-pad should be off by default")
 	}
 }
 
