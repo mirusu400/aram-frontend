@@ -96,26 +96,9 @@ func virtualKeypadButtonsFor(width, height int, sideKeys bool) []touchButton {
 			{Control: "back", Label: "C"},
 			{},
 		},
-		{
-			{Control: "num1", Label: "1\nㅣ"},
-			{Control: "num2", Label: "2\nㆍ"},
-			{Control: "num3", Label: "3\nㅡ"},
-		},
-		{
-			{Control: "num4", Label: "4\nㄱㅋ"},
-			{Control: "num5", Label: "5\nㄴㄹ"},
-			{Control: "num6", Label: "6\nㄷㅌ"},
-		},
-		{
-			{Control: "num7", Label: "7\nㅂㅍ"},
-			{Control: "num8", Label: "8\nㅅㅎ"},
-			{Control: "num9", Label: "9\nㅈㅊ"},
-		},
-		{
-			{Control: "star", Label: "*"},
-			{Control: "num0", Label: "0\nㅇㅁ"},
-			{Control: "hash", Label: "#"},
-		},
+	}
+	for row, keypadRow := range phoneKeypadLayout() {
+		layout[row+5] = keypadRow
 	}
 
 	buttons := make([]touchButton, 0, rows*columns)

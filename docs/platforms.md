@@ -74,8 +74,9 @@ survives rotation and resizes.
 
 A focused guest text field temporarily reveals that same phone keypad even
 when the persistent option is off. This makes legacy multi-tap and Korean
-Cheonjiin name entry discoverable, then restores the normal game layout when
-the field loses focus.
+Cheonjiin name entry discoverable. Numeric keys show both their Cheonjiin
+glyphs and the conventional English letter groups (ABC through WXYZ), then the
+normal game layout returns when the field loses focus.
 
 The Android/iOS render target is HiDPI-aware. Their native view dimensions
 arrive from Ebitengine in DIP, while `Monitor().DeviceScaleFactor()` identifies

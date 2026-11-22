@@ -62,24 +62,34 @@ func TestTouchDeckKeypadCoversEveryNumericControl(t *testing.T) {
 	}
 }
 
-func TestTouchKeypadShowsCheonjiinLegends(t *testing.T) {
+func TestTouchKeypadShowsCheonjiinAndEnglishLegends(t *testing.T) {
 	want := map[string]string{
-		"num1": "1\nㅣ", "num2": "2\nㆍ", "num3": "3\nㅡ",
-		"num4": "4\nㄱㅋ", "num5": "5\nㄴㄹ", "num6": "6\nㄷㅌ",
-		"num7": "7\nㅂㅍ", "num8": "8\nㅅㅎ", "num9": "9\nㅈㅊ",
-		"num0": "0\nㅇㅁ",
+		"num1": "1\nㅣ\n", "num2": "2\nㆍ\nABC", "num3": "3\nㅡ\nDEF",
+		"num4": "4\nㄱㅋ\nGHI", "num5": "5\nㄴㄹ\nJKL", "num6": "6\nㄷㅌ\nMNO",
+		"num7": "7\nㅂㅍ\nPQRS", "num8": "8\nㅅㅎ\nTUV", "num9": "9\nㅈㅊ\nWXYZ",
+		"num0": "0\nㅇㅁ\n",
 	}
-	buttons := touchControlButtonsWithOptions(1080, 2280, keypadOptions())
-	for _, button := range buttons {
-		if label, ok := want[button.Control]; ok {
-			if button.Label != label {
-				t.Errorf("%s label = %q, want %q", button.Control, button.Label, label)
-			}
-			delete(want, button.Control)
+	layouts := map[string][]touchButton{
+		"touch deck":   touchControlButtonsWithOptions(1080, 2280, keypadOptions()),
+		"desktop rail": virtualKeypadButtonsFor(logicalWidth, logicalHeight, true),
+		"focus mode":   focusControlButtonsFor(390, 844),
+	}
+	for name, buttons := range layouts {
+		remaining := make(map[string]string, len(want))
+		for control, label := range want {
+			remaining[control] = label
 		}
-	}
-	if len(want) != 0 {
-		t.Fatalf("missing Cheonjiin keys: %v", want)
+		for _, button := range buttons {
+			if label, ok := remaining[button.Control]; ok {
+				if button.Label != label {
+					t.Errorf("%s %s label = %q, want %q", name, button.Control, button.Label, label)
+				}
+				delete(remaining, button.Control)
+			}
+		}
+		if len(remaining) != 0 {
+			t.Errorf("%s is missing keypad legends: %v", name, remaining)
+		}
 	}
 }
 

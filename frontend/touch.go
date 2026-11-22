@@ -7,6 +7,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
 
 type touchButton struct {
@@ -457,19 +458,8 @@ func (s *Shell) drawTouchButton(screen *ebiten.Image, button touchButton, active
 		face := s.design.Type.Strong
 		top := centeredTextTop(face, bounds, s.design.Type.CenterNudge)
 		lines := strings.Split(label, "\n")
-		if len(lines) == 2 {
-			lineHeight := max(s.px(10), bounds.Dy()/3)
-			first := image.Rect(
-				bounds.Min.X, bounds.Min.Y+bounds.Dy()/2-lineHeight,
-				bounds.Max.X, bounds.Min.Y+bounds.Dy()/2,
-			)
-			second := image.Rect(
-				bounds.Min.X, first.Max.Y, bounds.Max.X, first.Max.Y+lineHeight,
-			)
-			drawCenteredText(screen, lines[0], face, textColor, first,
-				centeredTextTop(face, first, s.design.Type.CenterNudge))
-			drawCenteredText(screen, lines[1], s.design.Type.Caption, textColor, second,
-				centeredTextTop(s.design.Type.Caption, second, s.design.Type.CenterNudge))
+		if len(lines) > 1 {
+			s.drawTouchButtonLegendLines(screen, bounds, lines, textColor)
 			return
 		}
 		if shadow, ok := retroKeyLegendShadow(s.design.Family, s.design.Palette); ok {
@@ -495,13 +485,81 @@ func (s *Shell) drawTouchButton(screen *ebiten.Image, button touchButton, active
 	ebitenutil.DebugPrintAt(screen, label, textX, textY)
 }
 
-// numericTouchKeys is the handset keypad in reading order: three columns of
-// digits and the star/zero/hash row that closes them.
-var numericTouchKeys = [4][3]struct{ id, label string }{
-	{{"num1", "1\nㅣ"}, {"num2", "2\nㆍ"}, {"num3", "3\nㅡ"}},
-	{{"num4", "4\nㄱㅋ"}, {"num5", "5\nㄴㄹ"}, {"num6", "6\nㄷㅌ"}},
-	{{"num7", "7\nㅂㅍ"}, {"num8", "8\nㅅㅎ"}, {"num9", "9\nㅈㅊ"}},
-	{{"star", "*"}, {"num0", "0\nㅇㅁ"}, {"hash", "#"}},
+// drawTouchButtonLegendLines fits every line inside its own slice of the key.
+// The numeric keypad uses three lines (number, Cheonjiin, English), including
+// on compact and pixel-font layouts where drawing three full-size faces would
+// otherwise clip the bottom legend.
+func (s *Shell) drawTouchButtonLegendLines(
+	screen *ebiten.Image,
+	bounds image.Rectangle,
+	lines []string,
+	textColor color.Color,
+) {
+	for index, line := range lines {
+		if line == "" {
+			continue
+		}
+		lineBounds := image.Rect(
+			bounds.Min.X,
+			bounds.Min.Y+bounds.Dy()*index/len(lines),
+			bounds.Max.X,
+			bounds.Min.Y+bounds.Dy()*(index+1)/len(lines),
+		)
+		face := s.design.Type.Caption
+		if index == 0 {
+			face = s.design.Type.Strong
+		}
+		drawFittedCenteredText(
+			screen,
+			line,
+			face,
+			textColor,
+			lineBounds,
+			s.px(2),
+			s.design.Type.CenterNudge,
+		)
+	}
+}
+
+func drawFittedCenteredText(
+	screen *ebiten.Image,
+	label string,
+	face *text.Face,
+	textColor color.Color,
+	bounds image.Rectangle,
+	horizontalPadding int,
+	nudge int,
+) {
+	width, height := text.Measure(label, *face, 0)
+	if width <= 0 || height <= 0 || bounds.Empty() {
+		return
+	}
+	availableWidth := max(1, bounds.Dx()-horizontalPadding*2)
+	scale := min(
+		1.0,
+		float64(availableWidth)/width,
+		float64(bounds.Dy())/height,
+	)
+	options := &text.DrawOptions{}
+	options.GeoM.Scale(scale, scale)
+	options.GeoM.Translate(
+		float64(bounds.Min.X)+(float64(bounds.Dx())-width*scale)/2,
+		float64(bounds.Min.Y)+(float64(bounds.Dy())-height*scale)/2-float64(nudge)*scale,
+	)
+	options.ColorScale.ScaleWithColor(textColor)
+	text.Draw(screen, label, *face, options)
+}
+
+// phoneKeypadLayout is the single legend source for the desktop rail, the
+// mobile touch deck, and focus mode. The trailing blank line on 1 and 0 keeps
+// their number and Cheonjiin glyph aligned with keys that also carry English.
+func phoneKeypadLayout() [4][3]touchButton {
+	return [4][3]touchButton{
+		{{ID: "num1", Control: "num1", Label: "1\nㅣ\n"}, {ID: "num2", Control: "num2", Label: "2\nㆍ\nABC"}, {ID: "num3", Control: "num3", Label: "3\nㅡ\nDEF"}},
+		{{ID: "num4", Control: "num4", Label: "4\nㄱㅋ\nGHI"}, {ID: "num5", Control: "num5", Label: "5\nㄴㄹ\nJKL"}, {ID: "num6", Control: "num6", Label: "6\nㄷㅌ\nMNO"}},
+		{{ID: "num7", Control: "num7", Label: "7\nㅂㅍ\nPQRS"}, {ID: "num8", Control: "num8", Label: "8\nㅅㅎ\nTUV"}, {ID: "num9", Control: "num9", Label: "9\nㅈㅊ\nWXYZ"}},
+		{{ID: "star", Control: "star", Label: "*"}, {ID: "num0", Control: "num0", Label: "0\nㅇㅁ\n"}, {ID: "hash", Control: "hash", Label: "#"}},
+	}
 }
 
 // numericTouchButtons lays the keypad out as a centered 3x4 grid starting at
@@ -511,19 +569,15 @@ func numericTouchButtons(width, top, size, gap int) []touchButton {
 	gridWidth := size*3 + gap*2
 	left := max(0, (width-gridWidth)/2)
 	buttons := make([]touchButton, 0, 12)
-	for row, keys := range numericTouchKeys {
-		for column, key := range keys {
-			buttons = append(buttons, touchButton{
-				ID:      key.id,
-				Control: key.id,
-				Label:   key.label,
-				Bounds: rectAt(
-					left+column*(size+gap),
-					top+row*(size+gap),
-					size,
-					size,
-				),
-			})
+	for row, keys := range phoneKeypadLayout() {
+		for column, button := range keys {
+			button.Bounds = rectAt(
+				left+column*(size+gap),
+				top+row*(size+gap),
+				size,
+				size,
+			)
+			buttons = append(buttons, button)
 		}
 	}
 	return buttons

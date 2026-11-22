@@ -97,12 +97,7 @@ func focusControlButtonsAtScale(width, height int, scale, renderScale float64) [
 	)
 	gridLeft := width - margin - keyWidth*3 - gap*2
 	gridTop := deckTop + max(margin, (deckHeight-keyHeight*4-gap*3)/2)
-	layout := [4][3]touchButton{
-		{{Control: "num1", Label: "1\nㅣ"}, {Control: "num2", Label: "2\nㆍ"}, {Control: "num3", Label: "3\nㅡ"}},
-		{{Control: "num4", Label: "4\nㄱㅋ"}, {Control: "num5", Label: "5\nㄴㄹ"}, {Control: "num6", Label: "6\nㄷㅌ"}},
-		{{Control: "num7", Label: "7\nㅂㅍ"}, {Control: "num8", Label: "8\nㅅㅎ"}, {Control: "num9", Label: "9\nㅈㅊ"}},
-		{{Control: "star", Label: "*"}, {Control: "num0", Label: "0\nㅇㅁ"}, {Control: "hash", Label: "#"}},
-	}
+	layout := phoneKeypadLayout()
 	for row := range layout {
 		for column := range layout[row] {
 			button := layout[row][column]
