@@ -555,12 +555,13 @@ func (u *shellUI) settingsRowModelsForLayout(
 					},
 				},
 			},
-			{
-				label:       "Backend",
-				description: "Integration currently connected to the frontend.",
-				value:       shorten(shell.backendName(), 24),
-			},
 		}
+		rows = append(rows, handsetClockRowModels(shell)...)
+		rows = append(rows, settingsRowModel{
+			label:       "Backend",
+			description: "Integration currently connected to the frontend.",
+			value:       shorten(shell.backendName(), 24),
+		})
 	}
 
 	return settingsRowsForLayout(rows, touchLayout)
@@ -681,4 +682,50 @@ func virtualKeypadDescription() string {
 		return "Add the number, star, and hash keys to the on-screen controls."
 	}
 	return "Show a clickable phone keypad to the right of the guest display."
+}
+
+// handsetClockRowModels describes the handset clock rows: the mode, and while
+// a custom time is selected, one dropdown for each field of its date.
+func handsetClockRowModels(shell *Shell) []settingsRowModel {
+	rows := []settingsRowModel{{
+		label:       "Handset clock",
+		description: "Date and time a title reads from the handset. Follows this device by default; a custom time keeps running from the moment it is set. Takes effect the next time a title is opened.",
+		dropdown: &settingsDropdownModel{
+			count: 2,
+			label: func(i int) string { return shell.handsetClockModeLabel(i == 1) },
+			value: func() int {
+				if shell.settings.HandsetClockCustom {
+					return 1
+				}
+				return 0
+			},
+			apply: func(i int) { shell.setHandsetClockCustom(i == 1) },
+		},
+	}}
+	if !shell.settings.HandsetClockCustom {
+		return rows
+	}
+	for _, entry := range []struct {
+		field handsetClockField
+		label string
+	}{
+		{handsetClockYear, "Handset clock: year"},
+		{handsetClockMonth, "Handset clock: month"},
+		{handsetClockDay, "Handset clock: day"},
+		{handsetClockHour, "Handset clock: hour"},
+		{handsetClockMinute, "Handset clock: minute"},
+	} {
+		field := entry.field
+		first, count := shell.handsetClockFieldRange(field)
+		rows = append(rows, settingsRowModel{
+			label: entry.label,
+			dropdown: &settingsDropdownModel{
+				count: count,
+				label: func(i int) string { return shell.handsetClockFieldLabel(field, first+i) },
+				value: func() int { return shell.handsetClockFieldValue(field) - first },
+				apply: func(i int) { shell.setHandsetClockField(field, first+i) },
+			},
+		})
+	}
+	return rows
 }

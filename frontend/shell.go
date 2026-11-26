@@ -357,6 +357,11 @@ func NewShell(backend Backend, picker Picker, initialPath string) *Shell {
 			shell.appendLog(shell.tr("Widescreen: ") + err.Error())
 		}
 	}
+	if clock, ok := shell.backend.(ClockBackend); ok {
+		if err := clock.ConfigureClock(shell.currentClockSettings()); err != nil {
+			shell.appendLog(shell.tr("Handset clock: ") + err.Error())
+		}
+	}
 	if applied, err := loadCustomGamepadMappings(); err != nil {
 		shell.appendLog(shell.tr("Controller database: ") + err.Error())
 	} else if applied {

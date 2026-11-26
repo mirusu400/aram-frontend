@@ -174,6 +174,10 @@ type Settings struct {
 	AudioMixMode          bool                      `json:"audio_mix_mode"`
 	AudioSoften           bool                      `json:"audio_soften"`
 	AudioChannels         int                       `json:"audio_channels"`
+	// HandsetClockCustom sets the handset clock apart from this device's clock
+	// by HandsetClockOffsetSeconds. False (the default) follows the device.
+	HandsetClockCustom        bool  `json:"handset_clock_custom,omitempty"`
+	HandsetClockOffsetSeconds int64 `json:"handset_clock_offset_seconds,omitempty"`
 	// AudioLowPower trades audio fidelity for CPU on weak hardware by rendering
 	// SMAF FM synthesis at a reduced sample rate. False (the default) renders
 	// at full quality. Baked into the next machine created, like AudioMixMode.

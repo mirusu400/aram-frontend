@@ -155,7 +155,7 @@ func (u *shellUI) syncSettingsPanel(shell *Shell) {
 		shell.settings.FontChoice,
 		shell.settings.CustomFontPath,
 		shell.settings.CPUChoice,
-	)
+	) + "|" + shell.handsetClockSignature()
 	if signature == u.panelSignature && u.panelWindow != nil {
 		u.refreshSettingsSliders()
 		return

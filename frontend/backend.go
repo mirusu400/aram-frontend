@@ -448,6 +448,20 @@ type CPUBackendSelector interface {
 	AvailableCPUBackends() []string
 }
 
+// ClockSettings selects the date and time a title reads from the handset.
+// Offset is added to this device's clock at the moment a title is opened, so
+// zero means the handset shows the device's own local date and time.
+type ClockSettings struct {
+	Offset time.Duration
+}
+
+// ClockBackend is implemented by backends that can start the guest clock from
+// the device's clock. The selection takes effect the next time a title is
+// opened; a backend that is never configured keeps its own fixed start date.
+type ClockBackend interface {
+	ConfigureClock(ClockSettings) error
+}
+
 // DisplaySettings overrides the guest framebuffer geometry the backend hands to
 // a title. A zero Width and Height keep the device-native size. This is an
 // experimental control: only a title that lays its scene out from the
